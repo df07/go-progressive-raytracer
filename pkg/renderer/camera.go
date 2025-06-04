@@ -42,4 +42,4 @@ func (c *Camera) GetRay(s, t float64) math.Ray {
 		Subtract(c.origin)
 
 	return math.NewRay(c.origin, direction)
-} 
+}
