@@ -14,6 +14,9 @@
 # Go workspace file
 go.work
 
+# Raytracer output
+output/
+
 # IDE and editor files
 .vscode/
 .idea/
