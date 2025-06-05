@@ -5,6 +5,11 @@
 - Write specs before implementing major features
 - Update rules when completing units of work
 
+## Code Quality
+- Always run `go fmt ./...` before checking in
+- Always run `go vet ./...` and fix issues before checking in
+- Run `go test ./...` to ensure all tests pass
+
 ## Testing Guidelines
 - Test edge cases and tricky scenarios, not trivial operations
 - Use table-driven tests for related test cases

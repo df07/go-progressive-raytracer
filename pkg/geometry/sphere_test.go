@@ -2,14 +2,22 @@ package geometry
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 
-	mathpkg "github.com/df07/go-progressive-raytracer/pkg/math"
+	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
+// DummyMaterial for testing - doesn't actually scatter
+type DummyMaterial struct{}
+
+func (d DummyMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+	return core.ScatterResult{}, false
+}
+
 func TestSphere_Hit_Miss(t *testing.T) {
-	sphere := NewSphere(mathpkg.NewVec3(0, 0, 0), 1.0)
-	ray := mathpkg.NewRay(mathpkg.NewVec3(2, 0, 0), mathpkg.NewVec3(0, 1, 0))
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	ray := core.NewRay(core.NewVec3(2, 0, 0), core.NewVec3(0, 1, 0))
 
 	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
 	if isHit {
@@ -18,37 +26,37 @@ func TestSphere_Hit_Miss(t *testing.T) {
 }
 
 func TestSphere_Hit_FrontAndBackFace(t *testing.T) {
-	sphere := NewSphere(mathpkg.NewVec3(0, 0, 0), 1.0)
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
 
 	tests := []struct {
 		name           string
-		rayOrigin      mathpkg.Vec3
-		rayDirection   mathpkg.Vec3
+		rayOrigin      core.Vec3
+		rayDirection   core.Vec3
 		expectedT      float64
 		expectedFront  bool
-		expectedNormal mathpkg.Vec3
+		expectedNormal core.Vec3
 	}{
 		{
 			name:           "front face hit",
-			rayOrigin:      mathpkg.NewVec3(0, 0, 2),
-			rayDirection:   mathpkg.NewVec3(0, 0, -1),
+			rayOrigin:      core.NewVec3(0, 0, 2),
+			rayDirection:   core.NewVec3(0, 0, -1),
 			expectedT:      1.0,
 			expectedFront:  true,
-			expectedNormal: mathpkg.NewVec3(0, 0, 1),
+			expectedNormal: core.NewVec3(0, 0, 1),
 		},
 		{
 			name:           "back face hit",
-			rayOrigin:      mathpkg.NewVec3(0, 0, 0),
-			rayDirection:   mathpkg.NewVec3(0, 0, 1),
+			rayOrigin:      core.NewVec3(0, 0, 0),
+			rayDirection:   core.NewVec3(0, 0, 1),
 			expectedT:      1.0,
 			expectedFront:  false,
-			expectedNormal: mathpkg.NewVec3(0, 0, -1),
+			expectedNormal: core.NewVec3(0, 0, -1),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ray := mathpkg.NewRay(tt.rayOrigin, tt.rayDirection)
+			ray := core.NewRay(tt.rayOrigin, tt.rayDirection)
 			hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
 
 			if !isHit {
@@ -74,15 +82,15 @@ func TestSphere_Hit_FrontAndBackFace(t *testing.T) {
 }
 
 func TestSphere_Hit_GlancingHit(t *testing.T) {
-	sphere := NewSphere(mathpkg.NewVec3(0, 0, 0), 1.0)
-	ray := mathpkg.NewRay(mathpkg.NewVec3(1, 0, 2), mathpkg.NewVec3(0, 0, -1))
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	ray := core.NewRay(core.NewVec3(1, 0, 2), core.NewVec3(0, 0, -1))
 
 	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
 	if !isHit {
 		t.Fatal("Expected glancing hit, but got miss")
 	}
 
-	expectedPoint := mathpkg.NewVec3(1, 0, 0)
+	expectedPoint := core.NewVec3(1, 0, 0)
 	tolerance := 1e-9
 	if math.Abs(hit.Point.X-expectedPoint.X) > tolerance ||
 		math.Abs(hit.Point.Y-expectedPoint.Y) > tolerance ||
@@ -92,8 +100,8 @@ func TestSphere_Hit_GlancingHit(t *testing.T) {
 }
 
 func TestSphere_Hit_Bounds(t *testing.T) {
-	sphere := NewSphere(mathpkg.NewVec3(0, 0, 0), 1.0)
-	ray := mathpkg.NewRay(mathpkg.NewVec3(0, 0, 2), mathpkg.NewVec3(0, 0, -1))
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	ray := core.NewRay(core.NewVec3(0, 0, 2), core.NewVec3(0, 0, -1))
 
 	// Test tMax bound
 	hit, isHit := sphere.Hit(ray, 0.001, 0.5)
@@ -109,8 +117,8 @@ func TestSphere_Hit_Bounds(t *testing.T) {
 }
 
 func TestSphere_Hit_ClosestIntersection(t *testing.T) {
-	sphere := NewSphere(mathpkg.NewVec3(0, 0, 0), 1.0)
-	ray := mathpkg.NewRay(mathpkg.NewVec3(0, 0, 2), mathpkg.NewVec3(0, 0, -1))
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	ray := core.NewRay(core.NewVec3(0, 0, 2), core.NewVec3(0, 0, -1))
 
 	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
 	if !isHit {

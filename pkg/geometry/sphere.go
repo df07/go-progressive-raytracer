@@ -3,25 +3,27 @@ package geometry
 import (
 	"math"
 
-	mathpkg "github.com/df07/go-progressive-raytracer/pkg/math"
+	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
 // Sphere represents a sphere shape
 type Sphere struct {
-	Center mathpkg.Vec3
-	Radius float64
+	Center   core.Vec3
+	Radius   float64
+	Material core.Material
 }
 
 // NewSphere creates a new sphere
-func NewSphere(center mathpkg.Vec3, radius float64) *Sphere {
+func NewSphere(center core.Vec3, radius float64, material core.Material) *Sphere {
 	return &Sphere{
-		Center: center,
-		Radius: radius,
+		Center:   center,
+		Radius:   radius,
+		Material: material,
 	}
 }
 
 // Hit tests if a ray intersects with the sphere
-func (s *Sphere) Hit(ray mathpkg.Ray, tMin, tMax float64) (*HitRecord, bool) {
+func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
 	// Vector from ray origin to sphere center
 	oc := ray.Origin.Subtract(s.Center)
 
@@ -52,10 +54,11 @@ func (s *Sphere) Hit(ray mathpkg.Ray, tMin, tMax float64) (*HitRecord, bool) {
 		}
 	}
 
-	// Create hit record
-	hitRecord := &HitRecord{
-		T:     root,
-		Point: ray.At(root),
+	// Create hit record with material
+	hitRecord := &core.HitRecord{
+		T:        root,
+		Point:    ray.At(root),
+		Material: s.Material,
 	}
 
 	// Calculate outward normal (from center to hit point)

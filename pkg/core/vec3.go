@@ -1,6 +1,9 @@
-package math
+package core
 
-import "math"
+import (
+	"math"
+	"math/rand"
+)
 
 // Vec3 represents a 3D vector
 type Vec3 struct {
@@ -73,4 +76,66 @@ func (v Vec3) Normalize() Vec3 {
 		return Vec3{0, 0, 0}
 	}
 	return Vec3{v.X / length, v.Y / length, v.Z / length}
+}
+
+// Cross returns the cross product of two vectors
+func (v Vec3) Cross(other Vec3) Vec3 {
+	return Vec3{
+		X: v.Y*other.Z - v.Z*other.Y,
+		Y: v.Z*other.X - v.X*other.Z,
+		Z: v.X*other.Y - v.Y*other.X,
+	}
+}
+
+// MultiplyVec returns component-wise multiplication of two vectors
+func (v Vec3) MultiplyVec(other Vec3) Vec3 {
+	return Vec3{
+		X: v.X * other.X,
+		Y: v.Y * other.Y,
+		Z: v.Z * other.Z,
+	}
+}
+
+// Ray represents a ray with an origin and direction
+type Ray struct {
+	Origin    Vec3
+	Direction Vec3
+}
+
+// NewRay creates a new ray
+func NewRay(origin, direction Vec3) Ray {
+	return Ray{Origin: origin, Direction: direction}
+}
+
+// At returns the point at parameter t along the ray
+func (r Ray) At(t float64) Vec3 {
+	return r.Origin.Add(r.Direction.Multiply(t))
+}
+
+// RandomCosineDirection generates a cosine-weighted random direction in hemisphere around normal
+func RandomCosineDirection(normal Vec3, random *rand.Rand) Vec3 {
+	// Generate point in unit disk using uniform random sampling
+	a := 2.0 * math.Pi * random.Float64()
+	z := random.Float64()
+	r := math.Sqrt(z)
+
+	x := r * math.Cos(a)
+	y := r * math.Sin(a)
+	zCoord := math.Sqrt(1.0 - z)
+
+	// Create local coordinate system around normal
+	// Find a vector perpendicular to normal
+	var nt Vec3
+	if math.Abs(normal.X) > 0.1 {
+		nt = NewVec3(0, 1, 0)
+	} else {
+		nt = NewVec3(1, 0, 0)
+	}
+
+	// Create orthonormal basis
+	tangent := nt.Cross(normal).Normalize()
+	bitangent := normal.Cross(tangent)
+
+	// Transform to world space
+	return tangent.Multiply(x).Add(bitangent.Multiply(y)).Add(normal.Multiply(zCoord))
 }
