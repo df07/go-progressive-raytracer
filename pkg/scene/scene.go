@@ -13,9 +13,10 @@ type Scene struct {
 	TopColor    core.Vec3    // Color at top of gradient
 	BottomColor core.Vec3    // Color at bottom of gradient
 	Shapes      []core.Shape // Objects in the scene
+	Lights      []core.Light // Lights in the scene
 }
 
-// NewDefaultScene creates a default scene with gradient background and spheres with materials
+// NewDefaultScene creates a default scene with lighting, gradient background and spheres with materials
 func NewDefaultScene() *Scene {
 	config := renderer.CameraConfig{
 		Center:        core.NewVec3(0, 0.75, 2), // Position camera higher and farther back
@@ -30,14 +31,25 @@ func NewDefaultScene() *Scene {
 
 	camera := renderer.NewCamera(config)
 
+	// Create the scene
+	s := &Scene{
+		Camera:      camera,
+		TopColor:    core.NewVec3(0.5, 0.7, 1.0), // Blue
+		BottomColor: core.NewVec3(1.0, 1.0, 1.0), // White
+		Shapes:      make([]core.Shape, 0),
+		Lights:      make([]core.Light, 0),
+	}
+
+	// Add the specified light: pos [30, 30.5, 15], r: 10, emit: [15.0, 14.0, 13.0]
+	s.AddSphereLight(
+		core.NewVec3(30, 30.5, 15),     // position
+		10,                             // radius
+		core.NewVec3(15.0, 14.0, 13.0), // emission
+	)
+
 	// Create materials
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0))
 	lambertianBlue := material.NewLambertian(core.NewVec3(0.1, 0.2, 0.5))
-	/*lambertianMix := material.NewMix(
-		material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0),
-		material.NewLambertian(core.NewVec3(0.7, 0.3, 0.3)),
-		0.5,
-	)*/
 	metalSilver := material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0)
 	metalGold := material.NewMetal(core.NewVec3(0.8, 0.6, 0.2), 0.3)
 
@@ -47,16 +59,14 @@ func NewDefaultScene() *Scene {
 	sphereRight := geometry.NewSphere(core.NewVec3(1, 0.5, -1), 0.5, metalGold)
 	groundSphere := geometry.NewSphere(core.NewVec3(0, -100, -1), 100, lambertianGreen)
 
-	return &Scene{
-		Camera:      camera,
-		TopColor:    core.NewVec3(0.5, 0.7, 1.0), // Blue
-		BottomColor: core.NewVec3(1.0, 1.0, 1.0), // White
-		Shapes:      []core.Shape{sphereCenter, sphereLeft, sphereRight, groundSphere},
-	}
+	// Add objects to the scene
+	s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundSphere)
+
+	return s
 }
 
 // GetCamera returns the scene's camera
-func (s *Scene) GetCamera() *renderer.Camera {
+func (s *Scene) GetCamera() core.Camera {
 	return s.Camera
 }
 
@@ -68,4 +78,24 @@ func (s *Scene) GetBackgroundColors() (topColor, bottomColor core.Vec3) {
 // GetShapes returns all shapes in the scene
 func (s *Scene) GetShapes() []core.Shape {
 	return s.Shapes
+}
+
+// GetLights returns all lights in the scene
+func (s *Scene) GetLights() []core.Light {
+	return s.Lights
+}
+
+// AddSphereLight adds a spherical light to the scene
+func (s *Scene) AddSphereLight(center core.Vec3, radius float64, emission core.Vec3) {
+	// Create emissive material
+	emissiveMat := material.NewEmissive(emission)
+
+	// Create sphere light for sampling
+	sphereLight := geometry.NewSphereLight(center, radius, emissiveMat)
+
+	// Add to light list for direct lighting
+	s.Lights = append(s.Lights, sphereLight)
+
+	// Add to scene as a regular object for ray intersections
+	s.Shapes = append(s.Shapes, sphereLight.Sphere)
 }

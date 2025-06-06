@@ -26,18 +26,20 @@ func (m MockShape) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool)
 	return m.hitFn(ray, tMin, tMax)
 }
 
-// MockScene implements Scene for testing
+// MockScene implements core.Scene for testing
 type MockScene struct {
 	camera          *Camera
 	shapes          []core.Shape
 	backgroundColor core.Vec3
+	lights          []core.Light
 }
 
-func (m MockScene) GetCamera() *Camera      { return m.camera }
+func (m MockScene) GetCamera() core.Camera  { return m.camera }
 func (m MockScene) GetShapes() []core.Shape { return m.shapes }
 func (m MockScene) GetBackgroundColors() (core.Vec3, core.Vec3) {
 	return m.backgroundColor, m.backgroundColor
 }
+func (m MockScene) GetLights() []core.Light { return m.lights }
 
 func TestRaytracer_DiffuseColorCalculation(t *testing.T) {
 	// Create a scene with a single diffuse surface

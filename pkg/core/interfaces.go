@@ -14,6 +14,40 @@ type Material interface {
 	Scatter(rayIn Ray, hit HitRecord, random *rand.Rand) (ScatterResult, bool)
 }
 
+// Emitter interface for materials that emit light
+type Emitter interface {
+	Emit() Vec3
+}
+
+// Light interface for objects that can be sampled for direct lighting
+type Light interface {
+	Sample(point Vec3, random *rand.Rand) LightSample
+	PDF(point Vec3, direction Vec3) float64
+}
+
+// LightSample contains information about a sampled point on a light
+type LightSample struct {
+	Point     Vec3    // Point on the light source
+	Normal    Vec3    // Normal at the light sample point
+	Direction Vec3    // Direction from shading point to light
+	Distance  float64 // Distance to light
+	Emission  Vec3    // Emitted light
+	PDF       float64 // Probability density of this sample
+}
+
+// Camera interface for cameras to avoid circular imports
+type Camera interface {
+	GetRay(i, j int) Ray
+}
+
+// Scene interface for scene management
+type Scene interface {
+	GetCamera() Camera
+	GetBackgroundColors() (topColor, bottomColor Vec3)
+	GetShapes() []Shape
+	GetLights() []Light
+}
+
 // ScatterResult contains the result of material scattering
 type ScatterResult struct {
 	Scattered   Ray     // The scattered ray

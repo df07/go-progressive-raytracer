@@ -3,6 +3,7 @@ package renderer
 import (
 	"image"
 	"image/color"
+	"math"
 	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -24,22 +25,15 @@ func DefaultSamplingConfig() SamplingConfig {
 
 // Raytracer handles the rendering process
 type Raytracer struct {
-	scene  Scene
+	scene  core.Scene
 	width  int
 	height int
 	config SamplingConfig
 	random *rand.Rand
 }
 
-// Scene interface to avoid circular imports
-type Scene interface {
-	GetCamera() *Camera
-	GetBackgroundColors() (topColor, bottomColor core.Vec3)
-	GetShapes() []core.Shape
-}
-
 // NewRaytracer creates a new raytracer
-func NewRaytracer(scene Scene, width, height int) *Raytracer {
+func NewRaytracer(scene core.Scene, width, height int) *Raytracer {
 	return &Raytracer{
 		scene:  scene,
 		width:  width,
@@ -124,18 +118,106 @@ func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int) core.Vec3 {
 		return rt.backgroundGradient(r)
 	}
 
+	// Start with emitted light from the hit material
+	colorEmitted := rt.getEmittedLight(hit)
+
 	// Try to scatter the ray
 	scatter, didScatter := hit.Material.Scatter(r, *hit, rt.random)
 	if !didScatter {
-		return core.Vec3{X: 0, Y: 0, Z: 0} // Material absorbed the ray
+		// Material absorbed the ray, only return emitted light
+		return colorEmitted
 	}
 
 	// Handle scattering based on material type
+	var colorScattered core.Vec3
 	if scatter.IsSpecular() {
-		return rt.calculateSpecularColor(scatter, depth)
+		colorScattered = rt.calculateSpecularColor(scatter, depth)
 	} else {
-		return rt.calculateDiffuseColor(scatter, hit, depth)
+		// Combine direct lighting and indirect lighting using Multiple Importance Sampling
+		directLight := rt.calculateDirectLighting(rt.scene, scatter, hit)
+		indirectLight := rt.calculateIndirectLighting(rt.scene, scatter, hit, depth)
+		colorScattered = directLight.Add(indirectLight)
 	}
+
+	// Return emitted + scattered light
+	return colorEmitted.Add(colorScattered)
+}
+
+// getEmittedLight returns the emitted light from a material if it's emissive
+func (rt *Raytracer) getEmittedLight(hit *core.HitRecord) core.Vec3 {
+	if emitter, isEmissive := hit.Material.(core.Emitter); isEmissive {
+		return emitter.Emit()
+	}
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// calculateDirectLighting samples lights directly for direct illumination
+func (rt *Raytracer) calculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord) core.Vec3 {
+	lights := scene.GetLights()
+
+	// Sample a light
+	lightSample, hasLight := core.SampleLight(lights, hit.Point, rt.random)
+	if !hasLight {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Check if light is visible (shadow ray)
+	shadowRay := core.NewRay(hit.Point, lightSample.Direction)
+	_, blocked := rt.hitWorld(shadowRay, 0.001, lightSample.Distance-0.001)
+	if blocked {
+		// Light is blocked, no direct contribution
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Calculate the cosine factor
+	cosine := lightSample.Direction.Dot(hit.Normal)
+	if cosine <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0} // Light is behind the surface
+	}
+
+	// Get material PDF for this direction (for MIS)
+	materialPDF := cosine / math.Pi // Lambertian PDF: cos(θ)/π
+
+	// Calculate MIS weight
+	misWeight := core.PowerHeuristic(1, lightSample.PDF, 1, materialPDF)
+
+	// Calculate BRDF value (for Lambertian: albedo/π)
+	brdf := scatter.Attenuation
+
+	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
+	if lightSample.PDF > 0 {
+		contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
+		return contribution
+	}
+
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// calculateIndirectLighting handles indirect illumination via material sampling
+func (rt *Raytracer) calculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int) core.Vec3 {
+	if scatter.PDF <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	scatterDirection := scatter.Scattered.Direction.Normalize()
+	cosine := scatterDirection.Dot(hit.Normal)
+	if cosine <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Get light PDF for this direction (for MIS)
+	lights := scene.GetLights()
+	lightPDF := core.CalculateLightPDF(lights, hit.Point, scatterDirection)
+
+	// Calculate MIS weight
+	misWeight := core.PowerHeuristic(1, scatter.PDF, 1, lightPDF)
+
+	// Get incoming light from the scattered direction
+	incomingLight := rt.rayColorRecursive(scatter.Scattered, depth-1)
+
+	// Indirect lighting contribution with MIS
+	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)
+	return contribution
 }
 
 // vec3ToColor converts a Vec3 color to RGBA with proper clamping and gamma correction
