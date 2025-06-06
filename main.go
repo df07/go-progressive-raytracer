@@ -37,8 +37,10 @@ func main() {
 	})
 
 	// Render one pass
-	fmt.Println("Rendering...")
+	startTime := time.Now()
 	img := raytracer.RenderPass()
+	renderTime := time.Since(startTime)
+	fmt.Printf("Render completed in %v\n", renderTime)
 
 	// Create timestamped filename
 	timestamp := time.Now().Format("20060102_150405")
