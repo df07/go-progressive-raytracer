@@ -41,7 +41,17 @@ func (m MockScene) GetBackgroundColors() (core.Vec3, core.Vec3) {
 
 func TestRaytracer_DiffuseColorCalculation(t *testing.T) {
 	// Create a scene with a single diffuse surface
-	camera := NewCamera()
+	config := CameraConfig{
+		Center:        core.NewVec3(0, 0, 0),
+		LookAt:        core.NewVec3(0, 0, -1),
+		Up:            core.NewVec3(0, 1, 0),
+		Width:         400,
+		AspectRatio:   16.0 / 9.0,
+		VFov:          45.0,
+		Aperture:      0.0,
+		FocusDistance: 1.0,
+	}
+	camera := NewCamera(config)
 
 	// Create a mock material that always scatters with known values
 	material := &MockMaterial{
@@ -120,7 +130,17 @@ func TestRaytracer_DiffuseColorCalculation(t *testing.T) {
 
 func TestRaytracer_SpecularColorCalculation(t *testing.T) {
 	// Create a scene with a single specular surface
-	camera := NewCamera()
+	config := CameraConfig{
+		Center:        core.NewVec3(0, 0, 0),
+		LookAt:        core.NewVec3(0, 0, -1),
+		Up:            core.NewVec3(0, 1, 0),
+		Width:         400,
+		AspectRatio:   16.0 / 9.0,
+		VFov:          45.0,
+		Aperture:      0.0,
+		FocusDistance: 1.0,
+	}
+	camera := NewCamera(config)
 
 	scene := &MockScene{
 		camera:          camera,
@@ -151,7 +171,17 @@ func TestRaytracer_SpecularColorCalculation(t *testing.T) {
 }
 
 func TestRaytracer_RecursiveRayColor(t *testing.T) {
-	camera := NewCamera()
+	config := CameraConfig{
+		Center:        core.NewVec3(0, 0, 0),
+		LookAt:        core.NewVec3(0, 0, -1),
+		Up:            core.NewVec3(0, 1, 0),
+		Width:         400,
+		AspectRatio:   16.0 / 9.0,
+		VFov:          45.0,
+		Aperture:      0.0,
+		FocusDistance: 1.0,
+	}
+	camera := NewCamera(config)
 
 	// Test depth limiting
 	scene := &MockScene{

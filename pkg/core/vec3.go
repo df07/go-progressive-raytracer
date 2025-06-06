@@ -139,3 +139,15 @@ func RandomCosineDirection(normal Vec3, random *rand.Rand) Vec3 {
 	// Transform to world space
 	return tangent.Multiply(x).Add(bitangent.Multiply(y)).Add(normal.Multiply(zCoord))
 }
+
+// RandomInUnitDisk generates a random point in a unit disk (for depth of field)
+func RandomInUnitDisk(random *rand.Rand) Vec3 {
+	for {
+		// Generate random point in [-1,1] x [-1,1] square
+		p := NewVec3(2*random.Float64()-1, 2*random.Float64()-1, 0)
+		// Accept if inside unit disk
+		if p.Dot(p) <= 1.0 {
+			return p
+		}
+	}
+}

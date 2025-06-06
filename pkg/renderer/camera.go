@@ -1,45 +1,122 @@
 package renderer
 
 import (
+	"math"
+	"math/rand"
+
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
-// Camera generates rays for rendering
-type Camera struct {
-	origin          core.Vec3
-	lowerLeftCorner core.Vec3
-	horizontal      core.Vec3
-	vertical        core.Vec3
+// CameraConfig contains all camera configuration parameters
+type CameraConfig struct {
+	// Camera positioning
+	Center core.Vec3 // Camera position
+	LookAt core.Vec3 // Point the camera is looking at
+	Up     core.Vec3 // Up direction (usually (0,1,0))
+
+	// Image properties
+	Width       int     // Image width in pixels
+	AspectRatio float64 // Aspect ratio (width/height)
+	VFov        float64 // Vertical field of view in degrees
+
+	// Focus properties
+	Aperture      float64 // Angle of defocus blur (0 = no blur)
+	FocusDistance float64 // Distance to focus plane (0 = auto-calculate from LookAt)
 }
 
-// NewCamera creates a simple camera
-func NewCamera() *Camera {
-	aspectRatio := 16.0 / 9.0
-	viewportHeight := 2.0
-	viewportWidth := aspectRatio * viewportHeight
-	focalLength := 1.0
+// Camera generates rays for rendering with configurable positioning and depth of field
+type Camera struct {
+	center       core.Vec3 // Camera position
+	pixel00Loc   core.Vec3 // Location of pixel (0,0)
+	pixelDeltaU  core.Vec3 // Offset to pixel to the right
+	pixelDeltaV  core.Vec3 // Offset to pixel below
+	defocusDiskU core.Vec3 // Defocus disk horizontal radius
+	defocusDiskV core.Vec3 // Defocus disk vertical radius
+	random       *rand.Rand
+}
 
-	origin := core.NewVec3(0, 0, 0)
-	horizontal := core.NewVec3(viewportWidth, 0, 0)
-	vertical := core.NewVec3(0, viewportHeight, 0)
-	lowerLeftCorner := origin.Subtract(horizontal.Multiply(0.5)).
-		Subtract(vertical.Multiply(0.5)).
-		Subtract(core.NewVec3(0, 0, focalLength))
+// NewCamera creates a camera with the given configuration
+func NewCamera(config CameraConfig) *Camera {
+	// Calculate camera coordinate system
+	w := config.Center.Subtract(config.LookAt).Normalize() // Camera looks along -w
+	u := config.Up.Cross(w).Normalize()                    // Right vector
+	v := w.Cross(u)                                        // Up vector
+
+	// Calculate focus distance - auto-calculate from LookAt if not specified
+	focusDistance := config.FocusDistance
+	if focusDistance <= 0 {
+		focusDistance = config.Center.Subtract(config.LookAt).Length()
+	}
+
+	imageHeight := int(float64(config.Width) / config.AspectRatio) // Calculate height from width
+
+	// Calculate viewport dimensions
+	theta := config.VFov * math.Pi / 180.0 // Convert degrees to radians
+	h := math.Tan(theta / 2.0)
+	viewportHeight := 2.0 * h * focusDistance
+	viewportWidth := viewportHeight * config.AspectRatio
+
+	// Calculate the vectors across the horizontal and down the vertical viewport edges
+	viewportU := u.Multiply(viewportWidth)   // Vector across viewport horizontal edge
+	viewportV := v.Multiply(-viewportHeight) // Vector up viewport vertical edge
+
+	// Calculate the horizontal and vertical delta vectors from pixel to pixel
+	pixelDeltaU := viewportU.Multiply(1.0 / float64(config.Width))
+	pixelDeltaV := viewportV.Multiply(1.0 / float64(imageHeight))
+
+	// Calculate the location of the upper left pixel
+	halfViewportU := viewportU.Multiply(0.5)
+	halfViewportV := viewportV.Multiply(0.5)
+	viewportUpperLeft := config.Center.
+		Subtract(w.Multiply(focusDistance)).
+		Subtract(halfViewportU).
+		Subtract(halfViewportV)
+
+	pixel00Loc := viewportUpperLeft.Add(pixelDeltaU.Add(pixelDeltaV).Multiply(0.5))
+
+	// Calculate defocus disk basis vectors
+	defocusDiskU := u.Multiply(config.Aperture / 2)
+	defocusDiskV := v.Multiply(config.Aperture / 2)
 
 	return &Camera{
-		origin:          origin,
-		horizontal:      horizontal,
-		vertical:        vertical,
-		lowerLeftCorner: lowerLeftCorner,
+		center:       config.Center,
+		pixel00Loc:   pixel00Loc,
+		pixelDeltaU:  pixelDeltaU,
+		pixelDeltaV:  pixelDeltaV,
+		defocusDiskU: defocusDiskU,
+		defocusDiskV: defocusDiskV,
+		random:       rand.New(rand.NewSource(42)), // Deterministic for consistent results
 	}
 }
 
-// GetRay generates a ray for screen coordinates (s, t) where 0 <= s,t <= 1
-func (c *Camera) GetRay(s, t float64) core.Ray {
-	direction := c.lowerLeftCorner.
-		Add(c.horizontal.Multiply(s)).
-		Add(c.vertical.Multiply(t)).
-		Subtract(c.origin)
+// GetRay generates a ray for pixel coordinates (i, j) with sub-pixel sampling
+func (c *Camera) GetRay(i, j int) core.Ray {
+	// Add random offset for anti-aliasing
+	jitter := core.NewVec3(c.random.Float64()-0.5, c.random.Float64()-0.5, 0)
+	pixelSample := c.pixel00Loc.
+		Add(c.pixelDeltaU.Multiply(float64(i) + jitter.X)).
+		Add(c.pixelDeltaV.Multiply(float64(j) + jitter.Y))
 
-	return core.NewRay(c.origin, direction)
+	// Determine ray origin (with defocus blur if enabled)
+	rayOrigin := c.center
+	if c.defocusDiskU.Length() > 0 {
+		p := core.RandomInUnitDisk(c.random)
+		offset := c.defocusDiskU.Multiply(p.X).Add(c.defocusDiskV.Multiply(p.Y))
+		rayOrigin = c.center.Add(offset)
+	}
+
+	rayDirection := pixelSample.Subtract(rayOrigin)
+	return core.NewRay(rayOrigin, rayDirection)
+}
+
+// GetRayNormalized generates a ray for normalized screen coordinates (s, t) where 0 <= s,t <= 1
+// This method maintains compatibility with existing code
+func (c *Camera) GetRayNormalized(s, t float64) core.Ray {
+	// Convert normalized coordinates to pixel coordinates
+	// Assume default image dimensions for backward compatibility
+	width := 400.0
+	height := 225.0
+	i := int(s * width)
+	j := int(t * height)
+	return c.GetRay(i, j)
 }

@@ -30,6 +30,12 @@ func main() {
 	height := 225 // 16:9 aspect ratio
 	raytracer := renderer.NewRaytracer(defaultScene, width, height)
 
+	// Use fewer samples for faster rendering during development
+	raytracer.SetSamplingConfig(renderer.SamplingConfig{
+		SamplesPerPixel: 50, // Reduced for faster iteration
+		MaxDepth:        25, // Reduced for faster iteration
+	})
+
 	// Render one pass
 	fmt.Println("Rendering...")
 	img := raytracer.RenderPass()
@@ -51,5 +57,5 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Sphere render saved as %s\n", filename)
+	fmt.Printf("Render saved as %s\n", filename)
 }

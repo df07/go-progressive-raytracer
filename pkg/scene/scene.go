@@ -17,7 +17,18 @@ type Scene struct {
 
 // NewDefaultScene creates a default scene with gradient background and spheres with materials
 func NewDefaultScene() *Scene {
-	camera := renderer.NewCamera()
+	config := renderer.CameraConfig{
+		Center:        core.NewVec3(0, 0.75, 2), // Position camera higher and farther back
+		LookAt:        core.NewVec3(0, 0.5, -1), // Look at the sphere center
+		Up:            core.NewVec3(0, 1, 0),    // Standard up direction
+		Width:         400,
+		AspectRatio:   16.0 / 9.0,
+		VFov:          40.0, // Narrower field of view for focus effect
+		Aperture:      0.05, // Strong depth of field blur
+		FocusDistance: 0.0,  // Auto-calculate focus distance
+	}
+
+	camera := renderer.NewCamera(config)
 
 	// Create materials
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0))
@@ -31,10 +42,10 @@ func NewDefaultScene() *Scene {
 	metalGold := material.NewMetal(core.NewVec3(0.8, 0.6, 0.2), 0.3)
 
 	// Create spheres with different materials
-	sphereCenter := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertianBlue)
-	sphereLeft := geometry.NewSphere(core.NewVec3(-1, 0, -1), 0.5, metalSilver)
-	sphereRight := geometry.NewSphere(core.NewVec3(1, 0, -1), 0.5, metalGold)
-	groundSphere := geometry.NewSphere(core.NewVec3(0, -100.5, -1), 100, lambertianGreen)
+	sphereCenter := geometry.NewSphere(core.NewVec3(0, 0.5, -1), 0.5, lambertianBlue)
+	sphereLeft := geometry.NewSphere(core.NewVec3(-1, 0.5, -1), 0.5, metalSilver)
+	sphereRight := geometry.NewSphere(core.NewVec3(1, 0.5, -1), 0.5, metalGold)
+	groundSphere := geometry.NewSphere(core.NewVec3(0, -100, -1), 100, lambertianGreen)
 
 	return &Scene{
 		Camera:      camera,

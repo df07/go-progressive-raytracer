@@ -159,18 +159,14 @@ func (rt *Raytracer) RenderPass() *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, rt.width, rt.height))
 	camera := rt.scene.GetCamera()
 
-	for j := rt.height - 1; j >= 0; j-- {
+	for j := 0; j < rt.height; j++ {
 		for i := 0; i < rt.width; i++ {
 			// Accumulate color from multiple samples
 			colorAccum := core.Vec3{X: 0, Y: 0, Z: 0}
 
 			for sample := 0; sample < rt.config.SamplesPerPixel; sample++ {
-				// Convert pixel coordinates to normalized coordinates with jitter
-				s := (float64(i) + rt.random.Float64()) / float64(rt.width)
-				t := (float64(j) + rt.random.Float64()) / float64(rt.height)
-
-				// Get the ray for this jittered pixel
-				ray := camera.GetRay(s, t)
+				// Get the ray for this pixel (camera handles jittering internally)
+				ray := camera.GetRay(i, j)
 
 				// Calculate the color and accumulate
 				colorAccum = colorAccum.Add(rt.rayColorRecursive(ray, rt.config.MaxDepth))
@@ -181,7 +177,7 @@ func (rt *Raytracer) RenderPass() *image.RGBA {
 			pixelColor := rt.vec3ToColor(colorVec)
 
 			// Set the pixel
-			img.SetRGBA(i, rt.height-1-j, pixelColor)
+			img.SetRGBA(i, j, pixelColor)
 		}
 	}
 
