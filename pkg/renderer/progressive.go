@@ -73,6 +73,12 @@ func NewProgressiveRaytracer(scene core.Scene, width, height int, config Progres
 
 // getSamplesForPass calculates the target total samples for a given pass
 func (pr *ProgressiveRaytracer) getSamplesForPass(passNumber int) int {
+	// Special case: if only 1 pass, use all samples
+	if pr.config.MaxPasses == 1 {
+		return pr.config.MaxSamplesPerPixel
+	}
+
+	// For multiple passes: first pass is quick preview
 	if passNumber == 1 {
 		return pr.config.InitialSamples // Always 1 for quick preview
 	}
