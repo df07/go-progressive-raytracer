@@ -154,11 +154,19 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int) (*image.RGBA, RenderS
 	return img, stats, nil
 }
 
-// RenderProgressive renders multiple progressive passes and returns all images
-func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStats, error) {
-	var images []*image.RGBA
-	var allStats []RenderStats
+// PassResult contains the result of a single pass
+type PassResult struct {
+	PassNumber int
+	Image      *image.RGBA
+	Stats      RenderStats
+	IsLast     bool
+}
 
+// PassCallback is called after each pass completes
+type PassCallback func(result PassResult) error
+
+// RenderProgressiveWithCallback renders multiple progressive passes, calling the callback after each pass
+func (pr *ProgressiveRaytracer) RenderProgressiveWithCallback(callback PassCallback) error {
 	fmt.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
 
 	// Ensure worker pool is cleaned up when we're done
@@ -169,7 +177,7 @@ func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStat
 
 		img, stats, err := pr.RenderPass(pass)
 		if err != nil {
-			return images, allStats, err
+			return err
 		}
 
 		passTime := time.Since(startTime)
@@ -178,8 +186,18 @@ func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStat
 		fmt.Printf("Pass %d completed in %v (actual: %d samples/pixel)\n",
 			pass, passTime, actualSamples)
 
-		images = append(images, img)
-		allStats = append(allStats, stats)
+		// Call the callback with this pass result
+		isLast := pass == pr.config.MaxPasses || actualSamples >= pr.config.MaxSamplesPerPixel
+		result := PassResult{
+			PassNumber: pass,
+			Image:      img,
+			Stats:      stats,
+			IsLast:     isLast,
+		}
+
+		if err := callback(result); err != nil {
+			return fmt.Errorf("callback error: %v", err)
+		}
 
 		// Check if we've reached maximum samples
 		if actualSamples >= pr.config.MaxSamplesPerPixel {
@@ -188,7 +206,22 @@ func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStat
 		}
 	}
 
-	return images, allStats, nil
+	return nil
+}
+
+// RenderProgressive renders multiple progressive passes and returns all images
+func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStats, error) {
+	var images []*image.RGBA
+	var allStats []RenderStats
+
+	// Use the callback version to collect all results
+	err := pr.RenderProgressiveWithCallback(func(result PassResult) error {
+		images = append(images, result.Image)
+		allStats = append(allStats, result.Stats)
+		return nil
+	})
+
+	return images, allStats, err
 }
 
 // assembleCurrentImage creates an image from the current state of the shared pixel stats

@@ -167,7 +167,7 @@ func renderImage(config Config, sceneInfo SceneInfo, raytracer *renderer.Raytrac
 	}
 }
 
-// renderProgressive handles progressive rendering
+// renderProgressive handles progressive rendering with immediate file saving
 func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) RenderResult {
 	fmt.Println("Using progressive rendering...")
 
@@ -178,22 +178,49 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 
 	progressiveRT := renderer.NewProgressiveRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height, progressiveConfig)
 
-	images, allStats, err := progressiveRT.RenderProgressive()
+	// Create output directory
+	outputDir := createOutputDir(config.SceneType)
+	baseFilename := fmt.Sprintf("render_%s", timestamp)
+
+	var finalImage *image.RGBA
+	var finalStats renderer.RenderStats
+
+	// Use callback to save images immediately as they complete
+	err := progressiveRT.RenderProgressiveWithCallback(func(result renderer.PassResult) error {
+		// Save intermediate passes (not the final one)
+		if !result.IsLast {
+			passFilename := filepath.Join(outputDir, fmt.Sprintf("%s_pass_%02d.png", baseFilename, result.PassNumber))
+			if err := saveImageToFile(result.Image, passFilename); err != nil {
+				fmt.Printf("Warning: Failed to save pass %d image: %v\n", result.PassNumber, err)
+			}
+		} else {
+			// Save final image
+			finalFilename := filepath.Join(outputDir, fmt.Sprintf("%s.png", baseFilename))
+			if err := saveImageToFile(result.Image, finalFilename); err != nil {
+				return fmt.Errorf("failed to save final image: %v", err)
+			}
+		}
+
+		// Keep track of final result
+		finalImage = result.Image
+		finalStats = result.Stats
+
+		return nil
+	})
+
 	if err != nil {
 		fmt.Printf("Error during progressive rendering: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(images) == 0 {
+	if finalImage == nil {
 		fmt.Println("No images were rendered")
 		os.Exit(1)
 	}
 
 	return RenderResult{
-		Image:     images[len(images)-1],
-		Stats:     allStats[len(allStats)-1],
-		Images:    images,
-		AllStats:  allStats,
+		Image:     finalImage,
+		Stats:     finalStats,
 		Timestamp: timestamp,
 	}
 }
@@ -217,12 +244,12 @@ func renderNormal(config Config, raytracer *renderer.Raytracer, timestamp string
 
 // saveResults saves all the rendered images
 func saveResults(config Config, result RenderResult, outputDir string) {
-	// Save progressive pass images if applicable
+	// Progressive mode handles its own file saving in the callback
 	if config.RenderMode == "progressive" {
-		saveProgressiveImages(result, outputDir)
+		return
 	}
 
-	// Save final image
+	// Save final image for normal mode
 	filename := filepath.Join(outputDir, fmt.Sprintf("render_%s.png", result.Timestamp))
 	err := saveImageToFile(result.Image, filename)
 	if err != nil {
