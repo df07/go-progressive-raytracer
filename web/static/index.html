@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progressive Raytracer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        select, input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #545b62;
+        }
+
+        button:disabled {
+            background-color: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .render-area {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .image-container {
+            flex: 1;
+            text-align: center;
+        }
+
+        .render-image {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: opacity 0.3s;
+        }
+
+        .stats-panel {
+            width: 300px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+
+        .stats-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .stats-value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #28a745);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .status {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .status.idle {
+            background-color: #e9ecef;
+            color: #6c757d;
+        }
+
+        .status.rendering {
+            background-color: #cce5ff;
+            color: #0066cc;
+        }
+
+        .status.complete {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .no-image {
+            width: 400px;
+            height: 400px;
+            background: #f8f9fa;
+            border: 2px dashed #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 18px;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .render-area {
+                flex-direction: column;
+            }
+            
+            .stats-panel {
+                width: 100%;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 Progressive Raytracer</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="scene">Scene:</label>
+                <select id="scene">
+                    <option value="cornell-box">Cornell Box</option>
+                    <option value="basic">Basic Scene</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="width">Width:</label>
+                <input type="number" id="width" value="400" min="100" max="1000" step="50">
+            </div>
+            
+            <div class="control-group">
+                <label for="height">Height:</label>
+                <input type="number" id="height" value="400" min="100" max="1000" step="50">
+            </div>
+            
+            <div class="control-group">
+                <label for="maxSamples">Max Samples:</label>
+                <input type="number" id="maxSamples" value="50" min="1" max="10000" step="10">
+                <small style="color: #666; font-size: 12px;">Total samples per pixel (1-10000)</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="maxPasses">Max Passes:</label>
+                <input type="number" id="maxPasses" value="7" min="1" max="100" step="1">
+                <small style="color: #666; font-size: 12px;">Number of progressive updates (1-100)</small>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="startBtn" class="btn-primary">Start Rendering</button>
+            <button id="stopBtn" class="btn-secondary" disabled>Stop Rendering</button>
+        </div>
+
+        <div id="status" class="status idle">Ready to render</div>
+
+        <div class="render-area">
+            <div class="image-container">
+                <div id="noImage" class="no-image">Click "Start Rendering" to begin</div>
+                <img id="renderImage" class="render-image" style="display: none;" alt="Rendered image">
+            </div>
+
+            <div class="stats-panel">
+                <h3 style="margin-top: 0;">Render Statistics</h3>
+                
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                
+                <div class="stats-item">
+                    <span class="stats-label">Pass:</span>
+                    <span id="currentPass" class="stats-value">-</span>
+                </div>
+                
+                <div class="stats-item">
+                    <span class="stats-label">Total Passes:</span>
+                    <span id="totalPasses" class="stats-value">-</span>
+                </div>
+                
+                <div class="stats-item">
+                    <span class="stats-label">Avg Samples:</span>
+                    <span id="avgSamples" class="stats-value">-</span>
+                </div>
+                
+                <div class="stats-item">
+                    <span class="stats-label">Total Samples:</span>
+                    <span id="totalSamples" class="stats-value">-</span>
+                </div>
+                
+                <div class="stats-item">
+                    <span class="stats-label">Total Pixels:</span>
+                    <span id="totalPixels" class="stats-value">-</span>
+                </div>
+                
+                <div class="stats-item">
+                    <span class="stats-label">Elapsed:</span>
+                    <span id="elapsed" class="stats-value">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ProgressiveRaytracer {
+            constructor() {
+                this.eventSource = null;
+                this.isRendering = false;
+                this.bindEvents();
+            }
+
+            bindEvents() {
+                document.getElementById('startBtn').addEventListener('click', () => this.startRendering());
+                document.getElementById('stopBtn').addEventListener('click', () => this.stopRendering());
+            }
+
+            startRendering() {
+                if (this.isRendering) return;
+
+                // Validate parameters before starting
+                const validation = this.validateParameters();
+                if (!validation.isValid) {
+                    this.setStatus('error', validation.error);
+                    return;
+                }
+
+                const params = this.getParameters();
+                const url = `/api/render?${new URLSearchParams(params).toString()}`;
+
+                this.setStatus('rendering', 'Starting render...');
+                this.isRendering = true;
+                this.updateButtons();
+                this.resetStats();
+
+                this.eventSource = new EventSource(url);
+
+                this.eventSource.onopen = () => {
+                    console.log('SSE connection opened');
+                    this.setStatus('rendering', 'Rendering...');
+                };
+
+                this.eventSource.addEventListener('progress', (event) => {
+                    const data = JSON.parse(event.data);
+                    this.updateProgress(data);
+                });
+
+                this.eventSource.addEventListener('complete', (event) => {
+                    console.log('Rendering completed');
+                    this.setStatus('complete', 'Rendering completed!');
+                    this.stopRendering();
+                });
+
+                this.eventSource.addEventListener('error', (event) => {
+                    console.error('SSE error:', event.data);
+                    this.setStatus('error', `Error: ${event.data}`);
+                    this.stopRendering();
+                });
+
+                this.eventSource.onerror = (event) => {
+                    console.error('SSE connection error:', event);
+                    this.setStatus('error', 'Connection error');
+                    this.stopRendering();
+                };
+            }
+
+            stopRendering() {
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.eventSource = null;
+                }
+                
+                this.isRendering = false;
+                this.updateButtons();
+                
+                if (document.getElementById('status').classList.contains('rendering')) {
+                    this.setStatus('idle', 'Stopped');
+                }
+            }
+
+            getParameters() {
+                return {
+                    scene: document.getElementById('scene').value,
+                    width: document.getElementById('width').value,
+                    height: document.getElementById('height').value,
+                    maxSamples: document.getElementById('maxSamples').value,
+                    maxPasses: document.getElementById('maxPasses').value
+                };
+            }
+
+            validateParameters() {
+                const width = parseInt(document.getElementById('width').value);
+                const height = parseInt(document.getElementById('height').value);
+                const maxSamples = parseInt(document.getElementById('maxSamples').value);
+                const maxPasses = parseInt(document.getElementById('maxPasses').value);
+
+                if (isNaN(width) || width < 100 || width > 2000) {
+                    return { isValid: false, error: 'Width must be between 100 and 2000' };
+                }
+                if (isNaN(height) || height < 100 || height > 2000) {
+                    return { isValid: false, error: 'Height must be between 100 and 2000' };
+                }
+                if (isNaN(maxSamples) || maxSamples < 1 || maxSamples > 10000) {
+                    return { isValid: false, error: 'Max samples must be between 1 and 10000' };
+                }
+                if (isNaN(maxPasses) || maxPasses < 1 || maxPasses > 100) {
+                    return { isValid: false, error: 'Max passes must be between 1 and 100' };
+                }
+
+                // Performance warnings
+                if (width * height > 800 * 600 && maxSamples > 100) {
+                    return { isValid: false, error: 'Large images with high samples may be very slow. Try reducing resolution or samples.' };
+                }
+
+                return { isValid: true };
+            }
+
+            updateProgress(data) {
+                // Update image
+                const img = document.getElementById('renderImage');
+                const noImage = document.getElementById('noImage');
+                
+                img.src = `data:image/png;base64,${data.imageData}`;
+                img.style.display = 'block';
+                noImage.style.display = 'none';
+
+                // Update progress bar
+                const progress = (data.passNumber / data.totalPasses) * 100;
+                document.getElementById('progressFill').style.width = `${progress}%`;
+
+                // Update stats
+                document.getElementById('currentPass').textContent = data.passNumber;
+                document.getElementById('totalPasses').textContent = data.totalPasses;
+                document.getElementById('avgSamples').textContent = data.stats.averageSamples.toFixed(1);
+                document.getElementById('totalSamples').textContent = data.stats.totalSamples.toLocaleString();
+                document.getElementById('totalPixels').textContent = data.stats.totalPixels.toLocaleString();
+                document.getElementById('elapsed').textContent = `${(data.elapsedMs / 1000).toFixed(1)}s`;
+
+                // Update status
+                this.setStatus('rendering', `Pass ${data.passNumber}/${data.totalPasses} - ${data.stats.averageSamples.toFixed(1)} samples/pixel`);
+
+                if (data.isComplete) {
+                    setTimeout(() => {
+                        this.setStatus('complete', 'Rendering completed!');
+                        this.stopRendering();
+                    }, 100);
+                }
+            }
+
+            resetStats() {
+                document.getElementById('progressFill').style.width = '0%';
+                document.getElementById('currentPass').textContent = '-';
+                document.getElementById('totalPasses').textContent = '-';
+                document.getElementById('avgSamples').textContent = '-';
+                document.getElementById('totalSamples').textContent = '-';
+                document.getElementById('totalPixels').textContent = '-';
+                document.getElementById('elapsed').textContent = '-';
+            }
+
+            setStatus(type, message) {
+                const status = document.getElementById('status');
+                status.className = `status ${type}`;
+                status.textContent = message;
+            }
+
+            updateButtons() {
+                document.getElementById('startBtn').disabled = this.isRendering;
+                document.getElementById('stopBtn').disabled = !this.isRendering;
+            }
+        }
+
+        // Initialize the application
+        new ProgressiveRaytracer();
+    </script>
+</body>
+</html> 
