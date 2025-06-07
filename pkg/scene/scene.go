@@ -101,30 +101,16 @@ func (s *Scene) GetLights() []core.Light {
 
 // AddSphereLight adds a spherical light to the scene
 func (s *Scene) AddSphereLight(center core.Vec3, radius float64, emission core.Vec3) {
-	// Create emissive material
 	emissiveMat := material.NewEmissive(emission)
-
-	// Create sphere light for sampling
 	sphereLight := geometry.NewSphereLight(center, radius, emissiveMat)
-
-	// Add to light list for direct lighting
 	s.Lights = append(s.Lights, sphereLight)
-
-	// Add to scene as a regular object for ray intersections
 	s.Shapes = append(s.Shapes, sphereLight.Sphere)
 }
 
 // AddQuadLight adds a rectangular area light to the scene
 func (s *Scene) AddQuadLight(corner, u, v core.Vec3, emission core.Vec3) {
-	// Create emissive material
 	emissiveMat := material.NewEmissive(emission)
-
-	// Create quad light for sampling
 	quadLight := geometry.NewQuadLight(corner, u, v, emissiveMat)
-
-	// Add to light list for direct lighting
 	s.Lights = append(s.Lights, quadLight)
-
-	// Add to scene as a regular object for ray intersections
 	s.Shapes = append(s.Shapes, quadLight.Quad)
 }
