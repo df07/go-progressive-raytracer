@@ -335,13 +335,8 @@ func (rt *Raytracer) initRenderStatsForBounds(bounds image.Rectangle) RenderStat
 // updateStats updates the render statistics with data from a single pixel
 func (rt *Raytracer) updateStats(stats *RenderStats, samplesUsed int) {
 	stats.TotalSamples += samplesUsed
-
-	if samplesUsed < stats.MinSamples {
-		stats.MinSamples = samplesUsed
-	}
-	if samplesUsed > stats.MaxSamplesUsed {
-		stats.MaxSamplesUsed = samplesUsed
-	}
+	stats.MinSamples = min(stats.MinSamples, samplesUsed)
+	stats.MaxSamplesUsed = max(stats.MaxSamplesUsed, samplesUsed)
 }
 
 // finalizeStats calculates final statistics after all pixels are rendered

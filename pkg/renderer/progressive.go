@@ -187,12 +187,8 @@ func (pr *ProgressiveRaytracer) assembleCurrentImage(targetSamples int) (*image.
 
 			// Update statistics
 			stats.TotalSamples += pixel.SampleCount
-			if pixel.SampleCount < stats.MinSamples {
-				stats.MinSamples = pixel.SampleCount
-			}
-			if pixel.SampleCount > stats.MaxSamplesUsed {
-				stats.MaxSamplesUsed = pixel.SampleCount
-			}
+			stats.MinSamples = min(stats.MinSamples, pixel.SampleCount)
+			stats.MaxSamplesUsed = max(stats.MaxSamplesUsed, pixel.SampleCount)
 		}
 	}
 

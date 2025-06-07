@@ -46,21 +46,11 @@ func (v Vec3) Dot(other Vec3) float64 {
 }
 
 // Clamp returns a vector with components clamped to [min, max]
-func (v Vec3) Clamp(min, max float64) Vec3 {
-	clampValue := func(val, min, max float64) float64 {
-		if val < min {
-			return min
-		}
-		if val > max {
-			return max
-		}
-		return val
-	}
-
+func (v Vec3) Clamp(minVal, maxVal float64) Vec3 {
 	return Vec3{
-		X: clampValue(v.X, min, max),
-		Y: clampValue(v.Y, min, max),
-		Z: clampValue(v.Z, min, max),
+		X: max(minVal, min(maxVal, v.X)),
+		Y: max(minVal, min(maxVal, v.Y)),
+		Z: max(minVal, min(maxVal, v.Z)),
 	}
 }
 
