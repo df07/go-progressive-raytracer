@@ -18,6 +18,7 @@ type Config struct {
 	SceneType  string
 	RenderMode string
 	MaxPasses  int
+	MaxSamples int
 	NumWorkers int
 	Help       bool
 }
@@ -69,6 +70,7 @@ func parseFlags() Config {
 	flag.StringVar(&config.SceneType, "scene", "default", "Scene type: 'default' or 'cornell'")
 	flag.StringVar(&config.RenderMode, "mode", "normal", "Render mode: 'normal' or 'progressive'")
 	flag.IntVar(&config.MaxPasses, "max-passes", 5, "Maximum number of progressive passes")
+	flag.IntVar(&config.MaxSamples, "max-samples", 50, "Maximum samples per pixel")
 	flag.IntVar(&config.NumWorkers, "workers", 0, "Number of parallel workers (0 = auto-detect CPU count)")
 	flag.BoolVar(&config.Help, "help", false, "Show help information")
 	flag.Parse()
@@ -92,9 +94,10 @@ func showHelp() {
 	fmt.Println("  progressive - Progressive multi-pass parallel rendering")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  raytracer.exe --mode=progressive --max-passes=5")
+	fmt.Println("  raytracer.exe --mode=progressive --max-passes=5 --max-samples=100")
 	fmt.Println("  raytracer.exe --scene=cornell --mode=progressive --workers=4")
-	fmt.Println("  raytracer.exe --mode=normal")
+	fmt.Println("  raytracer.exe --mode=normal --max-samples=200")
+	fmt.Println("  raytracer.exe --mode=progressive --max-passes=1 --max-samples=25")
 	fmt.Println()
 	fmt.Println("Output will be saved to output/<scene_type>/render_<timestamp>.png")
 }
@@ -160,7 +163,7 @@ func renderImage(config Config, sceneInfo SceneInfo, raytracer *renderer.Raytrac
 	case "progressive":
 		return renderProgressive(config, sceneInfo, timestamp)
 	default:
-		return renderNormal(raytracer, timestamp)
+		return renderNormal(config, raytracer, timestamp)
 	}
 }
 
@@ -170,6 +173,7 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 
 	progressiveConfig := renderer.DefaultProgressiveConfig()
 	progressiveConfig.MaxPasses = config.MaxPasses
+	progressiveConfig.MaxSamplesPerPixel = config.MaxSamples
 	progressiveConfig.NumWorkers = config.NumWorkers
 
 	progressiveRT := renderer.NewProgressiveRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height, progressiveConfig)
@@ -195,7 +199,13 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 }
 
 // renderNormal handles normal rendering
-func renderNormal(raytracer *renderer.Raytracer, timestamp string) RenderResult {
+func renderNormal(config Config, raytracer *renderer.Raytracer, timestamp string) RenderResult {
+	// Update raytracer config to use CLI max samples
+	raytracer.SetSamplingConfig(renderer.SamplingConfig{
+		SamplesPerPixel: config.MaxSamples,
+		MaxDepth:        25, // Keep consistent
+	})
+
 	img, stats := raytracer.RenderPass()
 
 	return RenderResult{
@@ -221,11 +231,13 @@ func saveResults(config Config, result RenderResult, outputDir string) {
 	}
 }
 
-// saveProgressiveImages saves intermediate progressive images
+// saveProgressiveImages saves intermediate progressive images (excluding the final pass)
 func saveProgressiveImages(result RenderResult, outputDir string) {
 	baseFilename := fmt.Sprintf("render_%s", result.Timestamp)
 
-	for i, passImg := range result.Images {
+	// Save all passes except the last one (which gets saved as the final image)
+	for i := 0; i < len(result.Images)-1; i++ {
+		passImg := result.Images[i]
 		passNumber := i + 1
 		passFilename := filepath.Join(outputDir, fmt.Sprintf("%s_pass_%02d.png", baseFilename, passNumber))
 
