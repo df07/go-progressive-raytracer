@@ -101,6 +101,15 @@ func (v Vec3) MultiplyVec(other Vec3) Vec3 {
 	}
 }
 
+// Square returns component-wise squares of the vector
+func (v Vec3) Square() Vec3 {
+	return Vec3{
+		X: v.X * v.X,
+		Y: v.Y * v.Y,
+		Z: v.Z * v.Z,
+	}
+}
+
 // Negate returns the negative of the vector
 func (v Vec3) Negate() Vec3 {
 	return Vec3{

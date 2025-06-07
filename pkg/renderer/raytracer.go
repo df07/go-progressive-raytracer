@@ -9,6 +9,16 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
+// RenderStats contains statistics about the rendering process
+type RenderStats struct {
+	TotalPixels    int     // Total number of pixels rendered
+	TotalSamples   int     // Total number of samples taken
+	AverageSamples float64 // Average samples per pixel
+	MaxSamples     int     // Maximum samples allowed per pixel
+	MinSamples     int     // Minimum samples taken per pixel
+	MaxSamplesUsed int     // Maximum samples actually used by any pixel
+}
+
 // SamplingConfig contains rendering configuration
 type SamplingConfig struct {
 	SamplesPerPixel int // Number of rays per pixel
@@ -222,32 +232,111 @@ func (rt *Raytracer) vec3ToColor(colorVec core.Vec3) color.RGBA {
 	}
 }
 
-// RenderPass renders a single pass with multi-sampling and returns an image
-func (rt *Raytracer) RenderPass() *image.RGBA {
+// RenderPass renders a single pass with adaptive sampling and returns an image and statistics.
+// Adaptive sampling automatically adjusts the number of samples per pixel based on variance,
+// using fewer samples for smooth areas and more samples for noisy/complex areas.
+func (rt *Raytracer) RenderPass() (*image.RGBA, RenderStats) {
 	img := image.NewRGBA(image.Rect(0, 0, rt.width, rt.height))
 	camera := rt.scene.GetCamera()
 
+	// Initialize statistics tracking
+	stats := rt.initRenderStats()
+
 	for j := 0; j < rt.height; j++ {
 		for i := 0; i < rt.width; i++ {
-			// Accumulate color from multiple samples
-			colorAccum := core.Vec3{X: 0, Y: 0, Z: 0}
+			// Use adaptive sampling for this pixel
+			colorVec, samplesUsed := rt.adaptiveSamplePixel(camera, i, j)
+			rt.updateStats(&stats, samplesUsed)
 
-			for sample := 0; sample < rt.config.SamplesPerPixel; sample++ {
-				// Get the ray for this pixel (camera handles jittering internally)
-				ray := camera.GetRay(i, j)
-
-				// Calculate the color and accumulate
-				colorAccum = colorAccum.Add(rt.rayColorRecursive(ray, rt.config.MaxDepth))
-			}
-
-			// Average the accumulated colors
-			colorVec := colorAccum.Multiply(1.0 / float64(rt.config.SamplesPerPixel))
 			pixelColor := rt.vec3ToColor(colorVec)
-
-			// Set the pixel
 			img.SetRGBA(i, j, pixelColor)
 		}
 	}
 
-	return img
+	// Finalize statistics
+	rt.finalizeStats(&stats)
+	return img, stats
+}
+
+// adaptiveSamplePixel uses adaptive sampling to determine the optimal number of samples for a pixel.
+// It starts with a minimum number of samples and continues sampling until the variance is low enough
+// or the maximum sample count is reached. Returns the final color and number of samples used.
+func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int) (core.Vec3, int) {
+	maxSamples := rt.config.SamplesPerPixel
+
+	colorAccum := core.Vec3{X: 0, Y: 0, Z: 0}
+	colorSqAccum := core.Vec3{X: 0, Y: 0, Z: 0}
+	samplesTaken := 0
+
+	// Take samples until we reach convergence or max samples
+	for samplesTaken < maxSamples && !rt.sampleConverged(colorAccum, colorSqAccum, samplesTaken) {
+		samplesTaken++
+
+		// Take a sample
+		ray := camera.GetRay(i, j)
+		color := rt.rayColorRecursive(ray, rt.config.MaxDepth)
+
+		colorAccum = colorAccum.Add(color)
+		colorSqAccum = colorSqAccum.Add(color.Square())
+	}
+
+	// Return result
+	return colorAccum.Multiply(1.0 / float64(samplesTaken)), samplesTaken
+}
+
+// sampleConverged determines if adaptive sampling should stop based on variance
+func (rt *Raytracer) sampleConverged(colorAccum, colorSqAccum core.Vec3, samplesTaken int) bool {
+	minSamples := 8
+
+	// Don't stop before minimum samples
+	if samplesTaken < minSamples {
+		return false
+	}
+
+	// Calculate current variance
+	mean := colorAccum.Multiply(1.0 / float64(samplesTaken))
+	meanSq := colorSqAccum.Multiply(1.0 / float64(samplesTaken))
+	variance := core.Vec3{
+		X: math.Max(0, meanSq.X-mean.X*mean.X),
+		Y: math.Max(0, meanSq.Y-mean.Y*mean.Y),
+		Z: math.Max(0, meanSq.Z-mean.Z*mean.Z),
+	}
+
+	// Calculate maximum variance across color channels
+	maxVariance := math.Max(math.Max(variance.X, variance.Y), variance.Z)
+
+	// Use adaptive threshold that scales with brightness
+	brightness := (mean.X + mean.Y + mean.Z) / 3.0
+	threshold := 0.001 + brightness*0.01
+
+	return maxVariance < threshold
+}
+
+// initRenderStats initializes the render statistics tracking
+func (rt *Raytracer) initRenderStats() RenderStats {
+	return RenderStats{
+		TotalPixels:    rt.width * rt.height,
+		TotalSamples:   0,
+		AverageSamples: 0,
+		MaxSamples:     rt.config.SamplesPerPixel,
+		MinSamples:     rt.config.SamplesPerPixel, // Start with max, will be reduced
+		MaxSamplesUsed: 0,
+	}
+}
+
+// updateStats updates the render statistics with data from a single pixel
+func (rt *Raytracer) updateStats(stats *RenderStats, samplesUsed int) {
+	stats.TotalSamples += samplesUsed
+
+	if samplesUsed < stats.MinSamples {
+		stats.MinSamples = samplesUsed
+	}
+	if samplesUsed > stats.MaxSamplesUsed {
+		stats.MaxSamplesUsed = samplesUsed
+	}
+}
+
+// finalizeStats calculates final statistics after all pixels are rendered
+func (rt *Raytracer) finalizeStats(stats *RenderStats) {
+	stats.AverageSamples = float64(stats.TotalSamples) / float64(stats.TotalPixels)
 }

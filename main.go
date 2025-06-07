@@ -78,9 +78,12 @@ func main() {
 
 	// Render one pass
 	startTime := time.Now()
-	img := raytracer.RenderPass()
+	img, stats := raytracer.RenderPass()
 	renderTime := time.Since(startTime)
+
 	fmt.Printf("Render completed in %v\n", renderTime)
+	fmt.Printf("Samples per pixel: %.1f (range %d - %d)\n",
+		stats.AverageSamples, stats.MinSamples, stats.MaxSamplesUsed)
 
 	// Create timestamped filename
 	timestamp := time.Now().Format("20060102_150405")
