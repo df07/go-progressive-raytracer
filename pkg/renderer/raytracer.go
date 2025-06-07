@@ -64,7 +64,6 @@ type Raytracer struct {
 	width  int
 	height int
 	config SamplingConfig
-	random *rand.Rand
 }
 
 // NewRaytracer creates a new raytracer
@@ -74,7 +73,6 @@ func NewRaytracer(scene core.Scene, width, height int) *Raytracer {
 		width:  width,
 		height: height,
 		config: DefaultSamplingConfig(),
-		random: rand.New(rand.NewSource(42)), // Deterministic for testing
 	}
 }
 
@@ -115,14 +113,14 @@ func (rt *Raytracer) backgroundGradient(r core.Ray) core.Vec3 {
 	return bottomColor.Multiply(1.0 - t).Add(topColor.Multiply(t))
 }
 
-// calculateSpecularColor handles specular material scattering
-func (rt *Raytracer) calculateSpecularColor(scatter core.ScatterResult, depth int) core.Vec3 {
+// calculateSpecularColor handles specular material scattering with the provided random generator
+func (rt *Raytracer) calculateSpecularColor(scatter core.ScatterResult, depth int, random *rand.Rand) core.Vec3 {
 	return scatter.Attenuation.MultiplyVec(
-		rt.rayColorRecursive(scatter.Scattered, depth-1))
+		rt.rayColorRecursive(scatter.Scattered, depth-1, random))
 }
 
-// rayColorRecursive returns the color for a given ray with material support
-func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int) core.Vec3 {
+// rayColorRecursive returns the color for a given ray with material support using the provided random generator
+func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int, random *rand.Rand) core.Vec3 {
 	// If we've exceeded the ray bounce limit, no more light is gathered
 	if depth <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
@@ -138,7 +136,7 @@ func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int) core.Vec3 {
 	colorEmitted := rt.getEmittedLight(hit)
 
 	// Try to scatter the ray
-	scatter, didScatter := hit.Material.Scatter(r, *hit, rt.random)
+	scatter, didScatter := hit.Material.Scatter(r, *hit, random)
 	if !didScatter {
 		// Material absorbed the ray, only return emitted light
 		return colorEmitted
@@ -147,20 +145,20 @@ func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int) core.Vec3 {
 	// Handle scattering based on material type
 	var colorScattered core.Vec3
 	if scatter.IsSpecular() {
-		colorScattered = rt.calculateSpecularColor(scatter, depth)
+		colorScattered = rt.calculateSpecularColor(scatter, depth, random)
 	} else {
-		colorScattered = rt.calculateDiffuseColor(scatter, hit, depth)
+		colorScattered = rt.calculateDiffuseColor(scatter, hit, depth, random)
 	}
 
 	// Return emitted + scattered light
 	return colorEmitted.Add(colorScattered)
 }
 
-// calculateDiffuseColor handles diffuse material scattering
-func (rt *Raytracer) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, depth int) core.Vec3 {
+// calculateDiffuseColor handles diffuse material scattering with the provided random generator
+func (rt *Raytracer) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, depth int, random *rand.Rand) core.Vec3 {
 	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
-	directLight := rt.calculateDirectLighting(rt.scene, scatter, hit)
-	indirectLight := rt.calculateIndirectLighting(rt.scene, scatter, hit, depth)
+	directLight := rt.calculateDirectLighting(rt.scene, scatter, hit, random)
+	indirectLight := rt.calculateIndirectLighting(rt.scene, scatter, hit, depth, random)
 	return directLight.Add(indirectLight)
 }
 
@@ -172,12 +170,12 @@ func (rt *Raytracer) getEmittedLight(hit *core.HitRecord) core.Vec3 {
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
 
-// calculateDirectLighting samples lights directly for direct illumination
-func (rt *Raytracer) calculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord) core.Vec3 {
+// calculateDirectLighting samples lights directly for direct illumination with the provided random generator
+func (rt *Raytracer) calculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, random *rand.Rand) core.Vec3 {
 	lights := scene.GetLights()
 
 	// Sample a light
-	lightSample, hasLight := core.SampleLight(lights, hit.Point, rt.random)
+	lightSample, hasLight := core.SampleLight(lights, hit.Point, random)
 	if !hasLight {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -214,8 +212,8 @@ func (rt *Raytracer) calculateDirectLighting(scene core.Scene, scatter core.Scat
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
 
-// calculateIndirectLighting handles indirect illumination via material sampling
-func (rt *Raytracer) calculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int) core.Vec3 {
+// calculateIndirectLighting handles indirect illumination via material sampling with the provided random generator
+func (rt *Raytracer) calculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, random *rand.Rand) core.Vec3 {
 	if scatter.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -234,7 +232,7 @@ func (rt *Raytracer) calculateIndirectLighting(scene core.Scene, scatter core.Sc
 	misWeight := core.PowerHeuristic(1, scatter.PDF, 1, lightPDF)
 
 	// Get incoming light from the scattered direction
-	incomingLight := rt.rayColorRecursive(scatter.Scattered, depth-1)
+	incomingLight := rt.rayColorRecursive(scatter.Scattered, depth-1, random)
 
 	// Indirect lighting contribution with MIS
 	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)
@@ -257,62 +255,40 @@ func (rt *Raytracer) vec3ToColor(colorVec core.Vec3) color.RGBA {
 	}
 }
 
-// RenderPass renders a single pass with adaptive sampling and returns an image and statistics.
-// Adaptive sampling automatically adjusts the number of samples per pixel based on variance,
-// using fewer samples for smooth areas and more samples for noisy/complex areas.
-func (rt *Raytracer) RenderPass() (*image.RGBA, RenderStats) {
-	img := image.NewRGBA(image.Rect(0, 0, rt.width, rt.height))
+// RenderBounds renders pixels within the specified bounds using the provided pixel stats and random generator
+func (rt *Raytracer) RenderBounds(bounds image.Rectangle, pixelStats [][]PixelStats, random *rand.Rand) RenderStats {
 	camera := rt.scene.GetCamera()
 
-	// Initialize pixel statistics for all pixels
-	pixelStats := make([][]PixelStats, rt.height)
-	for j := range pixelStats {
-		pixelStats[j] = make([]PixelStats, rt.width)
-	}
+	// Initialize statistics tracking for this specific bounds
+	stats := rt.initRenderStatsForBounds(bounds)
 
-	// Initialize statistics tracking
-	stats := rt.initRenderStats()
-
-	for j := 0; j < rt.height; j++ {
-		for i := 0; i < rt.width; i++ {
-			// Use adaptive sampling for this pixel
-			samplesUsed := rt.adaptiveSamplePixel(camera, i, j, &pixelStats[j][i])
+	for j := bounds.Min.Y; j < bounds.Max.Y; j++ {
+		for i := bounds.Min.X; i < bounds.Max.X; i++ {
+			samplesUsed := rt.adaptiveSamplePixel(camera, i, j, &pixelStats[j][i], random)
 			rt.updateStats(&stats, samplesUsed)
-
-			// Get final color and set pixel
-			colorVec := pixelStats[j][i].GetColor()
-			pixelColor := rt.vec3ToColor(colorVec)
-			img.SetRGBA(i, j, pixelColor)
 		}
 	}
 
 	// Finalize statistics
 	rt.finalizeStats(&stats)
-	return img, stats
+	return stats
 }
 
-// adaptiveSamplePixel uses adaptive sampling to determine the optimal number of samples for a pixel.
-// It starts with a minimum number of samples and continues sampling until the variance is low enough
-// or the maximum sample count is reached. Returns the number of samples used.
-func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int, ps *PixelStats) int {
+// adaptiveSamplePixel uses adaptive sampling to sample a pixel up to the configured maximum.
+// It continues sampling until either the maximum is reached or adaptive convergence is achieved.
+// Returns the number of samples actually added this call.
+func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int, ps *PixelStats, random *rand.Rand) int {
+	initialSampleCount := ps.SampleCount
 	maxSamples := rt.config.SamplesPerPixel
-
-	// Reset pixel stats for fresh sampling
-	ps.ColorAccum = core.Vec3{X: 0, Y: 0, Z: 0}
-	ps.LuminanceAccum = 0.0
-	ps.LuminanceSqAccum = 0.0
-	ps.SampleCount = 0
 
 	// Take samples until we reach convergence or max samples
 	for ps.SampleCount < maxSamples && !rt.shouldStopSampling(ps) {
-		// Take a sample
-		ray := camera.GetRay(i, j)
-		color := rt.rayColorRecursive(ray, rt.config.MaxDepth)
-
+		ray := camera.GetRay(i, j, random)
+		color := rt.rayColorRecursive(ray, rt.config.MaxDepth, random)
 		ps.AddSample(color)
 	}
 
-	return ps.SampleCount
+	return ps.SampleCount - initialSampleCount
 }
 
 // shouldStopSampling determines if adaptive sampling should stop based on perceptual relative error
@@ -343,10 +319,11 @@ func (rt *Raytracer) shouldStopSampling(ps *PixelStats) bool {
 	return relativeError < threshold
 }
 
-// initRenderStats initializes the render statistics tracking
-func (rt *Raytracer) initRenderStats() RenderStats {
+// initRenderStatsForBounds initializes the render statistics tracking for specific bounds
+func (rt *Raytracer) initRenderStatsForBounds(bounds image.Rectangle) RenderStats {
+	pixelCount := bounds.Dx() * bounds.Dy()
 	return RenderStats{
-		TotalPixels:    rt.width * rt.height,
+		TotalPixels:    pixelCount,
 		TotalSamples:   0,
 		AverageSamples: 0,
 		MaxSamples:     rt.config.SamplesPerPixel,
@@ -370,4 +347,33 @@ func (rt *Raytracer) updateStats(stats *RenderStats, samplesUsed int) {
 // finalizeStats calculates final statistics after all pixels are rendered
 func (rt *Raytracer) finalizeStats(stats *RenderStats) {
 	stats.AverageSamples = float64(stats.TotalSamples) / float64(stats.TotalPixels)
+}
+
+// RenderPass renders a single pass with adaptive sampling and returns an image and statistics.
+// Adaptive sampling automatically adjusts the number of samples per pixel based on variance,
+// using fewer samples for smooth areas and more samples for noisy/complex areas.
+func (rt *Raytracer) RenderPass() (*image.RGBA, RenderStats) {
+	random := rand.New(rand.NewSource(42))
+
+	// Initialize pixel statistics for all pixels
+	pixelStats := make([][]PixelStats, rt.height)
+	for j := range pixelStats {
+		pixelStats[j] = make([]PixelStats, rt.width)
+	}
+
+	// Render the entire image bounds
+	bounds := image.Rect(0, 0, rt.width, rt.height)
+	stats := rt.RenderBounds(bounds, pixelStats, random)
+
+	// Create final image from pixel stats
+	img := image.NewRGBA(bounds)
+	for j := 0; j < rt.height; j++ {
+		for i := 0; i < rt.width; i++ {
+			colorVec := pixelStats[j][i].GetColor()
+			pixelColor := rt.vec3ToColor(colorVec)
+			img.SetRGBA(i, j, pixelColor)
+		}
+	}
+
+	return img, stats
 }

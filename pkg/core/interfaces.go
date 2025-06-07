@@ -37,7 +37,7 @@ type LightSample struct {
 
 // Camera interface for cameras to avoid circular imports
 type Camera interface {
-	GetRay(i, j int) Ray
+	GetRay(i, j int, random *rand.Rand) Ray
 }
 
 // Scene interface for scene management

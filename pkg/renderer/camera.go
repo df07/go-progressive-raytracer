@@ -32,7 +32,6 @@ type Camera struct {
 	pixelDeltaV  core.Vec3 // Offset to pixel below
 	defocusDiskU core.Vec3 // Defocus disk horizontal radius
 	defocusDiskV core.Vec3 // Defocus disk vertical radius
-	random       *rand.Rand
 }
 
 // NewCamera creates a camera with the given configuration
@@ -85,14 +84,13 @@ func NewCamera(config CameraConfig) *Camera {
 		pixelDeltaV:  pixelDeltaV,
 		defocusDiskU: defocusDiskU,
 		defocusDiskV: defocusDiskV,
-		random:       rand.New(rand.NewSource(42)), // Deterministic for consistent results
 	}
 }
 
-// GetRay generates a ray for pixel coordinates (i, j) with sub-pixel sampling
-func (c *Camera) GetRay(i, j int) core.Ray {
+// GetRay generates a ray for pixel coordinates (i, j) with sub-pixel sampling using the provided random generator
+func (c *Camera) GetRay(i, j int, random *rand.Rand) core.Ray {
 	// Add random offset for anti-aliasing
-	jitter := core.NewVec3(c.random.Float64()-0.5, c.random.Float64()-0.5, 0)
+	jitter := core.NewVec3(random.Float64()-0.5, random.Float64()-0.5, 0)
 	pixelSample := c.pixel00Loc.
 		Add(c.pixelDeltaU.Multiply(float64(i) + jitter.X)).
 		Add(c.pixelDeltaV.Multiply(float64(j) + jitter.Y))
@@ -100,7 +98,7 @@ func (c *Camera) GetRay(i, j int) core.Ray {
 	// Determine ray origin (with defocus blur if enabled)
 	rayOrigin := c.center
 	if c.defocusDiskU.Length() > 0 {
-		p := core.RandomInUnitDisk(c.random)
+		p := core.RandomInUnitDisk(random)
 		offset := c.defocusDiskU.Multiply(p.X).Add(c.defocusDiskV.Multiply(p.Y))
 		rayOrigin = c.center.Add(offset)
 	}
@@ -111,12 +109,12 @@ func (c *Camera) GetRay(i, j int) core.Ray {
 
 // GetRayNormalized generates a ray for normalized screen coordinates (s, t) where 0 <= s,t <= 1
 // This method maintains compatibility with existing code
-func (c *Camera) GetRayNormalized(s, t float64) core.Ray {
+func (c *Camera) GetRayNormalized(s, t float64, random *rand.Rand) core.Ray {
 	// Convert normalized coordinates to pixel coordinates
 	// Assume default image dimensions for backward compatibility
 	width := 400.0
 	height := 225.0
 	i := int(s * width)
 	j := int(t * height)
-	return c.GetRay(i, j)
+	return c.GetRay(i, j, random)
 }
