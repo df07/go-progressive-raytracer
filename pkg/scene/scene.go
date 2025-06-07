@@ -50,13 +50,16 @@ func NewDefaultScene() *Scene {
 	// Create materials
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0))
 	lambertianBlue := material.NewLambertian(core.NewVec3(0.1, 0.2, 0.5))
-	lambertianRed := material.NewLambertian(core.NewVec3(0.8, 0.1, 0.1))
+	lambertianRed := material.NewLambertian(core.NewVec3(0.65, 0.25, 0.2))
 	metalSilver := material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0)
 	metalGold := material.NewMetal(core.NewVec3(0.8, 0.6, 0.2), 0.3)
 	materialGlass := material.NewDielectric(1.5)
 
+	// Create layered material: glass coating over gold base
+	coatedRed := material.NewLayered(materialGlass, lambertianRed)
+
 	// Create spheres with different materials
-	sphereCenter := geometry.NewSphere(core.NewVec3(0, 0.5, -1), 0.5, lambertianBlue)
+	sphereCenter := geometry.NewSphere(core.NewVec3(0, 0.5, -1), 0.5, coatedRed)
 	sphereLeft := geometry.NewSphere(core.NewVec3(-1, 0.5, -1), 0.5, metalSilver)
 	sphereRight := geometry.NewSphere(core.NewVec3(1, 0.5, -1), 0.5, metalGold)
 	solidGlassSphere := geometry.NewSphere(core.NewVec3(0.5, 0.25, -0.5), 0.25, materialGlass)
@@ -65,7 +68,7 @@ func NewDefaultScene() *Scene {
 	// Create hollow glass sphere with blue sphere inside
 	hollowGlassOuter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.25, materialGlass)
 	hollowGlassInner := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), -0.24, materialGlass)
-	hollowGlassCenter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.20, lambertianRed)
+	hollowGlassCenter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.20, lambertianBlue)
 
 	// Add objects to the scene
 	s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundSphere,
