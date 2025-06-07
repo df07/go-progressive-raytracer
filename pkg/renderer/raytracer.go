@@ -86,25 +86,6 @@ func (rt *Raytracer) calculateSpecularColor(scatter core.ScatterResult, depth in
 		rt.rayColorRecursive(scatter.Scattered, depth-1))
 }
 
-// calculateDiffuseColor handles diffuse material scattering with proper Monte Carlo integration
-func (rt *Raytracer) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, depth int) core.Vec3 {
-	scatterDirection := scatter.Scattered.Direction.Normalize()
-	cosine := scatterDirection.Dot(hit.Normal)
-	if cosine < 0 {
-		cosine = 0
-	}
-
-	if scatter.PDF <= 0 {
-		return core.Vec3{X: 0, Y: 0, Z: 0} // Invalid PDF
-	}
-
-	// Monte Carlo estimator: (BRDF * incomingLight * cosine) / PDF
-	// For lambertian: BRDF = albedo/π, PDF = cosθ/π
-	// Result = (albedo/π * incomingLight * cosθ) / (cosθ/π) = albedo * incomingLight
-	incomingLight := rt.rayColorRecursive(scatter.Scattered, depth-1)
-	return scatter.Attenuation.Multiply(cosine / scatter.PDF).MultiplyVec(incomingLight)
-}
-
 // rayColorRecursive returns the color for a given ray with material support
 func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int) core.Vec3 {
 	// If we've exceeded the ray bounce limit, no more light is gathered
@@ -133,14 +114,19 @@ func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int) core.Vec3 {
 	if scatter.IsSpecular() {
 		colorScattered = rt.calculateSpecularColor(scatter, depth)
 	} else {
-		// Combine direct lighting and indirect lighting using Multiple Importance Sampling
-		directLight := rt.calculateDirectLighting(rt.scene, scatter, hit)
-		indirectLight := rt.calculateIndirectLighting(rt.scene, scatter, hit, depth)
-		colorScattered = directLight.Add(indirectLight)
+		colorScattered = rt.calculateDiffuseColor(scatter, hit, depth)
 	}
 
 	// Return emitted + scattered light
 	return colorEmitted.Add(colorScattered)
+}
+
+// calculateDiffuseColor handles diffuse material scattering
+func (rt *Raytracer) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, depth int) core.Vec3 {
+	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
+	directLight := rt.calculateDirectLighting(rt.scene, scatter, hit)
+	indirectLight := rt.calculateIndirectLighting(rt.scene, scatter, hit, depth)
+	return directLight.Add(indirectLight)
 }
 
 // getEmittedLight returns the emitted light from a material if it's emissive
