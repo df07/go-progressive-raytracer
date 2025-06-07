@@ -63,7 +63,9 @@ func NewDefaultScene() *Scene {
 	sphereLeft := geometry.NewSphere(core.NewVec3(-1, 0.5, -1), 0.5, metalSilver)
 	sphereRight := geometry.NewSphere(core.NewVec3(1, 0.5, -1), 0.5, metalGold)
 	solidGlassSphere := geometry.NewSphere(core.NewVec3(0.5, 0.25, -0.5), 0.25, materialGlass)
-	groundSphere := geometry.NewSphere(core.NewVec3(0, -100, -1), 100, lambertianGreen)
+
+	// Create ground plane instead of sphere
+	groundPlane := geometry.NewPlane(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0), lambertianGreen)
 
 	// Create hollow glass sphere with blue sphere inside
 	hollowGlassOuter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.25, materialGlass)
@@ -71,7 +73,7 @@ func NewDefaultScene() *Scene {
 	hollowGlassCenter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.20, lambertianBlue)
 
 	// Add objects to the scene
-	s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundSphere,
+	s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundPlane,
 		solidGlassSphere, hollowGlassOuter, hollowGlassInner, hollowGlassCenter)
 
 	return s
@@ -110,4 +112,19 @@ func (s *Scene) AddSphereLight(center core.Vec3, radius float64, emission core.V
 
 	// Add to scene as a regular object for ray intersections
 	s.Shapes = append(s.Shapes, sphereLight.Sphere)
+}
+
+// AddQuadLight adds a rectangular area light to the scene
+func (s *Scene) AddQuadLight(corner, u, v core.Vec3, emission core.Vec3) {
+	// Create emissive material
+	emissiveMat := material.NewEmissive(emission)
+
+	// Create quad light for sampling
+	quadLight := geometry.NewQuadLight(corner, u, v, emissiveMat)
+
+	// Add to light list for direct lighting
+	s.Lights = append(s.Lights, quadLight)
+
+	// Add to scene as a regular object for ray intersections
+	s.Shapes = append(s.Shapes, quadLight.Quad)
 }
