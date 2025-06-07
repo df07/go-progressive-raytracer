@@ -110,6 +110,12 @@ func (v Vec3) Square() Vec3 {
 	}
 }
 
+// Luminance returns the perceptual luminance of an RGB color
+// Uses standard luminance weights: 0.299*R + 0.587*G + 0.114*B
+func (v Vec3) Luminance() float64 {
+	return 0.299*v.X + 0.587*v.Y + 0.114*v.Z
+}
+
 // Negate returns the negative of the vector
 func (v Vec3) Negate() Vec3 {
 	return Vec3{

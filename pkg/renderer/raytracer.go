@@ -19,6 +19,31 @@ type RenderStats struct {
 	MaxSamplesUsed int     // Maximum samples actually used by any pixel
 }
 
+// PixelStats tracks sampling statistics for a single pixel
+type PixelStats struct {
+	ColorAccum       core.Vec3 // RGB accumulator for final result
+	LuminanceAccum   float64   // Luminance accumulator for convergence
+	LuminanceSqAccum float64   // Luminance squared for variance
+	SampleCount      int       // Number of samples taken
+}
+
+// AddSample adds a new color sample to the pixel statistics
+func (ps *PixelStats) AddSample(color core.Vec3) {
+	ps.ColorAccum = ps.ColorAccum.Add(color)
+	luminance := color.Luminance()
+	ps.LuminanceAccum += luminance
+	ps.LuminanceSqAccum += luminance * luminance
+	ps.SampleCount++
+}
+
+// GetColor returns the current average color for this pixel
+func (ps *PixelStats) GetColor() core.Vec3 {
+	if ps.SampleCount == 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+	return ps.ColorAccum.Multiply(1.0 / float64(ps.SampleCount))
+}
+
 // SamplingConfig contains rendering configuration
 type SamplingConfig struct {
 	SamplesPerPixel int // Number of rays per pixel
@@ -239,15 +264,23 @@ func (rt *Raytracer) RenderPass() (*image.RGBA, RenderStats) {
 	img := image.NewRGBA(image.Rect(0, 0, rt.width, rt.height))
 	camera := rt.scene.GetCamera()
 
+	// Initialize pixel statistics for all pixels
+	pixelStats := make([][]PixelStats, rt.height)
+	for j := range pixelStats {
+		pixelStats[j] = make([]PixelStats, rt.width)
+	}
+
 	// Initialize statistics tracking
 	stats := rt.initRenderStats()
 
 	for j := 0; j < rt.height; j++ {
 		for i := 0; i < rt.width; i++ {
 			// Use adaptive sampling for this pixel
-			colorVec, samplesUsed := rt.adaptiveSamplePixel(camera, i, j)
+			samplesUsed := rt.adaptiveSamplePixel(camera, i, j, &pixelStats[j][i])
 			rt.updateStats(&stats, samplesUsed)
 
+			// Get final color and set pixel
+			colorVec := pixelStats[j][i].GetColor()
 			pixelColor := rt.vec3ToColor(colorVec)
 			img.SetRGBA(i, j, pixelColor)
 		}
@@ -260,56 +293,54 @@ func (rt *Raytracer) RenderPass() (*image.RGBA, RenderStats) {
 
 // adaptiveSamplePixel uses adaptive sampling to determine the optimal number of samples for a pixel.
 // It starts with a minimum number of samples and continues sampling until the variance is low enough
-// or the maximum sample count is reached. Returns the final color and number of samples used.
-func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int) (core.Vec3, int) {
+// or the maximum sample count is reached. Returns the number of samples used.
+func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int, ps *PixelStats) int {
 	maxSamples := rt.config.SamplesPerPixel
 
-	colorAccum := core.Vec3{X: 0, Y: 0, Z: 0}
-	colorSqAccum := core.Vec3{X: 0, Y: 0, Z: 0}
-	samplesTaken := 0
+	// Reset pixel stats for fresh sampling
+	ps.ColorAccum = core.Vec3{X: 0, Y: 0, Z: 0}
+	ps.LuminanceAccum = 0.0
+	ps.LuminanceSqAccum = 0.0
+	ps.SampleCount = 0
 
 	// Take samples until we reach convergence or max samples
-	for samplesTaken < maxSamples && !rt.sampleConverged(colorAccum, colorSqAccum, samplesTaken) {
-		samplesTaken++
-
+	for ps.SampleCount < maxSamples && !rt.shouldStopSampling(ps) {
 		// Take a sample
 		ray := camera.GetRay(i, j)
 		color := rt.rayColorRecursive(ray, rt.config.MaxDepth)
 
-		colorAccum = colorAccum.Add(color)
-		colorSqAccum = colorSqAccum.Add(color.Square())
+		ps.AddSample(color)
 	}
 
-	// Return result
-	return colorAccum.Multiply(1.0 / float64(samplesTaken)), samplesTaken
+	return ps.SampleCount
 }
 
-// sampleConverged determines if adaptive sampling should stop based on variance
-func (rt *Raytracer) sampleConverged(colorAccum, colorSqAccum core.Vec3, samplesTaken int) bool {
+// shouldStopSampling determines if adaptive sampling should stop based on perceptual relative error
+func (rt *Raytracer) shouldStopSampling(ps *PixelStats) bool {
 	minSamples := 8
 
 	// Don't stop before minimum samples
-	if samplesTaken < minSamples {
+	if ps.SampleCount < minSamples {
 		return false
 	}
 
-	// Calculate current variance
-	mean := colorAccum.Multiply(1.0 / float64(samplesTaken))
-	meanSq := colorSqAccum.Multiply(1.0 / float64(samplesTaken))
-	variance := core.Vec3{
-		X: math.Max(0, meanSq.X-mean.X*mean.X),
-		Y: math.Max(0, meanSq.Y-mean.Y*mean.Y),
-		Z: math.Max(0, meanSq.Z-mean.Z*mean.Z),
+	// Calculate variance from accumulated statistics
+	mean := ps.LuminanceAccum / float64(ps.SampleCount)
+	meanSq := ps.LuminanceSqAccum / float64(ps.SampleCount)
+	variance := math.Max(0, meanSq-mean*mean)
+
+	// Avoid division by zero for black pixels
+	if mean <= 1e-8 {
+		return variance < 1e-6 // Very low absolute threshold for dark pixels
 	}
 
-	// Calculate maximum variance across color channels
-	maxVariance := math.Max(math.Max(variance.X, variance.Y), variance.Z)
+	// Calculate coefficient of variation (relative error)
+	relativeError := math.Sqrt(variance) / mean
 
-	// Use adaptive threshold that scales with brightness
-	brightness := (mean.X + mean.Y + mean.Z) / 3.0
-	threshold := 0.001 + brightness*0.01
+	// Stop when relative error is below 1% (perceptually imperceptible)
+	threshold := 0.01
 
-	return maxVariance < threshold
+	return relativeError < threshold
 }
 
 // initRenderStats initializes the render statistics tracking
