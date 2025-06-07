@@ -35,6 +35,11 @@ func (v Vec3) Length() float64 {
 	return math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z)
 }
 
+// LengthSquared returns the squared magnitude of the vector
+func (v Vec3) LengthSquared() float64 {
+	return v.X*v.X + v.Y*v.Y + v.Z*v.Z
+}
+
 // Dot returns the dot product of two vectors
 func (v Vec3) Dot(other Vec3) float64 {
 	return v.X*other.X + v.Y*other.Y + v.Z*other.Z
@@ -93,6 +98,15 @@ func (v Vec3) MultiplyVec(other Vec3) Vec3 {
 		X: v.X * other.X,
 		Y: v.Y * other.Y,
 		Z: v.Z * other.Z,
+	}
+}
+
+// Negate returns the negative of the vector
+func (v Vec3) Negate() Vec3 {
+	return Vec3{
+		X: -v.X,
+		Y: -v.Y,
+		Z: -v.Z,
 	}
 }
 
