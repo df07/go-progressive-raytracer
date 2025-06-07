@@ -15,6 +15,7 @@ type ProgressiveConfig struct {
 	InitialSamples     int // Samples for first pass (1 recommended)
 	MaxSamplesPerPixel int // Maximum total samples per pixel
 	MaxPasses          int // Maximum number of passes
+	NumWorkers         int // Number of parallel workers (0 = use CPU count)
 }
 
 // DefaultProgressiveConfig returns sensible default values
@@ -24,6 +25,7 @@ func DefaultProgressiveConfig() ProgressiveConfig {
 		InitialSamples:     1,
 		MaxSamplesPerPixel: 50, // Match original raytracer max samples
 		MaxPasses:          7,  // 1, 2, 4, 8, 16, 32, then adaptive up to 50
+		NumWorkers:         0,  // Auto-detect CPU count
 	}
 }
 
@@ -32,18 +34,11 @@ type ProgressiveRaytracer struct {
 	scene         core.Scene
 	width, height int
 	config        ProgressiveConfig
-
-	// Tile management
-	tiles []*Tile
-
-	// Progressive state
-	currentPass int
-
-	// Shared pixel statistics array (global image coordinates)
-	pixelStats [][]PixelStats
-
-	// Base raytracer for actual rendering
-	raytracer *Raytracer
+	tiles         []*Tile        // Tile management
+	currentPass   int            // Progressive state
+	pixelStats    [][]PixelStats // Shared pixel statistics array (global image coordinates)
+	raytracer     *Raytracer     // Base raytracer for actual rendering
+	workerPool    *WorkerPool    // Worker pool for parallel processing
 }
 
 // NewProgressiveRaytracer creates a new progressive raytracer
@@ -60,6 +55,9 @@ func NewProgressiveRaytracer(scene core.Scene, width, height int, config Progres
 		pixelStats[y] = make([]PixelStats, width)
 	}
 
+	// Create worker pool
+	workerPool := NewWorkerPool(scene, width, height, config.NumWorkers)
+
 	return &ProgressiveRaytracer{
 		scene:       scene,
 		width:       width,
@@ -69,6 +67,7 @@ func NewProgressiveRaytracer(scene core.Scene, width, height int, config Progres
 		currentPass: 0,
 		pixelStats:  pixelStats,
 		raytracer:   raytracer,
+		workerPool:  workerPool,
 	}
 }
 
@@ -94,31 +93,56 @@ func (pr *ProgressiveRaytracer) getSamplesForPass(passNumber int) int {
 	return targetSamples
 }
 
-// RenderPass renders a single progressive pass
+// RenderPass renders a single progressive pass using parallel processing
 func (pr *ProgressiveRaytracer) RenderPass(passNumber int) (*image.RGBA, RenderStats, error) {
 	pr.currentPass = passNumber
 
 	// Calculate target samples for this pass
 	targetSamples := pr.getSamplesForPass(passNumber)
 
-	fmt.Printf("Pass %d: Target %d samples per pixel...\n", passNumber, targetSamples)
+	fmt.Printf("Pass %d: Target %d samples per pixel (using %d workers)...\n",
+		passNumber, targetSamples, pr.workerPool.GetNumWorkers())
 
-	// Configure raytracer for this pass
+	// Configure base raytracer for this pass (for shared pixel stats processing)
 	pr.raytracer.SetSamplingConfig(SamplingConfig{
 		SamplesPerPixel: targetSamples,
 		MaxDepth:        25, // Keep consistent with main.go
 	})
 
-	// Render each tile
-	for _, tile := range pr.tiles {
-		// Render the tile bounds using the shared pixel stats with tile's random generator
-		pr.raytracer.RenderBounds(tile.Bounds, pr.pixelStats, tile.Random)
-
-		// Increment completed passes for this tile
-		tile.PassesCompleted++
+	// Start worker pool if not already started
+	if passNumber == 1 {
+		pr.workerPool.Start()
 	}
 
-	// Assemble image and calculate stats in a single pass
+	// Submit all tiles as tasks
+	taskID := 0
+	for _, tile := range pr.tiles {
+		task := TileTask{
+			Tile:          tile,
+			PassNumber:    passNumber,
+			TargetSamples: targetSamples,
+			TaskID:        taskID,
+			PixelStats:    pr.pixelStats, // Pass shared pixel stats array
+		}
+		pr.workerPool.SubmitTask(task)
+		taskID++
+	}
+
+	// Wait for all tiles to complete
+	for i := 0; i < len(pr.tiles); i++ {
+		result, ok := pr.workerPool.GetResult()
+		if !ok {
+			return nil, RenderStats{}, fmt.Errorf("worker pool closed unexpectedly")
+		}
+		if result.Error != nil {
+			return nil, RenderStats{}, result.Error
+		}
+
+		// Increment completed passes for the corresponding tile
+		pr.tiles[result.TaskID].PassesCompleted++
+	}
+
+	// Assemble image and calculate final stats from actual pixel data
 	img, stats := pr.assembleCurrentImage(targetSamples)
 
 	return img, stats, nil
@@ -130,6 +154,9 @@ func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStat
 	var allStats []RenderStats
 
 	fmt.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
+
+	// Ensure worker pool is cleaned up when we're done
+	defer pr.workerPool.Stop()
 
 	for pass := 1; pass <= pr.config.MaxPasses; pass++ {
 		startTime := time.Now()
@@ -147,8 +174,6 @@ func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStat
 
 		images = append(images, img)
 		allStats = append(allStats, stats)
-
-		// Note: Image saving is now handled by the caller (main.go)
 
 		// Check if we've reached maximum samples
 		if actualSamples >= pr.config.MaxSamplesPerPixel {

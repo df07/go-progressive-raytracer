@@ -18,6 +18,7 @@ type Config struct {
 	SceneType  string
 	RenderMode string
 	MaxPasses  int
+	NumWorkers int
 	Help       bool
 }
 
@@ -68,6 +69,7 @@ func parseFlags() Config {
 	flag.StringVar(&config.SceneType, "scene", "default", "Scene type: 'default' or 'cornell'")
 	flag.StringVar(&config.RenderMode, "mode", "normal", "Render mode: 'normal' or 'progressive'")
 	flag.IntVar(&config.MaxPasses, "max-passes", 5, "Maximum number of progressive passes")
+	flag.IntVar(&config.NumWorkers, "workers", 0, "Number of parallel workers (0 = auto-detect CPU count)")
 	flag.BoolVar(&config.Help, "help", false, "Show help information")
 	flag.Parse()
 	return config
@@ -87,7 +89,12 @@ func showHelp() {
 	fmt.Println()
 	fmt.Println("Available modes:")
 	fmt.Println("  normal      - Standard single-threaded rendering")
-	fmt.Println("  progressive - Progressive multi-pass rendering")
+	fmt.Println("  progressive - Progressive multi-pass parallel rendering")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  raytracer.exe --mode=progressive --max-passes=5")
+	fmt.Println("  raytracer.exe --scene=cornell --mode=progressive --workers=4")
+	fmt.Println("  raytracer.exe --mode=normal")
 	fmt.Println()
 	fmt.Println("Output will be saved to output/<scene_type>/render_<timestamp>.png")
 }
@@ -163,6 +170,7 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 
 	progressiveConfig := renderer.DefaultProgressiveConfig()
 	progressiveConfig.MaxPasses = config.MaxPasses
+	progressiveConfig.NumWorkers = config.NumWorkers
 
 	progressiveRT := renderer.NewProgressiveRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height, progressiveConfig)
 
