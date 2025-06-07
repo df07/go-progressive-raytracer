@@ -21,4 +21,8 @@
 - Use progressive refinement - start simple, add complexity incrementally
 - Prioritize correctness over performance initially
 - Make rendering results reproducible and testable
-- Design for progressive enhancement (multiple passes) 
+- Design for progressive enhancement (multiple passes)
+
+## Go Language Best Practices
+- Don't worry about backwards compatibility of modules. Nobody else uses this module.
+- Use the built-in min and max functions instead of custom implementations 
