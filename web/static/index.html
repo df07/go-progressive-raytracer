@@ -226,24 +226,54 @@
             
             <div class="control-group">
                 <label for="width">Width:</label>
-                <input type="number" id="width" value="400" min="100" max="1000" step="50">
+                <input type="number" id="width" value="400" step="50">
             </div>
             
             <div class="control-group">
                 <label for="height">Height:</label>
-                <input type="number" id="height" value="400" min="100" max="1000" step="50">
+                <input type="number" id="height" value="400" step="50">
             </div>
             
             <div class="control-group">
                 <label for="maxSamples">Max Samples:</label>
-                <input type="number" id="maxSamples" value="50" min="1" max="10000" step="10">
-                <small style="color: #666; font-size: 12px;">Total samples per pixel (1-10000)</small>
+                <input type="number" id="maxSamples" value="50" step="10">
+                <small style="color: #666; font-size: 12px;">Total samples per pixel</small>
             </div>
             
             <div class="control-group">
                 <label for="maxPasses">Max Passes:</label>
-                <input type="number" id="maxPasses" value="7" min="1" max="100" step="1">
-                <small style="color: #666; font-size: 12px;">Number of progressive updates (1-100)</small>
+                <input type="number" id="maxPasses" value="7" step="1">
+                <small style="color: #666; font-size: 12px;">Number of progressive updates</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="rrMinBounces">RR Min Bounces:</label>
+                <input type="number" id="rrMinBounces" value="" step="1">
+                <small style="color: #666; font-size: 12px;">Min bounces before Russian Roulette</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="rrMinSamples">RR Min Samples:</label>
+                <input type="number" id="rrMinSamples" value="" step="1">
+                <small style="color: #666; font-size: 12px;">Min samples before Russian Roulette</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="adaptiveMinSamples">Adaptive Min Samples:</label>
+                <input type="number" id="adaptiveMinSamples" value="" step="1">
+                <small style="color: #666; font-size: 12px;">Min samples before adaptive convergence</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="adaptiveThreshold">Adaptive Threshold:</label>
+                <input type="number" id="adaptiveThreshold" value="" step="0.001" min="0.001" max="0.5">
+                <small style="color: #666; font-size: 12px;">Relative error threshold (0.01 = 1%)</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="adaptiveDarkThreshold">Adaptive Dark Threshold:</label>
+                <input type="number" id="adaptiveDarkThreshold" value="" step="1e-7" min="1e-10" max="1e-3">
+                <small style="color: #666; font-size: 12px;">Absolute threshold for dark pixels</small>
             </div>
         </div>
 
@@ -305,12 +335,66 @@
             constructor() {
                 this.eventSource = null;
                 this.isRendering = false;
+                this.limits = null; // Store server-provided limits
                 this.bindEvents();
+                this.loadSceneDefaults(); // Load initial defaults
             }
 
             bindEvents() {
                 document.getElementById('startBtn').addEventListener('click', () => this.startRendering());
                 document.getElementById('stopBtn').addEventListener('click', () => this.stopRendering());
+                document.getElementById('scene').addEventListener('change', () => this.loadSceneDefaults());
+            }
+
+            async loadSceneDefaults() {
+                const scene = document.getElementById('scene').value;
+                try {
+                    const response = await fetch(`/api/scene-config?scene=${scene}`);
+                    if (response.ok) {
+                        const config = await response.json();
+                        
+                        // Update form controls with scene defaults
+                        document.getElementById('rrMinBounces').value = config.defaults.russianRouletteMinBounces;
+                        document.getElementById('rrMinSamples').value = config.defaults.russianRouletteMinSamples;
+                        document.getElementById('adaptiveMinSamples').value = config.defaults.adaptiveMinSamples;
+                        document.getElementById('adaptiveThreshold').value = config.defaults.adaptiveThreshold;
+                        document.getElementById('adaptiveDarkThreshold').value = config.defaults.adaptiveDarkThreshold;
+                        
+                        // Apply validation limits from server
+                        this.applyLimits(config.limits);
+                        
+                        console.log(`Loaded defaults for ${scene}:`, config);
+                    } else {
+                        console.error('Failed to load scene config:', response.statusText);
+                    }
+                } catch (error) {
+                    console.error('Error loading scene config:', error);
+                }
+            }
+
+            applyLimits(limits) {
+                this.limits = limits; // Store limits for validation
+                
+                // Apply limits to all form controls
+                const controls = [
+                    { id: 'width', limits: limits.width },
+                    { id: 'height', limits: limits.height },
+                    { id: 'maxSamples', limits: limits.maxSamples },
+                    { id: 'maxPasses', limits: limits.maxPasses },
+                    { id: 'rrMinBounces', limits: limits.russianRouletteMinBounces },
+                    { id: 'rrMinSamples', limits: limits.russianRouletteMinSamples },
+                    { id: 'adaptiveMinSamples', limits: limits.adaptiveMinSamples },
+                    { id: 'adaptiveThreshold', limits: limits.adaptiveThreshold },
+                    { id: 'adaptiveDarkThreshold', limits: limits.adaptiveDarkThreshold },
+                ];
+
+                controls.forEach(control => {
+                    const element = document.getElementById(control.id);
+                    if (element && control.limits) {
+                        element.min = control.limits.min;
+                        element.max = control.limits.max;
+                    }
+                });
             }
 
             startRendering() {
@@ -382,27 +466,65 @@
                     width: document.getElementById('width').value,
                     height: document.getElementById('height').value,
                     maxSamples: document.getElementById('maxSamples').value,
-                    maxPasses: document.getElementById('maxPasses').value
+                    maxPasses: document.getElementById('maxPasses').value,
+                    rrMinBounces: document.getElementById('rrMinBounces').value,
+                    rrMinSamples: document.getElementById('rrMinSamples').value,
+                    adaptiveMinSamples: document.getElementById('adaptiveMinSamples').value,
+                    adaptiveThreshold: document.getElementById('adaptiveThreshold').value,
+                    adaptiveDarkThreshold: document.getElementById('adaptiveDarkThreshold').value
                 };
             }
 
             validateParameters() {
+                // Use server-provided limits if available, otherwise fall back to defaults
+                const limits = this.limits || {
+                    width: { min: 100, max: 2000 },
+                    height: { min: 100, max: 2000 },
+                    maxSamples: { min: 1, max: 10000 },
+                    maxPasses: { min: 1, max: 100 },
+                    russianRouletteMinBounces: { min: 1, max: 20 },
+                    russianRouletteMinSamples: { min: 1, max: 50 },
+                    adaptiveMinSamples: { min: 1, max: 100 },
+                    adaptiveThreshold: { min: 0.001, max: 0.5 },
+                    adaptiveDarkThreshold: { min: 1e-10, max: 1e-3 },
+                };
+
                 const width = parseInt(document.getElementById('width').value);
                 const height = parseInt(document.getElementById('height').value);
                 const maxSamples = parseInt(document.getElementById('maxSamples').value);
                 const maxPasses = parseInt(document.getElementById('maxPasses').value);
+                const rrMinBounces = parseInt(document.getElementById('rrMinBounces').value);
+                const rrMinSamples = parseInt(document.getElementById('rrMinSamples').value);
+                const adaptiveMinSamples = parseInt(document.getElementById('adaptiveMinSamples').value);
+                const adaptiveThreshold = parseFloat(document.getElementById('adaptiveThreshold').value);
+                const adaptiveDarkThreshold = parseFloat(document.getElementById('adaptiveDarkThreshold').value);
 
-                if (isNaN(width) || width < 100 || width > 2000) {
-                    return { isValid: false, error: 'Width must be between 100 and 2000' };
+                if (isNaN(width) || width < limits.width.min || width > limits.width.max) {
+                    return { isValid: false, error: `Width must be between ${limits.width.min} and ${limits.width.max}` };
                 }
-                if (isNaN(height) || height < 100 || height > 2000) {
-                    return { isValid: false, error: 'Height must be between 100 and 2000' };
+                if (isNaN(height) || height < limits.height.min || height > limits.height.max) {
+                    return { isValid: false, error: `Height must be between ${limits.height.min} and ${limits.height.max}` };
                 }
-                if (isNaN(maxSamples) || maxSamples < 1 || maxSamples > 10000) {
-                    return { isValid: false, error: 'Max samples must be between 1 and 10000' };
+                if (isNaN(maxSamples) || maxSamples < limits.maxSamples.min || maxSamples > limits.maxSamples.max) {
+                    return { isValid: false, error: `Max samples must be between ${limits.maxSamples.min} and ${limits.maxSamples.max}` };
                 }
-                if (isNaN(maxPasses) || maxPasses < 1 || maxPasses > 100) {
-                    return { isValid: false, error: 'Max passes must be between 1 and 100' };
+                if (isNaN(maxPasses) || maxPasses < limits.maxPasses.min || maxPasses > limits.maxPasses.max) {
+                    return { isValid: false, error: `Max passes must be between ${limits.maxPasses.min} and ${limits.maxPasses.max}` };
+                }
+                if (isNaN(rrMinBounces) || rrMinBounces < limits.russianRouletteMinBounces.min || rrMinBounces > limits.russianRouletteMinBounces.max) {
+                    return { isValid: false, error: `RR Min Bounces must be between ${limits.russianRouletteMinBounces.min} and ${limits.russianRouletteMinBounces.max}` };
+                }
+                if (isNaN(rrMinSamples) || rrMinSamples < limits.russianRouletteMinSamples.min || rrMinSamples > limits.russianRouletteMinSamples.max) {
+                    return { isValid: false, error: `RR Min Samples must be between ${limits.russianRouletteMinSamples.min} and ${limits.russianRouletteMinSamples.max}` };
+                }
+                if (isNaN(adaptiveMinSamples) || adaptiveMinSamples < limits.adaptiveMinSamples.min || adaptiveMinSamples > limits.adaptiveMinSamples.max) {
+                    return { isValid: false, error: `Adaptive Min Samples must be between ${limits.adaptiveMinSamples.min} and ${limits.adaptiveMinSamples.max}` };
+                }
+                if (isNaN(adaptiveThreshold) || adaptiveThreshold < limits.adaptiveThreshold.min || adaptiveThreshold > limits.adaptiveThreshold.max) {
+                    return { isValid: false, error: `Adaptive Threshold must be between ${limits.adaptiveThreshold.min} and ${limits.adaptiveThreshold.max}` };
+                }
+                if (isNaN(adaptiveDarkThreshold) || adaptiveDarkThreshold < limits.adaptiveDarkThreshold.min || adaptiveDarkThreshold > limits.adaptiveDarkThreshold.max) {
+                    return { isValid: false, error: `Adaptive Dark Threshold must be between ${limits.adaptiveDarkThreshold.min} and ${limits.adaptiveDarkThreshold.max}` };
                 }
 
                 // Performance warnings

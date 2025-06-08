@@ -346,7 +346,7 @@ func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int, ps *Pixel
 
 // shouldStopSampling determines if adaptive sampling should stop based on perceptual relative error
 func (rt *Raytracer) shouldStopSampling(ps *PixelStats) bool {
-	minSamples := 8
+	minSamples := rt.config.AdaptiveMinSamples
 
 	// Don't stop before minimum samples
 	if ps.SampleCount < minSamples {
@@ -360,16 +360,14 @@ func (rt *Raytracer) shouldStopSampling(ps *PixelStats) bool {
 
 	// Avoid division by zero for black pixels
 	if mean <= 1e-8 {
-		return variance < 1e-6 // Very low absolute threshold for dark pixels
+		return variance < rt.config.AdaptiveDarkThreshold
 	}
 
 	// Calculate coefficient of variation (relative error)
 	relativeError := math.Sqrt(variance) / mean
 
-	// Stop when relative error is below 1% (perceptually imperceptible)
-	threshold := 0.01
-
-	return relativeError < threshold
+	// Stop when relative error is below configured threshold
+	return relativeError < rt.config.AdaptiveThreshold
 }
 
 // initRenderStatsForBounds initializes the render statistics tracking for specific bounds

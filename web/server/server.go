@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -28,11 +29,16 @@ func NewServer(port int) *Server {
 
 // RenderRequest represents a render request from the client
 type RenderRequest struct {
-	Scene      string `json:"scene"`      // Scene name (e.g., "cornell-box")
-	Width      int    `json:"width"`      // Image width
-	Height     int    `json:"height"`     // Image height
-	MaxSamples int    `json:"maxSamples"` // Maximum samples per pixel
-	MaxPasses  int    `json:"maxPasses"`  // Maximum number of passes
+	Scene                 string  `json:"scene"`                 // Scene name (e.g., "cornell-box")
+	Width                 int     `json:"width"`                 // Image width
+	Height                int     `json:"height"`                // Image height
+	MaxSamples            int     `json:"maxSamples"`            // Maximum samples per pixel
+	MaxPasses             int     `json:"maxPasses"`             // Maximum number of passes
+	RRMinBounces          int     `json:"rrMinBounces"`          // Russian Roulette minimum bounces
+	RRMinSamples          int     `json:"rrMinSamples"`          // Russian Roulette minimum samples
+	AdaptiveMinSamples    int     `json:"adaptiveMinSamples"`    // Adaptive sampling minimum samples
+	AdaptiveThreshold     float64 `json:"adaptiveThreshold"`     // Adaptive sampling relative error threshold
+	AdaptiveDarkThreshold float64 `json:"adaptiveDarkThreshold"` // Adaptive sampling dark pixel threshold
 }
 
 // ProgressUpdate represents a single progressive update sent via SSE
@@ -58,11 +64,12 @@ type Stats struct {
 // Start starts the web server
 func (s *Server) Start() error {
 	// Serve static files
-	http.Handle("/", http.FileServer(http.Dir("web/static/")))
+	http.Handle("/", http.FileServer(http.Dir("static/")))
 
 	// API endpoints
 	http.HandleFunc("/api/render", s.handleRender)
 	http.HandleFunc("/api/health", s.handleHealth)
+	http.HandleFunc("/api/scene-config", s.handleSceneConfig)
 
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("Starting web server on http://localhost%s", addr)
@@ -97,6 +104,14 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		s.sendSSEError(w, "Unknown scene: "+req.Scene)
 		return
 	}
+
+	// Override Russian Roulette settings from the web request
+	// Modify the scene's sampling config directly
+	sceneObj.SamplingConfig.RussianRouletteMinBounces = req.RRMinBounces
+	sceneObj.SamplingConfig.RussianRouletteMinSamples = req.RRMinSamples
+	sceneObj.SamplingConfig.AdaptiveMinSamples = req.AdaptiveMinSamples
+	sceneObj.SamplingConfig.AdaptiveThreshold = req.AdaptiveThreshold
+	sceneObj.SamplingConfig.AdaptiveDarkThreshold = req.AdaptiveDarkThreshold
 
 	// Create progressive raytracer
 	config := renderer.ProgressiveConfig{
@@ -151,73 +166,82 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 
 // parseRenderRequest parses request parameters
 func (s *Server) parseRenderRequest(r *http.Request) (*RenderRequest, error) {
-	// Default values
-	req := &RenderRequest{
-		Scene:      "cornell-box",
-		Width:      400,
-		Height:     400,
-		MaxSamples: 50,
-		MaxPasses:  7,
-	}
+	// Initialize request with defaults handled by helper functions
+	req := &RenderRequest{}
 
-	var warnings []string
-
-	// Parse query parameters with validation
+	// Parse scene name (string parameter, no validation needed)
 	if scene := r.URL.Query().Get("scene"); scene != "" {
 		req.Scene = scene
+	} else {
+		req.Scene = "cornell-box" // Default scene
 	}
 
-	if width := r.URL.Query().Get("width"); width != "" {
-		if w, err := strconv.Atoi(width); err != nil {
-			return nil, fmt.Errorf("invalid width: %s", width)
-		} else if w <= 0 || w > 2000 {
-			return nil, fmt.Errorf("width must be between 1 and 2000, got: %d", w)
-		} else {
-			req.Width = w
-		}
+	// Parse and validate all parameters using helper functions
+	var err error
+	if req.Width, err = parseIntParam(r.URL.Query(), "width", 400, 100, 2000); err != nil {
+		return nil, err
 	}
-
-	if height := r.URL.Query().Get("height"); height != "" {
-		if h, err := strconv.Atoi(height); err != nil {
-			return nil, fmt.Errorf("invalid height: %s", height)
-		} else if h <= 0 || h > 2000 {
-			return nil, fmt.Errorf("height must be between 1 and 2000, got: %d", h)
-		} else {
-			req.Height = h
-		}
+	if req.Height, err = parseIntParam(r.URL.Query(), "height", 400, 100, 2000); err != nil {
+		return nil, err
 	}
-
-	if maxSamples := r.URL.Query().Get("maxSamples"); maxSamples != "" {
-		if ms, err := strconv.Atoi(maxSamples); err != nil {
-			return nil, fmt.Errorf("invalid maxSamples: %s", maxSamples)
-		} else if ms <= 0 || ms > 10000 {
-			return nil, fmt.Errorf("maxSamples must be between 1 and 10000, got: %d", ms)
-		} else {
-			req.MaxSamples = ms
-		}
+	if req.MaxSamples, err = parseIntParam(r.URL.Query(), "maxSamples", 50, 1, 10000); err != nil {
+		return nil, err
 	}
-
-	if maxPasses := r.URL.Query().Get("maxPasses"); maxPasses != "" {
-		if mp, err := strconv.Atoi(maxPasses); err != nil {
-			return nil, fmt.Errorf("invalid maxPasses: %s", maxPasses)
-		} else if mp <= 0 || mp > 100 {
-			return nil, fmt.Errorf("maxPasses must be between 1 and 100, got: %d", mp)
-		} else {
-			req.MaxPasses = mp
-		}
+	if req.MaxPasses, err = parseIntParam(r.URL.Query(), "maxPasses", 7, 1, 10000); err != nil {
+		return nil, err
+	}
+	if req.RRMinBounces, err = parseIntParam(r.URL.Query(), "rrMinBounces", 5, 1, 1000); err != nil {
+		return nil, err
+	}
+	if req.RRMinSamples, err = parseIntParam(r.URL.Query(), "rrMinSamples", 8, 1, 1000); err != nil {
+		return nil, err
+	}
+	if req.AdaptiveMinSamples, err = parseIntParam(r.URL.Query(), "adaptiveMinSamples", 8, 1, 1000); err != nil {
+		return nil, err
+	}
+	if req.AdaptiveThreshold, err = parseFloatParam(r.URL.Query(), "adaptiveThreshold", 0.01, 0.001, 0.5); err != nil {
+		return nil, err
+	}
+	if req.AdaptiveDarkThreshold, err = parseFloatParam(r.URL.Query(), "adaptiveDarkThreshold", 1e-6, 1e-10, 1e-3); err != nil {
+		return nil, err
 	}
 
 	// Performance warning
 	if req.Width*req.Height > 800*600 && req.MaxSamples > 100 {
-		warnings = append(warnings, "Large image with high samples may render slowly")
-	}
-
-	// Log the warnings but don't fail the request
-	if len(warnings) > 0 {
-		log.Printf("Render warnings: %v", warnings)
+		log.Printf("Render warning: Large image with high samples may render slowly")
 	}
 
 	return req, nil
+}
+
+// parseIntParam parses an integer parameter from URL query with validation
+func parseIntParam(values url.Values, key string, defaultValue, min, max int) (int, error) {
+	if value := values.Get(key); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			return 0, fmt.Errorf("invalid %s: %s", key, value)
+		}
+		if parsed < min || parsed > max {
+			return 0, fmt.Errorf("%s must be between %d and %d, got: %d", key, min, max, parsed)
+		}
+		return parsed, nil
+	}
+	return defaultValue, nil
+}
+
+// parseFloatParam parses a float parameter from URL query with validation
+func parseFloatParam(values url.Values, key string, defaultValue, min, max float64) (float64, error) {
+	if value := values.Get(key); value != "" {
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid %s: %s", key, value)
+		}
+		if parsed < min || parsed > max {
+			return 0, fmt.Errorf("%s must be between %f and %f, got: %f", key, min, max, parsed)
+		}
+		return parsed, nil
+	}
+	return defaultValue, nil
 }
 
 // createScene creates a scene based on the scene name
@@ -263,4 +287,78 @@ func (s *Server) sendSSEEvent(w http.ResponseWriter, event, data string) error {
 		return nil
 	}
 	return fmt.Errorf("streaming not supported")
+}
+
+// handleSceneConfig returns the default configuration for a scene
+func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	sceneName := r.URL.Query().Get("scene")
+	if sceneName == "" {
+		sceneName = "cornell-box" // Default scene
+	}
+
+	sceneObj := s.createScene(sceneName)
+	if sceneObj == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + sceneName})
+		return
+	}
+
+	// Return the scene's sampling configuration with validation limits
+	config := sceneObj.GetSamplingConfig()
+	response := map[string]interface{}{
+		"scene": sceneName,
+		"defaults": map[string]interface{}{
+			"samplesPerPixel":           config.SamplesPerPixel,
+			"maxDepth":                  config.MaxDepth,
+			"russianRouletteMinBounces": config.RussianRouletteMinBounces,
+			"russianRouletteMinSamples": config.RussianRouletteMinSamples,
+			"adaptiveMinSamples":        config.AdaptiveMinSamples,
+			"adaptiveThreshold":         config.AdaptiveThreshold,
+			"adaptiveDarkThreshold":     config.AdaptiveDarkThreshold,
+		},
+		"limits": map[string]interface{}{
+			"width": map[string]int{
+				"min": 100,
+				"max": 2000,
+			},
+			"height": map[string]int{
+				"min": 100,
+				"max": 2000,
+			},
+			"maxSamples": map[string]int{
+				"min": 1,
+				"max": 10000,
+			},
+			"maxPasses": map[string]int{
+				"min": 1,
+				"max": 10000,
+			},
+			"russianRouletteMinBounces": map[string]int{
+				"min": 1,
+				"max": 1000,
+			},
+			"russianRouletteMinSamples": map[string]int{
+				"min": 1,
+				"max": 1000,
+			},
+			"adaptiveMinSamples": map[string]int{
+				"min": 1,
+				"max": 1000,
+			},
+			"adaptiveThreshold": map[string]float64{
+				"min": 0.001,
+				"max": 0.5,
+			},
+			"adaptiveDarkThreshold": map[string]float64{
+				"min": 1e-10,
+				"max": 1e-3,
+			},
+		},
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }

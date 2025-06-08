@@ -23,8 +23,11 @@ func NewCornellScene() *Scene {
 	samplingConfig := core.SamplingConfig{
 		SamplesPerPixel:           150,
 		MaxDepth:                  40,
-		RussianRouletteMinBounces: 4, // More aggressive - fewer complex caustics
-		RussianRouletteMinSamples: 6, // Fewer samples before RR
+		RussianRouletteMinBounces: 16,   // Need a lot of bounces for indirect lighting
+		RussianRouletteMinSamples: 8,    // Fewer samples before RR
+		AdaptiveMinSamples:        8,    // Lower minimum for simpler scene
+		AdaptiveThreshold:         0.01, // Slightly higher threshold (1%) for faster convergence
+		AdaptiveDarkThreshold:     1e-6, // Same absolute threshold for dark pixels
 	}
 
 	camera := renderer.NewCamera(config)

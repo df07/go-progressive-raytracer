@@ -33,8 +33,11 @@ func NewDefaultScene() *Scene {
 	samplingConfig := core.SamplingConfig{
 		SamplesPerPixel:           200,
 		MaxDepth:                  50,
-		RussianRouletteMinBounces: 6,  // More conservative for complex glass
-		RussianRouletteMinSamples: 10, // More samples before RR due to caustics
+		RussianRouletteMinBounces: 16,   // Need a lot of bounces for complex glass
+		RussianRouletteMinSamples: 8,    // More samples before RR due to caustics
+		AdaptiveMinSamples:        8,    // Standard minimum for adaptive sampling
+		AdaptiveThreshold:         0.01, // 1% relative error threshold
+		AdaptiveDarkThreshold:     1e-6, // Low absolute threshold for dark pixels
 	}
 
 	camera := renderer.NewCamera(config)
