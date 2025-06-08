@@ -111,7 +111,7 @@ func TestRaytracer_DiffuseColorCalculation(t *testing.T) {
 	}
 
 	// Test that PDF is properly used in Monte Carlo integration
-	color := raytracer.calculateDiffuseColor(scatter, hit, 2, random)
+	color := raytracer.calculateDiffuseColor(scatter, hit, 2, core.NewVec3(1, 1, 1), 0, random)
 
 	// For cosine-weighted sampling with albedo=0.5:
 	// - cosine = 1.0 (straight up)
@@ -163,7 +163,7 @@ func TestRaytracer_SpecularColorCalculation(t *testing.T) {
 
 	// For specular reflection:
 	// Result = attenuation * incoming = 0.8 * 1.0 = 0.8
-	color := raytracer.calculateSpecularColor(scatter, 5, random)
+	color := raytracer.calculateSpecularColor(scatter, 5, core.NewVec3(1, 1, 1), 0, random)
 	expectedColor := core.NewVec3(0.8, 0.8, 0.8)
 	tolerance := 1e-3
 
@@ -199,13 +199,13 @@ func TestRaytracer_RecursiveRayColor(t *testing.T) {
 	random := rand.New(rand.NewSource(42))
 
 	// At depth 0, should return black
-	color := raytracer.rayColorRecursive(ray, 0, random)
+	color := raytracer.rayColorRecursive(ray, 0, core.NewVec3(1, 1, 1), 0, random)
 	if color.X != 0 || color.Y != 0 || color.Z != 0 {
 		t.Errorf("Expected black at depth 0, got %v", color)
 	}
 
 	// Test background color when no intersection
-	color = raytracer.rayColorRecursive(ray, 5, random)
+	color = raytracer.rayColorRecursive(ray, 5, core.NewVec3(1, 1, 1), 0, random)
 	expectedColor := core.NewVec3(1, 1, 1) // White background
 	tolerance := 1e-3
 

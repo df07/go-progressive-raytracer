@@ -114,22 +114,64 @@ func (rt *Raytracer) backgroundGradient(r core.Ray) core.Vec3 {
 }
 
 // calculateSpecularColor handles specular material scattering with the provided random generator
-func (rt *Raytracer) calculateSpecularColor(scatter core.ScatterResult, depth int, random *rand.Rand) core.Vec3 {
+func (rt *Raytracer) calculateSpecularColor(scatter core.ScatterResult, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
+	// Update throughput with material attenuation
+	newThroughput := throughput.MultiplyVec(scatter.Attenuation)
 	return scatter.Attenuation.MultiplyVec(
-		rt.rayColorRecursive(scatter.Scattered, depth-1, random))
+		rt.rayColorRecursive(scatter.Scattered, depth-1, newThroughput, sampleIndex, random))
 }
 
-// rayColorRecursive returns the color for a given ray with material support using the provided random generator
-func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int, random *rand.Rand) core.Vec3 {
+// applyRussianRoulette determines if a ray should be terminated and returns the compensation factor
+// Returns (shouldTerminate, compensationFactor)
+func (rt *Raytracer) applyRussianRoulette(depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) (bool, float64) {
+	// Apply Russian Roulette after minimum bounces AND minimum samples per pixel
+	const minBounces = 5         // More conservative - protect more bounces
+	const minSamplesBeforeRR = 8 // Protect more early samples per pixel
+	initialDepth := rt.config.MaxDepth
+	currentBounce := initialDepth - depth
+
+	shouldApplyRR := currentBounce >= minBounces && sampleIndex >= minSamplesBeforeRR
+
+	if !shouldApplyRR {
+		return false, 1.0 // Don't terminate, no compensation needed
+	}
+
+	// Calculate survival probability based on throughput
+	// Use luminance for perceptually accurate survival probability
+	luminance := throughput.Luminance()
+
+	// Conservative bounds: survivalProb between 0.5 and 0.95
+	// This naturally limits compensation factor to between 1.05x and 2.0x
+	survivalProb := math.Min(0.95, math.Max(0.5, luminance))
+
+	// Russian Roulette test
+	if random.Float64() > survivalProb {
+		return true, 0.0 // Terminate ray
+	}
+
+	// Energy-conserving compensation (no artificial cap)
+	compensationFactor := 1.0 / survivalProb
+	return false, compensationFactor
+}
+
+// rayColorRecursive returns the color for a given ray with material support and Russian Roulette termination
+func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	// If we've exceeded the ray bounce limit, no more light is gathered
 	if depth <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Apply Russian Roulette termination
+	shouldTerminate, rrCompensation := rt.applyRussianRoulette(depth, throughput, sampleIndex, random)
+	if shouldTerminate {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
 	// Check for intersections with objects
 	hit, isHit := rt.hitWorld(r, 0.001, 1000.0)
 	if !isHit {
-		return rt.backgroundGradient(r)
+		bgColor := rt.backgroundGradient(r)
+		return bgColor.Multiply(rrCompensation)
 	}
 
 	// Start with emitted light from the hit material
@@ -139,26 +181,27 @@ func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int, random *rand.Rand)
 	scatter, didScatter := hit.Material.Scatter(r, *hit, random)
 	if !didScatter {
 		// Material absorbed the ray, only return emitted light
-		return colorEmitted
+		return colorEmitted.Multiply(rrCompensation)
 	}
 
 	// Handle scattering based on material type
 	var colorScattered core.Vec3
 	if scatter.IsSpecular() {
-		colorScattered = rt.calculateSpecularColor(scatter, depth, random)
+		colorScattered = rt.calculateSpecularColor(scatter, depth, throughput, sampleIndex, random)
 	} else {
-		colorScattered = rt.calculateDiffuseColor(scatter, hit, depth, random)
+		colorScattered = rt.calculateDiffuseColor(scatter, hit, depth, throughput, sampleIndex, random)
 	}
 
-	// Return emitted + scattered light
-	return colorEmitted.Add(colorScattered)
+	// Apply Russian Roulette compensation to the final result
+	finalColor := colorEmitted.Add(colorScattered)
+	return finalColor.Multiply(rrCompensation)
 }
 
-// calculateDiffuseColor handles diffuse material scattering with the provided random generator
-func (rt *Raytracer) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, depth int, random *rand.Rand) core.Vec3 {
+// calculateDiffuseColor handles diffuse material scattering with throughput tracking
+func (rt *Raytracer) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
 	directLight := rt.calculateDirectLighting(rt.scene, scatter, hit, random)
-	indirectLight := rt.calculateIndirectLighting(rt.scene, scatter, hit, depth, random)
+	indirectLight := rt.calculateIndirectLighting(rt.scene, scatter, hit, depth, throughput, sampleIndex, random)
 	return directLight.Add(indirectLight)
 }
 
@@ -212,8 +255,8 @@ func (rt *Raytracer) calculateDirectLighting(scene core.Scene, scatter core.Scat
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
 
-// calculateIndirectLighting handles indirect illumination via material sampling with the provided random generator
-func (rt *Raytracer) calculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, random *rand.Rand) core.Vec3 {
+// calculateIndirectLighting handles indirect illumination via material sampling with throughput tracking
+func (rt *Raytracer) calculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	if scatter.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -231,8 +274,11 @@ func (rt *Raytracer) calculateIndirectLighting(scene core.Scene, scatter core.Sc
 	// Calculate MIS weight
 	misWeight := core.PowerHeuristic(1, scatter.PDF, 1, lightPDF)
 
-	// Get incoming light from the scattered direction
-	incomingLight := rt.rayColorRecursive(scatter.Scattered, depth-1, random)
+	// Update throughput for the recursive call
+	newThroughput := throughput.MultiplyVec(scatter.Attenuation).Multiply(cosine / scatter.PDF)
+
+	// Get incoming light from the scattered direction with throughput tracking
+	incomingLight := rt.rayColorRecursive(scatter.Scattered, depth-1, newThroughput, sampleIndex, random)
 
 	// Indirect lighting contribution with MIS
 	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)
@@ -284,7 +330,8 @@ func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int, ps *Pixel
 	// Take samples until we reach convergence or max samples
 	for ps.SampleCount < maxSamples && !rt.shouldStopSampling(ps) {
 		ray := camera.GetRay(i, j, random)
-		color := rt.rayColorRecursive(ray, rt.config.MaxDepth, random)
+		// Use sample-aware Russian Roulette that protects early samples
+		color := rt.rayColorRecursive(ray, rt.config.MaxDepth, core.Vec3{X: 1.0, Y: 1.0, Z: 1.0}, ps.SampleCount, random)
 		ps.AddSample(color)
 	}
 
