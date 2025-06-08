@@ -44,40 +44,48 @@ func (ps *PixelStats) GetColor() core.Vec3 {
 	return ps.ColorAccum.Multiply(1.0 / float64(ps.SampleCount))
 }
 
-// SamplingConfig contains rendering configuration
-type SamplingConfig struct {
-	SamplesPerPixel int // Number of rays per pixel
-	MaxDepth        int // Maximum ray bounce depth
-}
-
-// DefaultSamplingConfig returns sensible default values
-func DefaultSamplingConfig() SamplingConfig {
-	return SamplingConfig{
-		SamplesPerPixel: 200,
-		MaxDepth:        50,
-	}
-}
-
 // Raytracer handles the rendering process
 type Raytracer struct {
 	scene  core.Scene
 	width  int
 	height int
-	config SamplingConfig
+	config core.SamplingConfig
 }
 
 // NewRaytracer creates a new raytracer
 func NewRaytracer(scene core.Scene, width, height int) *Raytracer {
+	samplingConfig := scene.GetSamplingConfig()
 	return &Raytracer{
 		scene:  scene,
 		width:  width,
 		height: height,
-		config: DefaultSamplingConfig(),
+		config: samplingConfig,
 	}
 }
 
+// MergeSamplingConfig updates only the non-zero fields from the provided config
+func (rt *Raytracer) MergeSamplingConfig(updates core.SamplingConfig) {
+	if updates.SamplesPerPixel != 0 {
+		rt.config.SamplesPerPixel = updates.SamplesPerPixel
+	}
+	if updates.MaxDepth != 0 {
+		rt.config.MaxDepth = updates.MaxDepth
+	}
+	if updates.RussianRouletteMinBounces != 0 {
+		rt.config.RussianRouletteMinBounces = updates.RussianRouletteMinBounces
+	}
+	if updates.RussianRouletteMinSamples != 0 {
+		rt.config.RussianRouletteMinSamples = updates.RussianRouletteMinSamples
+	}
+}
+
+// GetSamplingConfig returns the current sampling configuration
+func (rt *Raytracer) GetSamplingConfig() core.SamplingConfig {
+	return rt.config
+}
+
 // SetSamplingConfig updates the sampling configuration
-func (rt *Raytracer) SetSamplingConfig(config SamplingConfig) {
+func (rt *Raytracer) SetSamplingConfig(config core.SamplingConfig) {
 	rt.config = config
 }
 
@@ -125,12 +133,10 @@ func (rt *Raytracer) calculateSpecularColor(scatter core.ScatterResult, depth in
 // Returns (shouldTerminate, compensationFactor)
 func (rt *Raytracer) applyRussianRoulette(depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) (bool, float64) {
 	// Apply Russian Roulette after minimum bounces AND minimum samples per pixel
-	const minBounces = 5         // More conservative - protect more bounces
-	const minSamplesBeforeRR = 8 // Protect more early samples per pixel
 	initialDepth := rt.config.MaxDepth
 	currentBounce := initialDepth - depth
 
-	shouldApplyRR := currentBounce >= minBounces && sampleIndex >= minSamplesBeforeRR
+	shouldApplyRR := currentBounce >= rt.config.RussianRouletteMinBounces && sampleIndex >= rt.config.RussianRouletteMinSamples
 
 	if !shouldApplyRR {
 		return false, 1.0 // Don't terminate, no compensation needed

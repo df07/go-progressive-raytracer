@@ -9,11 +9,12 @@ import (
 
 // Scene contains all the elements needed for rendering
 type Scene struct {
-	Camera      *renderer.Camera
-	TopColor    core.Vec3    // Color at top of gradient
-	BottomColor core.Vec3    // Color at bottom of gradient
-	Shapes      []core.Shape // Objects in the scene
-	Lights      []core.Light // Lights in the scene
+	Camera         *renderer.Camera
+	TopColor       core.Vec3    // Color at top of gradient
+	BottomColor    core.Vec3    // Color at bottom of gradient
+	Shapes         []core.Shape // Objects in the scene
+	Lights         []core.Light // Lights in the scene
+	SamplingConfig core.SamplingConfig
 }
 
 // NewDefaultScene creates a default scene with lighting, gradient background and spheres with materials
@@ -29,15 +30,23 @@ func NewDefaultScene() *Scene {
 		FocusDistance: 0.0,  // Auto-calculate focus distance
 	}
 
+	samplingConfig := core.SamplingConfig{
+		SamplesPerPixel:           200,
+		MaxDepth:                  50,
+		RussianRouletteMinBounces: 6,  // More conservative for complex glass
+		RussianRouletteMinSamples: 10, // More samples before RR due to caustics
+	}
+
 	camera := renderer.NewCamera(config)
 
 	// Create the scene
 	s := &Scene{
-		Camera:      camera,
-		TopColor:    core.NewVec3(0.5, 0.7, 1.0), // Blue
-		BottomColor: core.NewVec3(1.0, 1.0, 1.0), // White
-		Shapes:      make([]core.Shape, 0),
-		Lights:      make([]core.Light, 0),
+		Camera:         camera,
+		TopColor:       core.NewVec3(0.5, 0.7, 1.0), // Blue
+		BottomColor:    core.NewVec3(1.0, 1.0, 1.0), // White
+		Shapes:         make([]core.Shape, 0),
+		Lights:         make([]core.Light, 0),
+		SamplingConfig: samplingConfig,
 	}
 
 	// Add the specified light: pos [30, 30.5, 15], r: 10, emit: [15.0, 14.0, 13.0]
@@ -97,6 +106,11 @@ func (s *Scene) GetShapes() []core.Shape {
 // GetLights returns all lights in the scene
 func (s *Scene) GetLights() []core.Light {
 	return s.Lights
+}
+
+// GetSamplingConfig returns the scene's sampling configuration
+func (s *Scene) GetSamplingConfig() core.SamplingConfig {
+	return s.SamplingConfig
 }
 
 // AddSphereLight adds a spherical light to the scene

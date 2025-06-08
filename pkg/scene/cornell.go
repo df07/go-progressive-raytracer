@@ -20,15 +20,23 @@ func NewCornellScene() *Scene {
 		FocusDistance: 0.0,  // Auto-calculate focus distance
 	}
 
+	samplingConfig := core.SamplingConfig{
+		SamplesPerPixel:           150,
+		MaxDepth:                  40,
+		RussianRouletteMinBounces: 4, // More aggressive - fewer complex caustics
+		RussianRouletteMinSamples: 6, // Fewer samples before RR
+	}
+
 	camera := renderer.NewCamera(config)
 
 	// Create the scene
 	s := &Scene{
-		Camera:      camera,
-		TopColor:    core.NewVec3(0.0, 0.0, 0.0), // Black background
-		BottomColor: core.NewVec3(0.0, 0.0, 0.0), // Black background
-		Shapes:      make([]core.Shape, 0),
-		Lights:      make([]core.Light, 0),
+		Camera:         camera,
+		TopColor:       core.NewVec3(0.0, 0.0, 0.0), // Black background
+		BottomColor:    core.NewVec3(0.0, 0.0, 0.0), // Black background
+		Shapes:         make([]core.Shape, 0),
+		Lights:         make([]core.Light, 0),
+		SamplingConfig: samplingConfig,
 	}
 
 	// Create materials

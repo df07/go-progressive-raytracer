@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -222,7 +221,7 @@ func (s *Server) parseRenderRequest(r *http.Request) (*RenderRequest, error) {
 }
 
 // createScene creates a scene based on the scene name
-func (s *Server) createScene(sceneName string) core.Scene {
+func (s *Server) createScene(sceneName string) *scene.Scene {
 	switch sceneName {
 	case "cornell-box":
 		return scene.NewCornellScene()

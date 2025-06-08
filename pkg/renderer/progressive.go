@@ -110,9 +110,8 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int) (*image.RGBA, RenderS
 		passNumber, targetSamples, pr.workerPool.GetNumWorkers())
 
 	// Configure base raytracer for this pass (for shared pixel stats processing)
-	pr.raytracer.SetSamplingConfig(SamplingConfig{
+	pr.raytracer.MergeSamplingConfig(core.SamplingConfig{
 		SamplesPerPixel: targetSamples,
-		MaxDepth:        25, // Keep consistent with main.go
 	})
 
 	// Start worker pool if not already started

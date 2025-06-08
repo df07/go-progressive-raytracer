@@ -110,10 +110,9 @@ func (w *Worker) run(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for task := range w.taskQueue {
-		// Configure raytracer for this pass
-		w.raytracer.SetSamplingConfig(SamplingConfig{
+		// Configure raytracer for this pass, merging only the target samples
+		w.raytracer.MergeSamplingConfig(core.SamplingConfig{
 			SamplesPerPixel: task.TargetSamples,
-			MaxDepth:        25, // Keep consistent
 		})
 
 		// Render the tile directly to the shared pixel stats array

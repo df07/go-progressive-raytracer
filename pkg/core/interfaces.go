@@ -46,6 +46,15 @@ type Scene interface {
 	GetBackgroundColors() (topColor, bottomColor Vec3)
 	GetShapes() []Shape
 	GetLights() []Light
+	GetSamplingConfig() SamplingConfig
+}
+
+// SamplingConfig contains rendering configuration
+type SamplingConfig struct {
+	SamplesPerPixel           int // Number of rays per pixel
+	MaxDepth                  int // Maximum ray bounce depth
+	RussianRouletteMinBounces int // Minimum bounces before Russian Roulette can activate
+	RussianRouletteMinSamples int // Minimum samples per pixel before Russian Roulette can activate
 }
 
 // ScatterResult contains the result of material scattering

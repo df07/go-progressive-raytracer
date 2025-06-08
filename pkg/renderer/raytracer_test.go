@@ -32,6 +32,7 @@ type MockScene struct {
 	shapes          []core.Shape
 	backgroundColor core.Vec3
 	lights          []core.Light
+	samplingConfig  core.SamplingConfig
 }
 
 func (m MockScene) GetCamera() core.Camera  { return m.camera }
@@ -39,7 +40,8 @@ func (m MockScene) GetShapes() []core.Shape { return m.shapes }
 func (m MockScene) GetBackgroundColors() (core.Vec3, core.Vec3) {
 	return m.backgroundColor, m.backgroundColor
 }
-func (m MockScene) GetLights() []core.Light { return m.lights }
+func (m MockScene) GetLights() []core.Light                { return m.lights }
+func (m MockScene) GetSamplingConfig() core.SamplingConfig { return m.samplingConfig }
 
 func TestRaytracer_DiffuseColorCalculation(t *testing.T) {
 	// Create a scene with a single diffuse surface
@@ -92,6 +94,7 @@ func TestRaytracer_DiffuseColorCalculation(t *testing.T) {
 		camera:          camera,
 		shapes:          []core.Shape{shape},
 		backgroundColor: core.NewVec3(1, 1, 1), // White background
+		samplingConfig:  core.SamplingConfig{},
 	}
 
 	raytracer := NewRaytracer(scene, 800, 600)

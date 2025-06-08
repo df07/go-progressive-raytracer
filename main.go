@@ -10,6 +10,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -52,7 +53,7 @@ func main() {
 	startTime := time.Now()
 
 	sceneInfo := createScene(config.SceneType)
-	raytracer := setupRaytracer(sceneInfo)
+	raytracer := renderer.NewRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height)
 
 	outputDir := createOutputDir(config.SceneType)
 	result := renderImage(config, sceneInfo, raytracer)
@@ -140,10 +141,7 @@ func createScene(sceneType string) SceneInfo {
 // setupRaytracer creates and configures a raytracer
 func setupRaytracer(sceneInfo SceneInfo) *renderer.Raytracer {
 	raytracer := renderer.NewRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height)
-	raytracer.SetSamplingConfig(renderer.SamplingConfig{
-		SamplesPerPixel: 50, // Reduced for faster iteration
-		MaxDepth:        25, // Reduced for faster iteration
-	})
+
 	return raytracer
 }
 
@@ -253,9 +251,9 @@ func renderNormal(config Config, raytracer *renderer.Raytracer, timestamp string
 	}
 
 	// Update raytracer config to use CLI max samples
-	raytracer.SetSamplingConfig(renderer.SamplingConfig{
+	raytracer.MergeSamplingConfig(core.SamplingConfig{
 		SamplesPerPixel: config.MaxSamples,
-		MaxDepth:        25, // Keep consistent
+		// Leave other settings (MaxDepth, Russian Roulette) from previous config
 	})
 
 	fmt.Println("Starting single-threaded render...")
