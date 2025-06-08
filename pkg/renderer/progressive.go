@@ -165,8 +165,8 @@ type PassResult struct {
 // PassCallback is called after each pass completes
 type PassCallback func(result PassResult) error
 
-// RenderProgressiveWithCallback renders multiple progressive passes, calling the callback after each pass
-func (pr *ProgressiveRaytracer) RenderProgressiveWithCallback(ctx context.Context, callback PassCallback) error {
+// RenderProgressive renders multiple progressive passes, calling the callback after each pass
+func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, callback PassCallback) error {
 	fmt.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
 
 	// Ensure worker pool is cleaned up when we're done
@@ -215,21 +215,6 @@ func (pr *ProgressiveRaytracer) RenderProgressiveWithCallback(ctx context.Contex
 	}
 
 	return nil
-}
-
-// RenderProgressive renders multiple progressive passes and returns all images
-func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStats, error) {
-	var images []*image.RGBA
-	var allStats []RenderStats
-
-	// Use the callback version to collect all results
-	err := pr.RenderProgressiveWithCallback(context.Background(), func(result PassResult) error {
-		images = append(images, result.Image)
-		allStats = append(allStats, result.Stats)
-		return nil
-	})
-
-	return images, allStats, err
 }
 
 // assembleCurrentImage creates an image from the current state of the shared pixel stats

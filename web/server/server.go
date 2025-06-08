@@ -130,7 +130,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	// Start progressive rendering with callback
 	startTime := time.Now()
 
-	err = raytracer.RenderProgressiveWithCallback(ctx, func(result renderer.PassResult) error {
+	err = raytracer.RenderProgressive(ctx, func(result renderer.PassResult) error {
 		// Convert image to base64 PNG
 		imageData, err := s.imageToBase64PNG(result.Image)
 		if err != nil {

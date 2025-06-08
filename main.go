@@ -193,7 +193,7 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 	var finalStats renderer.RenderStats
 
 	// Use callback to save images immediately as they complete
-	err := progressiveRT.RenderProgressiveWithCallback(context.Background(), func(result renderer.PassResult) error {
+	err := progressiveRT.RenderProgressive(context.Background(), func(result renderer.PassResult) error {
 		// Save intermediate passes (not the final one)
 		if !result.IsLast {
 			passFilename := filepath.Join(outputDir, fmt.Sprintf("%s_pass_%02d.png", baseFilename, result.PassNumber))
