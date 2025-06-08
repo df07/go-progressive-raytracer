@@ -124,10 +124,13 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 
 	raytracer := renderer.NewProgressiveRaytracer(sceneObj, req.Width, req.Height, config)
 
+	// Use request context to detect client disconnection
+	ctx := r.Context()
+
 	// Start progressive rendering with callback
 	startTime := time.Now()
 
-	err = raytracer.RenderProgressiveWithCallback(func(result renderer.PassResult) error {
+	err = raytracer.RenderProgressiveWithCallback(ctx, func(result renderer.PassResult) error {
 		// Convert image to base64 PNG
 		imageData, err := s.imageToBase64PNG(result.Image)
 		if err != nil {

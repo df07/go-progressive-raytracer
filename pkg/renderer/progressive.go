@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"math/rand"
@@ -165,13 +166,21 @@ type PassResult struct {
 type PassCallback func(result PassResult) error
 
 // RenderProgressiveWithCallback renders multiple progressive passes, calling the callback after each pass
-func (pr *ProgressiveRaytracer) RenderProgressiveWithCallback(callback PassCallback) error {
+func (pr *ProgressiveRaytracer) RenderProgressiveWithCallback(ctx context.Context, callback PassCallback) error {
 	fmt.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
 
 	// Ensure worker pool is cleaned up when we're done
 	defer pr.workerPool.Stop()
 
 	for pass := 1; pass <= pr.config.MaxPasses; pass++ {
+		// Check if client disconnected before starting this pass
+		select {
+		case <-ctx.Done():
+			fmt.Printf("Rendering cancelled before pass %d\n", pass)
+			return ctx.Err()
+		default:
+		}
+
 		startTime := time.Now()
 
 		img, stats, err := pr.RenderPass(pass)
@@ -214,7 +223,7 @@ func (pr *ProgressiveRaytracer) RenderProgressive() ([]*image.RGBA, []RenderStat
 	var allStats []RenderStats
 
 	// Use the callback version to collect all results
-	err := pr.RenderProgressiveWithCallback(func(result PassResult) error {
+	err := pr.RenderProgressiveWithCallback(context.Background(), func(result PassResult) error {
 		images = append(images, result.Image)
 		allStats = append(allStats, result.Stats)
 		return nil
