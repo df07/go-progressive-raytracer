@@ -17,6 +17,10 @@ go.work
 # Raytracer output
 output/
 
+# Air hot-reload temporary files
+tmp/
+web/tmp/
+
 # IDE and editor files
 .vscode/
 .idea/
