@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"time"
 
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
@@ -20,6 +21,7 @@ type Config struct {
 	MaxPasses  int
 	MaxSamples int
 	NumWorkers int
+	Profile    string // CPU profile output file
 	Help       bool
 }
 
@@ -72,6 +74,7 @@ func parseFlags() Config {
 	flag.IntVar(&config.MaxPasses, "max-passes", 5, "Maximum number of progressive passes")
 	flag.IntVar(&config.MaxSamples, "max-samples", 50, "Maximum samples per pixel")
 	flag.IntVar(&config.NumWorkers, "workers", 0, "Number of parallel workers (0 = auto-detect CPU count)")
+	flag.StringVar(&config.Profile, "profile", "", "CPU profile output file")
 	flag.BoolVar(&config.Help, "help", false, "Show help information")
 	flag.Parse()
 	return config
@@ -93,10 +96,15 @@ func showHelp() {
 	fmt.Println("  normal      - Standard single-threaded rendering")
 	fmt.Println("  progressive - Progressive multi-pass parallel rendering")
 	fmt.Println()
+	fmt.Println("Profiling:")
+	fmt.Println("  Use --profile=cpu.prof to generate CPU profile for normal mode")
+	fmt.Println("  Analyze with: go tool pprof cpu.prof")
+	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  raytracer.exe --mode=progressive --max-passes=5 --max-samples=100")
 	fmt.Println("  raytracer.exe --scene=cornell --mode=progressive --workers=4")
 	fmt.Println("  raytracer.exe --mode=normal --max-samples=200")
+	fmt.Println("  raytracer.exe --mode=normal --max-samples=100 --profile=cpu.prof")
 	fmt.Println("  raytracer.exe --mode=progressive --max-passes=1 --max-samples=25")
 	fmt.Println()
 	fmt.Println("Output will be saved to output/<scene_type>/render_<timestamp>.png")
@@ -227,13 +235,35 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 
 // renderNormal handles normal rendering
 func renderNormal(config Config, raytracer *renderer.Raytracer, timestamp string) RenderResult {
+	// Start CPU profiling if requested
+	if config.Profile != "" {
+		fmt.Printf("Starting CPU profiling, output: %s\n", config.Profile)
+		f, err := os.Create(config.Profile)
+		if err != nil {
+			fmt.Printf("Error creating profile file: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Printf("Error starting CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	// Update raytracer config to use CLI max samples
 	raytracer.SetSamplingConfig(renderer.SamplingConfig{
 		SamplesPerPixel: config.MaxSamples,
 		MaxDepth:        25, // Keep consistent
 	})
 
+	fmt.Println("Starting single-threaded render...")
 	img, stats := raytracer.RenderPass()
+
+	if config.Profile != "" {
+		fmt.Printf("CPU profiling complete. Analyze with: go tool pprof %s\n", config.Profile)
+	}
 
 	return RenderResult{
 		Image:     img,
