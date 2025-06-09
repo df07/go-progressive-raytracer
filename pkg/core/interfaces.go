@@ -7,6 +7,7 @@ import (
 // Shape interface for objects that can be hit by rays
 type Shape interface {
 	Hit(ray Ray, tMin, tMax float64) (*HitRecord, bool)
+	BoundingBox() AABB
 }
 
 // Material interface for objects that can scatter rays

@@ -71,7 +71,7 @@ func main() {
 // parseFlags parses command line flags and returns configuration
 func parseFlags() Config {
 	config := Config{}
-	flag.StringVar(&config.SceneType, "scene", "default", "Scene type: 'default' or 'cornell'")
+	flag.StringVar(&config.SceneType, "scene", "default", "Scene type: 'default', 'cornell', or 'spheregrid'")
 	flag.StringVar(&config.RenderMode, "mode", "normal", "Render mode: 'normal' or 'progressive'")
 	flag.IntVar(&config.MaxPasses, "max-passes", 5, "Maximum number of progressive passes")
 	flag.IntVar(&config.MaxSamples, "max-samples", 50, "Maximum samples per pixel")
@@ -91,8 +91,9 @@ func showHelp() {
 	flag.PrintDefaults()
 	fmt.Println()
 	fmt.Println("Available scenes:")
-	fmt.Println("  default - Default scene with spheres and plane ground")
-	fmt.Println("  cornell - Cornell box scene with quad walls and area lighting")
+	fmt.Println("  default    - Default scene with spheres and plane ground")
+	fmt.Println("  cornell    - Cornell box scene with quad walls and area lighting")
+	fmt.Println("  spheregrid - 10x10 grid of rainbow-colored metallic spheres (perfect for BVH testing)")
 	fmt.Println()
 	fmt.Println("Available modes:")
 	fmt.Println("  normal      - Standard single-threaded rendering")
@@ -122,6 +123,13 @@ func createScene(sceneType string) SceneInfo {
 			Width:  400,
 			Height: 400, // Square aspect ratio for Cornell box
 		}
+	case "spheregrid":
+		fmt.Println("Using sphere grid scene...")
+		return SceneInfo{
+			Scene:  scene.NewSphereGridScene(),
+			Width:  800,
+			Height: 450, // 16:9 aspect ratio for sphere grid
+		}
 	case "default":
 		fmt.Println("Using default scene...")
 		return SceneInfo{
@@ -149,7 +157,7 @@ func setupRaytracer(sceneInfo SceneInfo) *renderer.Raytracer {
 // createOutputDir creates the output directory for the scene type
 func createOutputDir(sceneType string) string {
 	// Normalize scene type
-	if sceneType != "cornell" && sceneType != "default" {
+	if sceneType != "cornell" && sceneType != "default" && sceneType != "spheregrid" {
 		sceneType = "default"
 	}
 

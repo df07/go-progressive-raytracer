@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 func TestQuad_Hit_BasicIntersection(t *testing.T) {
@@ -120,5 +121,80 @@ func TestQuad_Hit_ParallelRay(t *testing.T) {
 	_, isHit := quad.Hit(ray, 0.001, 1000.0)
 	if isHit {
 		t.Error("Expected miss for parallel ray, but got hit")
+	}
+}
+
+func TestGetAxisAlignment(t *testing.T) {
+	tests := []struct {
+		name     string
+		normal   core.Vec3
+		expected AxisAlignment
+	}{
+		{
+			name:     "X-axis aligned",
+			normal:   core.NewVec3(1, 0, 0),
+			expected: XAxisAligned,
+		},
+		{
+			name:     "Y-axis aligned",
+			normal:   core.NewVec3(0, 1, 0),
+			expected: YAxisAligned,
+		},
+		{
+			name:     "Z-axis aligned",
+			normal:   core.NewVec3(0, 0, 1),
+			expected: ZAxisAligned,
+		},
+		{
+			name:     "Negative X-axis aligned",
+			normal:   core.NewVec3(-1, 0, 0),
+			expected: XAxisAligned,
+		},
+		{
+			name:     "Not axis aligned",
+			normal:   core.NewVec3(0.707, 0.707, 0),
+			expected: NotAxisAligned,
+		},
+		{
+			name:     "Nearly axis aligned but not quite",
+			normal:   core.NewVec3(0.999, 0.001, 0),
+			expected: NotAxisAligned,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getAxisAlignment(tt.normal)
+			if result != tt.expected {
+				t.Errorf("getAxisAlignment(%v) = %v, want %v", tt.normal, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAxisAlignedQuadBoundingBox(t *testing.T) {
+	mat := &material.Lambertian{Albedo: core.NewVec3(0.5, 0.5, 0.5)}
+
+	// Test X-axis aligned quad (in YZ plane)
+	quad := NewQuad(
+		core.NewVec3(5, 0, 0), // corner
+		core.NewVec3(0, 2, 0), // u vector (along Y)
+		core.NewVec3(0, 0, 3), // v vector (along Z)
+		mat,
+	)
+
+	bbox := quad.BoundingBox()
+
+	// Should have thin X dimension and proper Y,Z extents
+	const epsilon = 0.001
+	expectedMin := core.NewVec3(5-epsilon, 0, 0)
+	expectedMax := core.NewVec3(5+epsilon, 2, 3)
+
+	// Check each component with tolerance
+	if math.Abs(bbox.Min.X-(5-epsilon)) > epsilon || math.Abs(bbox.Min.Y-0) > epsilon || math.Abs(bbox.Min.Z-0) > epsilon {
+		t.Errorf("X-aligned quad bbox min = %v, want %v", bbox.Min, expectedMin)
+	}
+	if math.Abs(bbox.Max.X-(5+epsilon)) > epsilon || math.Abs(bbox.Max.Y-2) > epsilon || math.Abs(bbox.Max.Z-3) > epsilon {
+		t.Errorf("X-aligned quad bbox max = %v, want %v", bbox.Max, expectedMax)
 	}
 }

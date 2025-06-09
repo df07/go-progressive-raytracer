@@ -26,6 +26,11 @@ func (m MockShape) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool)
 	return m.hitFn(ray, tMin, tMax)
 }
 
+func (m MockShape) BoundingBox() core.AABB {
+	// Return a simple bounding box for testing
+	return core.NewAABB(core.NewVec3(-1, -1, -1), core.NewVec3(1, 1, 1))
+}
+
 // MockScene implements core.Scene for testing
 type MockScene struct {
 	camera          *Camera

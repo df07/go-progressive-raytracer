@@ -254,6 +254,8 @@ func (s *Server) createScene(sceneName string) *scene.Scene {
 		return scene.NewCornellScene()
 	case "basic":
 		return scene.NewDefaultScene()
+	case "sphere-grid":
+		return scene.NewSphereGridScene()
 	default:
 		return nil
 	}

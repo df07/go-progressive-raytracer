@@ -50,16 +50,23 @@ type Raytracer struct {
 	width  int
 	height int
 	config core.SamplingConfig
+	bvh    *core.BVH // BVH for fast ray-object intersection
 }
 
 // NewRaytracer creates a new raytracer
 func NewRaytracer(scene core.Scene, width, height int) *Raytracer {
 	samplingConfig := scene.GetSamplingConfig()
+
+	// Build BVH from scene shapes for fast intersection
+	shapes := scene.GetShapes()
+	bvh := core.NewBVH(shapes)
+
 	return &Raytracer{
 		scene:  scene,
 		width:  width,
 		height: height,
 		config: samplingConfig,
+		bvh:    bvh,
 	}
 }
 
@@ -89,21 +96,9 @@ func (rt *Raytracer) SetSamplingConfig(config core.SamplingConfig) {
 	rt.config = config
 }
 
-// hitWorld checks if a ray hits any object in the scene
+// hitWorld checks if a ray hits any object in the scene using BVH
 func (rt *Raytracer) hitWorld(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
-	var closestHit *core.HitRecord
-	closestSoFar := tMax
-	hitAnything := false
-
-	for _, shape := range rt.scene.GetShapes() {
-		if hit, isHit := shape.Hit(ray, tMin, closestSoFar); isHit {
-			hitAnything = true
-			closestSoFar = hit.T
-			closestHit = hit
-		}
-	}
-
-	return closestHit, hitAnything
+	return rt.bvh.Hit(ray, tMin, tMax)
 }
 
 // backgroundGradient returns a gradient color based on ray direction

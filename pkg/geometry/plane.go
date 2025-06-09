@@ -55,3 +55,42 @@ func (p *Plane) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
 
 	return hitRecord, true
 }
+
+// BoundingBox returns a bounding box for this plane
+func (p *Plane) BoundingBox() core.AABB {
+	const largeValue = 1e6
+	const epsilon = 0.001 // Small thickness to avoid zero-width bounding box
+
+	// Check if the plane is axis-aligned for better BVH performance
+	alignment := getAxisAlignment(p.Normal)
+
+	switch alignment {
+	case XAxisAligned:
+		// Plane is perpendicular to X axis (e.g., wall at x = constant)
+		x := p.Point.X
+		return core.NewAABB(
+			core.NewVec3(x-epsilon, -largeValue, -largeValue),
+			core.NewVec3(x+epsilon, largeValue, largeValue),
+		)
+	case YAxisAligned:
+		// Plane is perpendicular to Y axis (e.g., ground plane at y = constant)
+		y := p.Point.Y
+		return core.NewAABB(
+			core.NewVec3(-largeValue, y-epsilon, -largeValue),
+			core.NewVec3(largeValue, y+epsilon, largeValue),
+		)
+	case ZAxisAligned:
+		// Plane is perpendicular to Z axis (e.g., back wall at z = constant)
+		z := p.Point.Z
+		return core.NewAABB(
+			core.NewVec3(-largeValue, -largeValue, z-epsilon),
+			core.NewVec3(largeValue, largeValue, z+epsilon),
+		)
+	default:
+		// Not axis-aligned - use large bounding box (less optimal but correct)
+		return core.NewAABB(
+			core.NewVec3(-largeValue, -largeValue, -largeValue),
+			core.NewVec3(largeValue, largeValue, largeValue),
+		)
+	}
+}
