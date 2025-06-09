@@ -115,43 +115,32 @@ func showHelp() {
 
 // createScene creates the appropriate scene based on scene type
 func createScene(sceneType string) SceneInfo {
+	var sceneObj *scene.Scene
+
 	switch sceneType {
 	case "cornell":
 		fmt.Println("Using Cornell scene...")
-		return SceneInfo{
-			Scene:  scene.NewCornellScene(),
-			Width:  400,
-			Height: 400, // Square aspect ratio for Cornell box
-		}
+		sceneObj = scene.NewCornellScene()
 	case "spheregrid":
 		fmt.Println("Using sphere grid scene...")
-		return SceneInfo{
-			Scene:  scene.NewSphereGridScene(),
-			Width:  800,
-			Height: 450, // 16:9 aspect ratio for sphere grid
-		}
+		sceneObj = scene.NewSphereGridScene()
 	case "default":
 		fmt.Println("Using default scene...")
-		return SceneInfo{
-			Scene:  scene.NewDefaultScene(),
-			Width:  400,
-			Height: 225, // 16:9 aspect ratio
-		}
+		sceneObj = scene.NewDefaultScene()
 	default:
 		fmt.Printf("Unknown scene type: %s. Using default scene.\n", sceneType)
-		return SceneInfo{
-			Scene:  scene.NewDefaultScene(),
-			Width:  400,
-			Height: 225,
-		}
+		sceneObj = scene.NewDefaultScene()
 	}
-}
 
-// setupRaytracer creates and configures a raytracer
-func setupRaytracer(sceneInfo SceneInfo) *renderer.Raytracer {
-	raytracer := renderer.NewRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height)
+	// Get the width and height from the scene's camera configuration
+	width := sceneObj.CameraConfig.Width
+	height := int(float64(width) / sceneObj.CameraConfig.AspectRatio)
 
-	return raytracer
+	return SceneInfo{
+		Scene:  sceneObj,
+		Width:  width,
+		Height: height,
+	}
 }
 
 // createOutputDir creates the output directory for the scene type

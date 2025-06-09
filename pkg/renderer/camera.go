@@ -107,14 +107,35 @@ func (c *Camera) GetRay(i, j int, random *rand.Rand) core.Ray {
 	return core.NewRay(rayOrigin, rayDirection)
 }
 
-// GetRayNormalized generates a ray for normalized screen coordinates (s, t) where 0 <= s,t <= 1
-// This method maintains compatibility with existing code
-func (c *Camera) GetRayNormalized(s, t float64, random *rand.Rand) core.Ray {
-	// Convert normalized coordinates to pixel coordinates
-	// Assume default image dimensions for backward compatibility
-	width := 400.0
-	height := 225.0
-	i := int(s * width)
-	j := int(t * height)
-	return c.GetRay(i, j, random)
+// MergeCameraConfig merges camera configuration overrides with defaults
+// Only non-zero values in the override will replace the default values
+func MergeCameraConfig(defaultConfig CameraConfig, override CameraConfig) CameraConfig {
+	result := defaultConfig
+
+	if override.Width != 0 {
+		result.Width = override.Width
+	}
+	if override.AspectRatio != 0 {
+		result.AspectRatio = override.AspectRatio
+	}
+	if override.Center.Length() != 0 {
+		result.Center = override.Center
+	}
+	if override.LookAt.Length() != 0 {
+		result.LookAt = override.LookAt
+	}
+	if override.Up.Length() != 0 {
+		result.Up = override.Up
+	}
+	if override.VFov != 0 {
+		result.VFov = override.VFov
+	}
+	if override.Aperture != 0 {
+		result.Aperture = override.Aperture
+	}
+	if override.FocusDistance != 0 {
+		result.FocusDistance = override.FocusDistance
+	}
+
+	return result
 }

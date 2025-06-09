@@ -15,11 +15,13 @@ type Scene struct {
 	Shapes         []core.Shape // Objects in the scene
 	Lights         []core.Light // Lights in the scene
 	SamplingConfig core.SamplingConfig
+	CameraConfig   renderer.CameraConfig
 }
 
-// NewDefaultScene creates a default scene with lighting, gradient background and spheres with materials
-func NewDefaultScene() *Scene {
-	config := renderer.CameraConfig{
+// NewDefaultScene creates a default scene with spheres, ground, and camera
+func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
+	// Default camera configuration
+	defaultCameraConfig := renderer.CameraConfig{
 		Center:        core.NewVec3(0, 0.75, 2), // Position camera higher and farther back
 		LookAt:        core.NewVec3(0, 0.5, -1), // Look at the sphere center
 		Up:            core.NewVec3(0, 1, 0),    // Standard up direction
@@ -29,6 +31,14 @@ func NewDefaultScene() *Scene {
 		Aperture:      0.05, // Strong depth of field blur
 		FocusDistance: 0.0,  // Auto-calculate focus distance
 	}
+
+	// Apply any overrides using the reusable merge function
+	cameraConfig := defaultCameraConfig
+	if len(cameraOverrides) > 0 {
+		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
+	}
+
+	camera := renderer.NewCamera(cameraConfig)
 
 	samplingConfig := core.SamplingConfig{
 		SamplesPerPixel:           200,
@@ -40,9 +50,6 @@ func NewDefaultScene() *Scene {
 		AdaptiveDarkThreshold:     1e-6, // Low absolute threshold for dark pixels
 	}
 
-	camera := renderer.NewCamera(config)
-
-	// Create the scene
 	s := &Scene{
 		Camera:         camera,
 		TopColor:       core.NewVec3(0.5, 0.7, 1.0), // Blue
@@ -50,6 +57,7 @@ func NewDefaultScene() *Scene {
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: samplingConfig,
+		CameraConfig:   cameraConfig,
 	}
 
 	// Add the specified light: pos [30, 30.5, 15], r: 10, emit: [15.0, 14.0, 13.0]

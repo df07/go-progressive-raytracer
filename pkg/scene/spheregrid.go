@@ -46,9 +46,10 @@ func oklchToRGB(l, c, h float64) core.Vec3 {
 	return core.NewVec3(r, g, blue)
 }
 
-// NewSphereGridScene creates a scene with 10,000 spheres in a 100x100 grid with rainbow OKLCH colors
-func NewSphereGridScene() *Scene {
-	config := renderer.CameraConfig{
+// NewSphereGridScene creates a scene with a 10x10 grid of spheres
+func NewSphereGridScene(cameraOverrides ...renderer.CameraConfig) *Scene {
+	// Default camera configuration for sphere grid
+	defaultCameraConfig := renderer.CameraConfig{
 		Center:        core.NewVec3(4.5, 6, 18),    // Position camera farther back and slightly lower
 		LookAt:        core.NewVec3(4.5, 0.8, 4.5), // Look at center of grid, slightly lower
 		Up:            core.NewVec3(0, 1, 0),       // Standard up direction
@@ -57,6 +58,12 @@ func NewSphereGridScene() *Scene {
 		VFov:          40.0,       // Slightly narrower field of view for better framing
 		Aperture:      0.02,       // Small depth of field for some focus variation
 		FocusDistance: 0.0,        // Auto-calculate focus distance
+	}
+
+	// Apply any overrides using the reusable merge function
+	cameraConfig := defaultCameraConfig
+	if len(cameraOverrides) > 0 {
+		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
 	samplingConfig := core.SamplingConfig{
@@ -69,7 +76,7 @@ func NewSphereGridScene() *Scene {
 		AdaptiveDarkThreshold:     1e-6,  // Standard absolute threshold
 	}
 
-	camera := renderer.NewCamera(config)
+	camera := renderer.NewCamera(cameraConfig)
 
 	// Create the scene
 	s := &Scene{
@@ -79,6 +86,7 @@ func NewSphereGridScene() *Scene {
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: samplingConfig,
+		CameraConfig:   cameraConfig,
 	}
 
 	// Add environmental lighting - a bright sun-like light

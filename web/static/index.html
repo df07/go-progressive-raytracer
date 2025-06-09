@@ -355,6 +355,8 @@
                         const config = await response.json();
                         
                         // Update form controls with scene defaults
+                        document.getElementById('width').value = config.defaults.width;
+                        document.getElementById('height').value = config.defaults.height;
                         document.getElementById('rrMinBounces').value = config.defaults.russianRouletteMinBounces;
                         document.getElementById('rrMinSamples').value = config.defaults.russianRouletteMinSamples;
                         document.getElementById('adaptiveMinSamples').value = config.defaults.adaptiveMinSamples;

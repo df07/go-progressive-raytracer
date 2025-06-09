@@ -99,7 +99,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create scene
-	sceneObj := s.createScene(req.Scene)
+	sceneObj := s.createScene(req.Scene, req.Width, req.Height)
 	if sceneObj == nil {
 		s.sendSSEError(w, "Unknown scene: "+req.Scene)
 		return
@@ -247,15 +247,25 @@ func parseFloatParam(values url.Values, key string, defaultValue, min, max float
 	return defaultValue, nil
 }
 
-// createScene creates a scene based on the scene name
-func (s *Server) createScene(sceneName string) *scene.Scene {
+// createScene creates a scene based on the scene name and optionally updates camera for requested dimensions
+func (s *Server) createScene(sceneName string, width, height int) *scene.Scene {
+	// Create camera override config (empty if width/height are 0, which means use defaults)
+	var cameraOverride renderer.CameraConfig
+	if width > 0 && height > 0 {
+		cameraOverride = renderer.CameraConfig{
+			Width:       width,
+			AspectRatio: float64(width) / float64(height),
+		}
+	}
+
+	// Single switch statement - pass override (which may be empty for defaults)
 	switch sceneName {
 	case "cornell-box":
-		return scene.NewCornellScene()
+		return scene.NewCornellScene(cameraOverride)
 	case "basic":
-		return scene.NewDefaultScene()
+		return scene.NewDefaultScene(cameraOverride)
 	case "sphere-grid":
-		return scene.NewSphereGridScene()
+		return scene.NewSphereGridScene(cameraOverride)
 	default:
 		return nil
 	}
@@ -304,18 +314,25 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 		sceneName = "cornell-box" // Default scene
 	}
 
-	sceneObj := s.createScene(sceneName)
+	// Create scene with default camera settings to get sampling config and default dimensions
+	sceneObj := s.createScene(sceneName, 0, 0)
 	if sceneObj == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + sceneName})
 		return
 	}
 
+	// Get default width and height from the scene's camera
+	defaultWidth := sceneObj.CameraConfig.Width
+	defaultHeight := int(float64(defaultWidth) / sceneObj.CameraConfig.AspectRatio)
+
 	// Return the scene's sampling configuration with validation limits
 	config := sceneObj.GetSamplingConfig()
 	response := map[string]interface{}{
 		"scene": sceneName,
 		"defaults": map[string]interface{}{
+			"width":                     defaultWidth,
+			"height":                    defaultHeight,
 			"samplesPerPixel":           config.SamplesPerPixel,
 			"maxDepth":                  config.MaxDepth,
 			"russianRouletteMinBounces": config.RussianRouletteMinBounces,

@@ -8,8 +8,9 @@ import (
 )
 
 // NewCornellScene creates a classic Cornell box scene with quad walls and area lighting
-func NewCornellScene() *Scene {
-	config := renderer.CameraConfig{
+func NewCornellScene(cameraOverrides ...renderer.CameraConfig) *Scene {
+	// Default camera configuration for Cornell box
+	defaultCameraConfig := renderer.CameraConfig{
 		Center:        core.NewVec3(278, 278, -800), // Position camera outside the box looking in
 		LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
 		Up:            core.NewVec3(0, 1, 0),        // Standard up direction
@@ -18,6 +19,12 @@ func NewCornellScene() *Scene {
 		VFov:          40.0, // Field of view
 		Aperture:      0.0,  // No depth of field for Cornell box
 		FocusDistance: 0.0,  // Auto-calculate focus distance
+	}
+
+	// Apply any overrides using the reusable merge function
+	cameraConfig := defaultCameraConfig
+	if len(cameraOverrides) > 0 {
+		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
 	samplingConfig := core.SamplingConfig{
@@ -30,9 +37,8 @@ func NewCornellScene() *Scene {
 		AdaptiveDarkThreshold:     1e-6, // Same absolute threshold for dark pixels
 	}
 
-	camera := renderer.NewCamera(config)
+	camera := renderer.NewCamera(cameraConfig)
 
-	// Create the scene
 	s := &Scene{
 		Camera:         camera,
 		TopColor:       core.NewVec3(0.0, 0.0, 0.0), // Black background
@@ -40,6 +46,7 @@ func NewCornellScene() *Scene {
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: samplingConfig,
+		CameraConfig:   cameraConfig,
 	}
 
 	// Create materials
