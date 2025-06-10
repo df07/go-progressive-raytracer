@@ -114,6 +114,11 @@
             transition: opacity 0.3s;
         }
 
+        .render-image:hover {
+            border-color: #007bff;
+            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+        }
+
         .stats-panel {
             width: 300px;
             background: #f8f9fa;
@@ -327,6 +332,12 @@
                     <span class="stats-label">Elapsed:</span>
                     <span id="elapsed" class="stats-value">-</span>
                 </div>
+                
+                <div id="inspectSection" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+                    <h4 style="margin-top: 0;">Object Inspector</h4>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Click on the image to inspect objects</p>
+                    <div id="inspectResult" style="font-size: 12px;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -345,6 +356,9 @@
                 document.getElementById('startBtn').addEventListener('click', () => this.startRendering());
                 document.getElementById('stopBtn').addEventListener('click', () => this.stopRendering());
                 document.getElementById('scene').addEventListener('change', () => this.loadSceneDefaults());
+                
+                // Add click handler to the rendered image for inspection
+                document.getElementById('renderImage').addEventListener('click', (event) => this.handleImageClick(event));
             }
 
             async loadSceneDefaults() {
@@ -589,6 +603,150 @@
             updateButtons() {
                 document.getElementById('startBtn').disabled = this.isRendering;
                 document.getElementById('stopBtn').disabled = !this.isRendering;
+            }
+
+            async handleImageClick(event) {
+                const img = event.target;
+                const rect = img.getBoundingClientRect();
+                
+                // Calculate click coordinates relative to the image
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                
+                // Convert to pixel coordinates based on image scale
+                const scaleX = img.naturalWidth / rect.width;
+                const scaleY = img.naturalHeight / rect.height;
+                
+                const pixelX = Math.floor(x * scaleX);
+                const pixelY = Math.floor(y * scaleY);
+                
+                // Get current render parameters
+                const params = this.getParameters();
+                
+                try {
+                    // Call the inspect API
+                    const url = `/api/inspect?scene=${params.scene}&width=${params.width}&height=${params.height}&x=${pixelX}&y=${pixelY}`;
+                    const response = await fetch(url);
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.displayInspectResult(result, pixelX, pixelY);
+                    } else {
+                        const error = await response.json();
+                        this.displayInspectError(error.error || 'Inspection failed');
+                    }
+                } catch (error) {
+                    console.error('Inspection error:', error);
+                    this.displayInspectError('Network error during inspection');
+                }
+            }
+
+            displayInspectResult(result, pixelX, pixelY) {
+                const resultDiv = document.getElementById('inspectResult');
+                
+                if (!result.hit) {
+                    resultDiv.innerHTML = `
+                        <div style="padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #6c757d;">
+                            <strong>Pixel (${pixelX}, ${pixelY})</strong><br>
+                            No object hit - background/sky
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Extract material and geometry properties
+                const materialProps = result.properties.material || {};
+                const geometryProps = result.properties.geometry || {};
+                
+                // Create color swatch if color is available
+                let colorSwatch = '';
+                if (materialProps.color) {
+                    colorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                }
+                
+                // Format material information
+                let materialInfo = `<strong>Material:</strong> ${result.materialType}${colorSwatch}<br>`;
+                
+                if (result.materialType === 'lambertian' && materialProps.albedo) {
+                    const albedo = materialProps.albedo;
+                    materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})<br>`;
+                }
+                
+                if (result.materialType === 'metal') {
+                    if (materialProps.albedo) {
+                        const albedo = materialProps.albedo;
+                        materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})<br>`;
+                    }
+                    if (materialProps.fuzzness !== undefined) {
+                        materialInfo += `&nbsp;&nbsp;Fuzzness: ${materialProps.fuzzness.toFixed(3)}<br>`;
+                    }
+                }
+                
+                if (result.materialType === 'dielectric' && materialProps.refractiveIndex) {
+                    materialInfo += `&nbsp;&nbsp;Refractive Index: ${materialProps.refractiveIndex.toFixed(3)}<br>`;
+                }
+                
+                if (result.materialType === 'emissive' && materialProps.emission) {
+                    const emission = materialProps.emission;
+                    materialInfo += `&nbsp;&nbsp;Emission: (${emission[0].toFixed(3)}, ${emission[1].toFixed(3)}, ${emission[2].toFixed(3)})<br>`;
+                }
+                
+                if (result.materialType === 'layered') {
+                    materialInfo += `&nbsp;&nbsp;Outer: ${materialProps.outer?.type || 'unknown'}<br>`;
+                    materialInfo += `&nbsp;&nbsp;Inner: ${materialProps.inner?.type || 'unknown'}<br>`;
+                }
+                
+                // Format geometry information
+                let geometryInfo = `<strong>Geometry:</strong> ${result.geometryType}<br>`;
+                
+                if (result.geometryType === 'sphere') {
+                    if (geometryProps.center) {
+                        const center = geometryProps.center;
+                        geometryInfo += `&nbsp;&nbsp;Center: (${center[0].toFixed(3)}, ${center[1].toFixed(3)}, ${center[2].toFixed(3)})<br>`;
+                    }
+                    if (geometryProps.radius !== undefined) {
+                        geometryInfo += `&nbsp;&nbsp;Radius: ${geometryProps.radius.toFixed(3)}<br>`;
+                    }
+                }
+                
+                if (result.geometryType === 'quad' || result.geometryType === 'quad_light') {
+                    if (geometryProps.corner) {
+                        const corner = geometryProps.corner;
+                        geometryInfo += `&nbsp;&nbsp;Corner: (${corner[0].toFixed(3)}, ${corner[1].toFixed(3)}, ${corner[2].toFixed(3)})<br>`;
+                    }
+                    if (result.geometryType === 'quad_light' && geometryProps.area !== undefined) {
+                        geometryInfo += `&nbsp;&nbsp;Area: ${geometryProps.area.toFixed(3)}<br>`;
+                    }
+                }
+                
+                if (result.geometryType === 'plane') {
+                    if (geometryProps.point) {
+                        const point = geometryProps.point;
+                        geometryInfo += `&nbsp;&nbsp;Point: (${point[0].toFixed(3)}, ${point[1].toFixed(3)}, ${point[2].toFixed(3)})<br>`;
+                    }
+                }
+                
+                resultDiv.innerHTML = `
+                    <div style="padding: 8px; background: #d4edda; border-radius: 4px; border-left: 3px solid #28a745;">
+                        <strong>Pixel (${pixelX}, ${pixelY}) - Object Hit</strong><br>
+                        ${materialInfo}
+                        ${geometryInfo}
+                        <strong>Distance:</strong> ${result.distance.toFixed(3)}<br>
+                        <strong>Position:</strong> (${result.point[0].toFixed(3)}, ${result.point[1].toFixed(3)}, ${result.point[2].toFixed(3)})<br>
+                        <strong>Normal:</strong> (${result.normal[0].toFixed(3)}, ${result.normal[1].toFixed(3)}, ${result.normal[2].toFixed(3)})<br>
+                        <strong>Front Face:</strong> ${result.frontFace ? 'Yes' : 'No'}
+                    </div>
+                `;
+            }
+
+            displayInspectError(errorMessage) {
+                const resultDiv = document.getElementById('inspectResult');
+                resultDiv.innerHTML = `
+                    <div style="padding: 8px; background: #f8d7da; border-radius: 4px; border-left: 3px solid #dc3545;">
+                        <strong>Inspection Error:</strong><br>
+                        ${errorMessage}
+                    </div>
+                `;
             }
         }
 

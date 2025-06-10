@@ -70,6 +70,7 @@ func (s *Server) Start() error {
 	http.HandleFunc("/api/render", s.handleRender)
 	http.HandleFunc("/api/health", s.handleHealth)
 	http.HandleFunc("/api/scene-config", s.handleSceneConfig)
+	http.HandleFunc("/api/inspect", s.handleInspect)
 
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("Starting web server on http://localhost%s", addr)

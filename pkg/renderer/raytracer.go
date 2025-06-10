@@ -390,6 +390,54 @@ func (rt *Raytracer) finalizeStats(stats *RenderStats) {
 	stats.AverageSamples = float64(stats.TotalSamples) / float64(stats.TotalPixels)
 }
 
+// hitWorldWithShape finds the closest hit and returns both the hit record and the shape
+func (rt *Raytracer) hitWorldWithShape(ray core.Ray, tMin, tMax float64) (*core.HitRecord, core.Shape, bool) {
+	var closestHit *core.HitRecord
+	var closestShape core.Shape
+	closestSoFar := tMax
+
+	shapes := rt.scene.GetShapes()
+	for _, shape := range shapes {
+		if hit, isHit := shape.Hit(ray, tMin, closestSoFar); isHit {
+			closestSoFar = hit.T
+			closestHit = hit
+			closestShape = shape
+		}
+	}
+
+	return closestHit, closestShape, closestHit != nil
+}
+
+// InspectResult contains rich information about an object hit by an inspection ray
+type InspectResult struct {
+	Hit       bool
+	HitRecord *core.HitRecord // Full hit record with material reference
+	Shape     core.Shape      // The actual shape that was hit
+}
+
+// InspectPixel casts a ray through the specified pixel coordinates and returns information about the first object hit
+func (rt *Raytracer) InspectPixel(pixelX, pixelY int) InspectResult {
+	// Get camera and create a ray for the pixel center (no jitter for inspection)
+	camera := rt.scene.GetCamera()
+
+	// Create a deterministic random generator for ray generation
+	// This ensures we get a consistent ray through the pixel center
+	inspectRandom := rand.New(rand.NewSource(0))
+	ray := camera.GetRay(pixelX, pixelY, inspectRandom)
+
+	// Cast the ray and find the first intersection
+	hit, shape, isHit := rt.hitWorldWithShape(ray, 0.001, 1000.0)
+	if !isHit {
+		return InspectResult{Hit: false}
+	}
+
+	return InspectResult{
+		Hit:       true,
+		HitRecord: hit,
+		Shape:     shape,
+	}
+}
+
 // RenderPass renders a single pass with adaptive sampling and returns an image and statistics.
 // Adaptive sampling automatically adjusts the number of samples per pixel based on variance,
 // using fewer samples for smooth areas and more samples for noisy/complex areas.

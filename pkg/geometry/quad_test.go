@@ -91,10 +91,10 @@ func TestQuad_Hit_CornerHits(t *testing.T) {
 	quad := NewQuad(corner, u, v, DummyMaterial{})
 
 	corners := []core.Vec3{
-		{0, 0, 0}, // corner
-		{1, 0, 0}, // corner + u
-		{0, 0, 1}, // corner + v
-		{1, 0, 1}, // corner + u + v
+		{X: 0, Y: 0, Z: 0}, // corner
+		{X: 1, Y: 0, Z: 0}, // corner + u
+		{X: 0, Y: 0, Z: 1}, // corner + v
+		{X: 1, Y: 0, Z: 1}, // corner + u + v
 	}
 
 	for i, cornerPoint := range corners {
