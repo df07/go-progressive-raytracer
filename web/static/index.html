@@ -787,24 +787,26 @@
                 const materialProps = result.properties.material || {};
                 const geometryProps = result.properties.geometry || {};
                 
-                // Create color swatch if color is available
-                let colorSwatch = '';
-                if (materialProps.color) {
-                    colorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
-                }
-                
                 // Format material information
-                let materialInfo = `<strong>Material:</strong> ${result.materialType}${colorSwatch}<br>`;
+                let materialInfo = `<strong>Material:</strong> ${result.materialType}<br>`;
                 
                 if (result.materialType === 'lambertian' && materialProps.albedo) {
                     const albedo = materialProps.albedo;
-                    materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})<br>`;
+                    let colorSwatch = '';
+                    if (materialProps.color) {
+                        colorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                    }
+                    materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${colorSwatch}<br>`;
                 }
                 
                 if (result.materialType === 'metal') {
                     if (materialProps.albedo) {
                         const albedo = materialProps.albedo;
-                        materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})<br>`;
+                        let colorSwatch = '';
+                        if (materialProps.color) {
+                            colorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                        }
+                        materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${colorSwatch}<br>`;
                     }
                     if (materialProps.fuzzness !== undefined) {
                         materialInfo += `&nbsp;&nbsp;Fuzzness: ${materialProps.fuzzness.toFixed(3)}<br>`;
@@ -822,7 +824,48 @@
                 
                 if (result.materialType === 'layered') {
                     materialInfo += `&nbsp;&nbsp;Outer: ${materialProps.outer?.type || 'unknown'}<br>`;
+                    if (materialProps.outer?.properties?.refractiveIndex) {
+                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Refractive Index: ${materialProps.outer.properties.refractiveIndex.toFixed(3)}<br>`;
+                    }
                     materialInfo += `&nbsp;&nbsp;Inner: ${materialProps.inner?.type || 'unknown'}<br>`;
+                    if (materialProps.inner?.properties?.albedo) {
+                        const albedo = materialProps.inner.properties.albedo;
+                        let innerColorSwatch = '';
+                        if (materialProps.inner.properties.color) {
+                            innerColorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.inner.properties.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                        }
+                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${innerColorSwatch}<br>`;
+                    }
+                    if (materialProps.inner?.properties?.fuzzness !== undefined) {
+                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Fuzzness: ${materialProps.inner.properties.fuzzness.toFixed(3)}<br>`;
+                    }
+                }
+                
+                if (result.materialType === 'mixed') {
+                    if (materialProps.description) {
+                        materialInfo += `&nbsp;&nbsp;Mix: ${materialProps.description}<br>`;
+                    }
+                    materialInfo += `&nbsp;&nbsp;Material 1: ${materialProps.material1?.type || 'unknown'}<br>`;
+                    if (materialProps.material1?.properties?.albedo) {
+                        const albedo = materialProps.material1.properties.albedo;
+                        let color1Swatch = '';
+                        if (materialProps.material1.properties.color) {
+                            color1Swatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.material1.properties.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                        }
+                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${color1Swatch}<br>`;
+                    }
+                    materialInfo += `&nbsp;&nbsp;Material 2: ${materialProps.material2?.type || 'unknown'}<br>`;
+                    if (materialProps.material2?.properties?.albedo) {
+                        const albedo = materialProps.material2.properties.albedo;
+                        let color2Swatch = '';
+                        if (materialProps.material2.properties.color) {
+                            color2Swatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.material2.properties.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                        }
+                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${color2Swatch}<br>`;
+                    }
+                    if (materialProps.material2?.properties?.fuzzness !== undefined) {
+                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Fuzzness: ${materialProps.material2.properties.fuzzness.toFixed(3)}<br>`;
+                    }
                 }
                 
                 // Format geometry information

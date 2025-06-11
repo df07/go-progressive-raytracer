@@ -68,6 +68,23 @@ func (s *Server) extractMaterialInfo(mat core.Material) (string, map[string]inte
 		}
 		return "layered", properties
 
+	case *material.Mix:
+		// For mixed materials, show info about both materials and the mix ratio
+		material1Type, material1Props := s.extractMaterialInfo(m.Material1)
+		material2Type, material2Props := s.extractMaterialInfo(m.Material2)
+		properties["material1"] = map[string]interface{}{
+			"type":       material1Type,
+			"properties": material1Props,
+		}
+		properties["material2"] = map[string]interface{}{
+			"type":       material2Type,
+			"properties": material2Props,
+		}
+		properties["ratio"] = m.Ratio
+		properties["description"] = fmt.Sprintf("%.0f%% %s, %.0f%% %s",
+			(1-m.Ratio)*100, material1Type, m.Ratio*100, material2Type)
+		return "mixed", properties
+
 	default:
 		// Check if it's emissive using interface
 		if emitter, ok := mat.(core.Emitter); ok {
