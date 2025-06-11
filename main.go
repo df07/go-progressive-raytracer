@@ -127,7 +127,7 @@ func createScene(sceneType string) SceneInfo {
 		sceneObj = scene.NewCornellScene(scene.CornellBoxes)
 	case "spheregrid":
 		fmt.Println("Using sphere grid scene...")
-		sceneObj = scene.NewSphereGridScene()
+		sceneObj = scene.NewSphereGridScene(20) // Default grid size
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()

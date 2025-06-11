@@ -126,22 +126,17 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	// Parse parameters
-	sceneName := r.URL.Query().Get("scene")
-	if sceneName == "" {
-		sceneName = "cornell-box"
+	// Create request object for parameter parsing
+	inspectReq := &RenderRequest{}
+
+	// Parse common scene parameters using shared function
+	if err := s.parseCommonSceneParams(r, inspectReq); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid scene parameters: " + err.Error()})
+		return
 	}
 
-	width, err := strconv.Atoi(r.URL.Query().Get("width"))
-	if err != nil || width <= 0 {
-		width = 400
-	}
-
-	height, err := strconv.Atoi(r.URL.Query().Get("height"))
-	if err != nil || height <= 0 {
-		height = 400
-	}
-
+	// Parse pixel coordinates
 	pixelX, err := strconv.Atoi(r.URL.Query().Get("x"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -157,22 +152,20 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate pixel coordinates
-	if pixelX < 0 || pixelX >= width || pixelY < 0 || pixelY >= height {
+	if pixelX < 0 || pixelX >= inspectReq.Width || pixelY < 0 || pixelY >= inspectReq.Height {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Pixel coordinates out of bounds"})
 		return
 	}
-
-	// Create scene
-	sceneObj := s.createScene(sceneName, width, height)
+	sceneObj := s.createScene(inspectReq)
 	if sceneObj == nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + sceneName})
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + inspectReq.Scene})
 		return
 	}
 
 	// Create a minimal raytracer for inspection
-	raytracer := renderer.NewRaytracer(sceneObj, width, height)
+	raytracer := renderer.NewRaytracer(sceneObj, inspectReq.Width, inspectReq.Height)
 
 	// Perform the inspection
 	result := raytracer.InspectPixel(pixelX, pixelY)

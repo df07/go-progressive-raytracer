@@ -39,6 +39,10 @@ type RenderRequest struct {
 	AdaptiveMinSamples    int     `json:"adaptiveMinSamples"`    // Adaptive sampling minimum samples
 	AdaptiveThreshold     float64 `json:"adaptiveThreshold"`     // Adaptive sampling relative error threshold
 	AdaptiveDarkThreshold float64 `json:"adaptiveDarkThreshold"` // Adaptive sampling dark pixel threshold
+
+	// Scene-specific configuration
+	CornellGeometry string `json:"cornellGeometry"` // Cornell box geometry type: "spheres", "boxes", "empty"
+	SphereGridSize  int    `json:"sphereGridSize"`  // Sphere grid size (e.g., 10, 20, 100)
 }
 
 // ProgressUpdate represents a single progressive update sent via SSE
@@ -100,7 +104,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create scene
-	sceneObj := s.createScene(req.Scene, req.Width, req.Height)
+	sceneObj := s.createScene(req)
 	if sceneObj == nil {
 		s.sendSSEError(w, "Unknown scene: "+req.Scene)
 		return
@@ -170,24 +174,16 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 
 // parseRenderRequest parses request parameters
 func (s *Server) parseRenderRequest(r *http.Request) (*RenderRequest, error) {
-	// Initialize request with defaults handled by helper functions
+	// Initialize request
 	req := &RenderRequest{}
 
-	// Parse scene name (string parameter, no validation needed)
-	if scene := r.URL.Query().Get("scene"); scene != "" {
-		req.Scene = scene
-	} else {
-		req.Scene = "cornell-box" // Default scene
+	// Parse common scene parameters using shared function
+	if err := s.parseCommonSceneParams(r, req); err != nil {
+		return nil, err
 	}
 
-	// Parse and validate all parameters using helper functions
+	// Parse and validate render-specific parameters using helper functions
 	var err error
-	if req.Width, err = parseIntParam(r.URL.Query(), "width", 400, 100, 2000); err != nil {
-		return nil, err
-	}
-	if req.Height, err = parseIntParam(r.URL.Query(), "height", 400, 100, 2000); err != nil {
-		return nil, err
-	}
 	if req.MaxSamples, err = parseIntParam(r.URL.Query(), "maxSamples", 50, 1, 10000); err != nil {
 		return nil, err
 	}
@@ -248,27 +244,68 @@ func parseFloatParam(values url.Values, key string, defaultValue, min, max float
 	return defaultValue, nil
 }
 
+// parseCommonSceneParams parses all common scene parameters (basic + scene-specific)
+func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) error {
+	var err error
+
+	// Parse scene name
+	if scene := r.URL.Query().Get("scene"); scene != "" {
+		req.Scene = scene
+	} else {
+		req.Scene = "cornell-box" // Default scene
+	}
+
+	// Parse width and height
+	if req.Width, err = parseIntParam(r.URL.Query(), "width", 400, 100, 2000); err != nil {
+		return err
+	}
+	if req.Height, err = parseIntParam(r.URL.Query(), "height", 400, 100, 2000); err != nil {
+		return err
+	}
+
+	// Parse Cornell geometry type
+	req.CornellGeometry = r.URL.Query().Get("cornellGeometry")
+	if req.CornellGeometry == "" {
+		req.CornellGeometry = "spheres" // Default
+	}
+
+	// Parse sphere grid size
+	if req.SphereGridSize, err = parseIntParam(r.URL.Query(), "sphereGridSize", 20, 5, 200); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // createScene creates a scene based on the scene name and optionally updates camera for requested dimensions
-func (s *Server) createScene(sceneName string, width, height int) *scene.Scene {
+func (s *Server) createScene(req *RenderRequest) *scene.Scene {
 	// Create camera override config (empty if width/height are 0, which means use defaults)
 	var cameraOverride renderer.CameraConfig
-	if width > 0 && height > 0 {
+	if req.Width > 0 && req.Height > 0 {
 		cameraOverride = renderer.CameraConfig{
-			Width:       width,
-			AspectRatio: float64(width) / float64(height),
+			Width:       req.Width,
+			AspectRatio: float64(req.Width) / float64(req.Height),
 		}
 	}
 
 	// Single switch statement - pass override (which may be empty for defaults)
-	switch sceneName {
+	switch req.Scene {
 	case "cornell-box":
-		return scene.NewCornellScene(scene.CornellSpheres, cameraOverride)
-	case "cornell-box-boxes":
-		return scene.NewCornellScene(scene.CornellBoxes, cameraOverride)
+		// Parse Cornell geometry type
+		var geometryType scene.CornellGeometryType
+		switch req.CornellGeometry {
+		case "boxes":
+			geometryType = scene.CornellBoxes
+		case "empty":
+			geometryType = scene.CornellEmpty
+		default: // "spheres" or any other value
+			geometryType = scene.CornellSpheres
+		}
+		return scene.NewCornellScene(geometryType, cameraOverride)
 	case "basic":
 		return scene.NewDefaultScene(cameraOverride)
 	case "sphere-grid":
-		return scene.NewSphereGridScene(cameraOverride)
+		return scene.NewSphereGridScene(req.SphereGridSize, cameraOverride)
 	default:
 		return nil
 	}
@@ -318,7 +355,14 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create scene with default camera settings to get sampling config and default dimensions
-	sceneObj := s.createScene(sceneName, 0, 0)
+	defaultReq := &RenderRequest{
+		Scene:           sceneName,
+		Width:           0,
+		Height:          0,
+		CornellGeometry: "spheres", // Default
+		SphereGridSize:  20,        // Default
+	}
+	sceneObj := s.createScene(defaultReq)
 	if sceneObj == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + sceneName})
@@ -343,6 +387,8 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"adaptiveMinSamples":        config.AdaptiveMinSamples,
 			"adaptiveThreshold":         config.AdaptiveThreshold,
 			"adaptiveDarkThreshold":     config.AdaptiveDarkThreshold,
+			"cornellGeometry":           "spheres",
+			"sphereGridSize":            20,
 		},
 		"limits": map[string]interface{}{
 			"width": map[string]int{
@@ -381,7 +427,32 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"min": 1e-10,
 				"max": 1e-3,
 			},
+			"sphereGridSize": map[string]int{
+				"min": 5,
+				"max": 200,
+			},
 		},
+	}
+
+	// Add scene-specific configuration options
+	switch sceneName {
+	case "cornell-box":
+		response["sceneOptions"] = map[string]interface{}{
+			"cornellGeometry": map[string]interface{}{
+				"type":    "select",
+				"options": []string{"spheres", "boxes", "empty"},
+				"default": "spheres",
+			},
+		}
+	case "sphere-grid":
+		response["sceneOptions"] = map[string]interface{}{
+			"sphereGridSize": map[string]interface{}{
+				"type":    "number",
+				"min":     5,
+				"max":     200,
+				"default": 20,
+			},
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)

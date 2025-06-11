@@ -15,6 +15,7 @@ type CornellGeometryType int
 const (
 	CornellSpheres CornellGeometryType = iota
 	CornellBoxes
+	CornellEmpty
 )
 
 // NewCornellScene creates a classic Cornell box scene with quad walls and area lighting
@@ -157,6 +158,8 @@ func addCornellGeometry(s *Scene, geometryType CornellGeometryType) {
 		addCornellSpheres(s)
 	case CornellBoxes:
 		addCornellBoxes(s)
+	case CornellEmpty:
+		// No geometry added - just the empty Cornell box
 	}
 }
 

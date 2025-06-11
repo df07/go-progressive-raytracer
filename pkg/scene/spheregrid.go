@@ -46,8 +46,8 @@ func oklchToRGB(l, c, h float64) core.Vec3 {
 	return core.NewVec3(r, g, blue)
 }
 
-// NewSphereGridScene creates a scene with a 10x10 grid of spheres
-func NewSphereGridScene(cameraOverrides ...renderer.CameraConfig) *Scene {
+// NewSphereGridScene creates a scene with a configurable grid of spheres
+func NewSphereGridScene(gridSize int, cameraOverrides ...renderer.CameraConfig) *Scene {
 	// Default camera configuration for sphere grid
 	defaultCameraConfig := renderer.CameraConfig{
 		Center:        core.NewVec3(4.5, 6, 18),    // Position camera farther back and slightly lower
@@ -105,8 +105,6 @@ func NewSphereGridScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 	s.Shapes = append(s.Shapes, groundPlane)
 
 	// Create grid of spheres - automatically scale to fit in same visual space
-	gridSize := 20
-
 	// Calculate spacing and radius to fit grid in same visual area
 	// Target area: roughly 9x9 units (to fit nicely in camera view)
 	targetArea := 9.0

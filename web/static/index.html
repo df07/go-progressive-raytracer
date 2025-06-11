@@ -224,12 +224,14 @@
             <div class="control-group">
                 <label for="scene">Scene:</label>
                 <select id="scene">
-                    <option value="cornell-box">Cornell Box (Spheres)</option>
-                    <option value="cornell-box-boxes">Cornell Box (Boxes)</option>
+                    <option value="cornell-box">Cornell Box</option>
                     <option value="basic">Basic Scene</option>
                     <option value="sphere-grid">Sphere Grid</option>
                 </select>
             </div>
+            
+            <!-- Scene-specific configuration options will be inserted here -->
+            <div id="sceneOptions"></div>
             
             <div class="control-group">
                 <label for="width">Width:</label>
@@ -381,6 +383,9 @@
                         // Apply validation limits from server
                         this.applyLimits(config.limits);
                         
+                        // Update scene-specific options
+                        this.updateSceneOptions(config.sceneOptions || {});
+                        
                         console.log(`Loaded defaults for ${scene}:`, config);
                     } else {
                         console.error('Failed to load scene config:', response.statusText);
@@ -413,6 +418,94 @@
                         element.max = control.limits.max;
                     }
                 });
+            }
+
+            updateSceneOptions(sceneOptions) {
+                const container = document.getElementById('sceneOptions');
+                container.innerHTML = ''; // Clear existing options
+                
+                Object.keys(sceneOptions).forEach(optionKey => {
+                    const option = sceneOptions[optionKey];
+                    const controlGroup = document.createElement('div');
+                    controlGroup.className = 'control-group';
+                    
+                    const label = document.createElement('label');
+                    label.setAttribute('for', optionKey);
+                    label.textContent = this.formatLabel(optionKey) + ':';
+                    controlGroup.appendChild(label);
+                    
+                    if (option.type === 'select') {
+                        const select = document.createElement('select');
+                        select.id = optionKey;
+                        
+                        option.options.forEach(optionValue => {
+                            const optionElement = document.createElement('option');
+                            optionElement.value = optionValue;
+                            optionElement.textContent = this.formatOptionText(optionValue);
+                            if (optionValue === option.default) {
+                                optionElement.selected = true;
+                            }
+                            select.appendChild(optionElement);
+                        });
+                        
+                        controlGroup.appendChild(select);
+                    } else if (option.type === 'number') {
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.id = optionKey;
+                        input.value = option.default;
+                        input.min = option.min;
+                        input.max = option.max;
+                        input.step = 1;
+                        
+                        controlGroup.appendChild(input);
+                        
+                        // Add small description
+                        const small = document.createElement('small');
+                        small.style.color = '#666';
+                        small.style.fontSize = '12px';
+                        small.textContent = `Range: ${option.min} - ${option.max}`;
+                        controlGroup.appendChild(small);
+                    }
+                    
+                    container.appendChild(controlGroup);
+                });
+            }
+
+            formatLabel(key) {
+                // Convert camelCase to readable labels
+                switch (key) {
+                    case 'cornellGeometry': return 'Cornell Geometry';
+                    case 'sphereGridSize': return 'Grid Size';
+                    default: return key.charAt(0).toUpperCase() + key.slice(1);
+                }
+            }
+
+            formatOptionText(value) {
+                // Format option values for display
+                switch (value) {
+                    case 'spheres': return 'Spheres';
+                    case 'boxes': return 'Boxes';
+                    case 'empty': return 'Empty';
+                    default: return value.charAt(0).toUpperCase() + value.slice(1);
+                }
+            }
+
+            buildUrlWithSceneParams(baseUrl, params) {
+                // Build URL with scene-specific parameters
+                let url = baseUrl;
+                
+                // Add scene-specific parameters if they exist
+                if (params.cornellGeometry) {
+                    url += url.includes('?') ? '&' : '?';
+                    url += `cornellGeometry=${params.cornellGeometry}`;
+                }
+                if (params.sphereGridSize) {
+                    url += url.includes('?') ? '&' : '?';
+                    url += `sphereGridSize=${params.sphereGridSize}`;
+                }
+                
+                return url;
             }
 
             startRendering() {
@@ -479,7 +572,7 @@
             }
 
             getParameters() {
-                return {
+                const params = {
                     scene: document.getElementById('scene').value,
                     width: document.getElementById('width').value,
                     height: document.getElementById('height').value,
@@ -491,6 +584,19 @@
                     adaptiveThreshold: document.getElementById('adaptiveThreshold').value,
                     adaptiveDarkThreshold: document.getElementById('adaptiveDarkThreshold').value
                 };
+                
+                // Add scene-specific parameters
+                const cornellGeometry = document.getElementById('cornellGeometry');
+                if (cornellGeometry) {
+                    params.cornellGeometry = cornellGeometry.value;
+                }
+                
+                const sphereGridSize = document.getElementById('sphereGridSize');
+                if (sphereGridSize) {
+                    params.sphereGridSize = sphereGridSize.value;
+                }
+                
+                return params;
             }
 
             validateParameters() {
@@ -625,8 +731,10 @@
                 const params = this.getParameters();
                 
                 try {
-                    // Call the inspect API
-                    const url = `/api/inspect?scene=${params.scene}&width=${params.width}&height=${params.height}&x=${pixelX}&y=${pixelY}`;
+                    // Build inspect URL with scene-specific parameters
+                    const baseUrl = `/api/inspect?scene=${params.scene}&width=${params.width}&height=${params.height}&x=${pixelX}&y=${pixelY}`;
+                    const url = this.buildUrlWithSceneParams(baseUrl, params);
+                    
                     const response = await fetch(url);
                     
                     if (response.ok) {
