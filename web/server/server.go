@@ -262,7 +262,9 @@ func (s *Server) createScene(sceneName string, width, height int) *scene.Scene {
 	// Single switch statement - pass override (which may be empty for defaults)
 	switch sceneName {
 	case "cornell-box":
-		return scene.NewCornellScene(cameraOverride)
+		return scene.NewCornellScene(scene.CornellSpheres, cameraOverride)
+	case "cornell-box-boxes":
+		return scene.NewCornellScene(scene.CornellBoxes, cameraOverride)
 	case "basic":
 		return scene.NewDefaultScene(cameraOverride)
 	case "sphere-grid":

@@ -25,4 +25,6 @@
 
 ## Go Language Best Practices
 - Don't worry about backwards compatibility of modules. Nobody else uses this module.
-- Use the built-in min and max functions instead of custom implementations 
+- Use the built-in min and max functions instead of custom implementations
+- Avoid the {Function}With{Parameter} pattern - modify function signatures directly instead of creating wrapper functions
+- When adding parameters to existing functions, update all call sites rather than maintaining multiple versions 

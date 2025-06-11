@@ -91,9 +91,10 @@ func showHelp() {
 	flag.PrintDefaults()
 	fmt.Println()
 	fmt.Println("Available scenes:")
-	fmt.Println("  default    - Default scene with spheres and plane ground")
-	fmt.Println("  cornell    - Cornell box scene with quad walls and area lighting")
-	fmt.Println("  spheregrid - 10x10 grid of rainbow-colored metallic spheres (perfect for BVH testing)")
+	fmt.Println("  default      - Default scene with spheres and plane ground")
+	fmt.Println("  cornell      - Cornell box scene with spheres")
+	fmt.Println("  cornell-boxes - Cornell box scene with rotated boxes")
+	fmt.Println("  spheregrid   - 10x10 grid of rainbow-colored metallic spheres (perfect for BVH testing)")
 	fmt.Println()
 	fmt.Println("Available modes:")
 	fmt.Println("  normal      - Standard single-threaded rendering")
@@ -120,7 +121,10 @@ func createScene(sceneType string) SceneInfo {
 	switch sceneType {
 	case "cornell":
 		fmt.Println("Using Cornell scene...")
-		sceneObj = scene.NewCornellScene()
+		sceneObj = scene.NewCornellScene(scene.CornellSpheres)
+	case "cornell-boxes":
+		fmt.Println("Using Cornell scene with boxes...")
+		sceneObj = scene.NewCornellScene(scene.CornellBoxes)
 	case "spheregrid":
 		fmt.Println("Using sphere grid scene...")
 		sceneObj = scene.NewSphereGridScene()
@@ -146,7 +150,7 @@ func createScene(sceneType string) SceneInfo {
 // createOutputDir creates the output directory for the scene type
 func createOutputDir(sceneType string) string {
 	// Normalize scene type
-	if sceneType != "cornell" && sceneType != "default" && sceneType != "spheregrid" {
+	if sceneType != "cornell" && sceneType != "cornell-boxes" && sceneType != "default" && sceneType != "spheregrid" {
 		sceneType = "default"
 	}
 

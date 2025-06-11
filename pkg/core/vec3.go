@@ -115,6 +115,46 @@ func (v Vec3) Negate() Vec3 {
 	}
 }
 
+// Rotate applies rotation around X, Y, Z axes (in that order) to the vector
+// Rotation angles are in radians
+func (v Vec3) Rotate(rotation Vec3) Vec3 {
+	// If no rotation, return original vector
+	if rotation.X == 0 && rotation.Y == 0 && rotation.Z == 0 {
+		return v
+	}
+
+	result := v
+
+	// Rotation around X axis
+	if rotation.X != 0 {
+		cosX := math.Cos(rotation.X)
+		sinX := math.Sin(rotation.X)
+		y := result.Y*cosX - result.Z*sinX
+		z := result.Y*sinX + result.Z*cosX
+		result = NewVec3(result.X, y, z)
+	}
+
+	// Rotation around Y axis
+	if rotation.Y != 0 {
+		cosY := math.Cos(rotation.Y)
+		sinY := math.Sin(rotation.Y)
+		x := result.X*cosY + result.Z*sinY
+		z := -result.X*sinY + result.Z*cosY
+		result = NewVec3(x, result.Y, z)
+	}
+
+	// Rotation around Z axis
+	if rotation.Z != 0 {
+		cosZ := math.Cos(rotation.Z)
+		sinZ := math.Sin(rotation.Z)
+		x := result.X*cosZ - result.Y*sinZ
+		y := result.X*sinZ + result.Y*cosZ
+		result = NewVec3(x, y, result.Z)
+	}
+
+	return result
+}
+
 // Ray represents a ray with an origin and direction
 type Ray struct {
 	Origin    Vec3
