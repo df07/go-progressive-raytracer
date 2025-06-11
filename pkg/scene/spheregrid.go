@@ -47,7 +47,7 @@ func oklchToRGB(l, c, h float64) core.Vec3 {
 }
 
 // NewSphereGridScene creates a scene with a configurable grid of spheres
-func NewSphereGridScene(gridSize int, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...renderer.CameraConfig) *Scene {
 	// Default camera configuration for sphere grid
 	defaultCameraConfig := renderer.CameraConfig{
 		Center:        core.NewVec3(4.5, 6, 18),    // Position camera farther back and slightly lower
@@ -89,11 +89,11 @@ func NewSphereGridScene(gridSize int, cameraOverrides ...renderer.CameraConfig) 
 		CameraConfig:   cameraConfig,
 	}
 
-	// Add environmental lighting - a bright sun-like light
+	// Add environmental lighting - dimmed for better lambertian appearance
 	s.AddSphereLight(
-		core.NewVec3(20, 25, 20),       // position (high and to the side)
-		8,                              // radius
-		core.NewVec3(12.0, 11.5, 10.0), // warm white emission
+		core.NewVec3(20, 25, 20),    // position (high and to the side)
+		8,                           // radius
+		core.NewVec3(8.0, 7.5, 6.5), // dimmed warm white emission
 	)
 
 	// Create ground plane (gray lambertian)
@@ -149,13 +149,36 @@ func NewSphereGridScene(gridSize int, cameraOverrides ...renderer.CameraConfig) 
 			// Convert OKLCH to RGB
 			color := oklchToRGB(lightness, chroma, hue)
 
-			// Create metallic material with the calculated color
-			// Add slight roughness for more realistic metal appearance
-			roughness := 0.05 + 0.1*float64((i+j)%3)/2.0 // Vary roughness slightly
-			metalMaterial := material.NewMetal(color, roughness)
+			// Create material based on finish type
+			var sphereMaterial core.Material
+			switch materialFinish {
+			case "matte":
+				// Lambertian (diffuse) material - flat, no reflections
+				sphereMaterial = material.NewLambertian(color)
+			case "glossy":
+				// Layered material: glass coating over colored metal
+				inner := material.NewLambertian(color)
+				outerGlass := material.NewDielectric(1.5) // Glass coating
+				sphereMaterial = material.NewLayered(outerGlass, inner)
+			case "mirror":
+				// Perfect mirror - zero roughness metal with neutral color
+				mirrorColor := core.NewVec3(0.9, 0.9, 0.9) // Slightly tinted white
+				sphereMaterial = material.NewMetal(mirrorColor, 0.0)
+			case "glass":
+				// Clear glass dielectric
+				sphereMaterial = material.NewDielectric(1.5) // Glass refractive index
+			case "mixed":
+				// Mix of matte and metallic with consistent 50/50 ratio
+				matte := material.NewLambertian(color)
+				metallic := material.NewMetal(color, 0.1)
+				sphereMaterial = material.NewMix(matte, metallic, 0.5) // Fixed 50/50 mix
+			default: // "metallic"
+				// Consistent metallic material with fixed roughness
+				sphereMaterial = material.NewMetal(color, 0.05) // Fixed low roughness
+			}
 
 			// Create sphere
-			sphere := geometry.NewSphere(position, sphereRadius, metalMaterial)
+			sphere := geometry.NewSphere(position, sphereRadius, sphereMaterial)
 			s.Shapes = append(s.Shapes, sphere)
 		}
 	}

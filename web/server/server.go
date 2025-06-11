@@ -43,6 +43,7 @@ type RenderRequest struct {
 	// Scene-specific configuration
 	CornellGeometry string `json:"cornellGeometry"` // Cornell box geometry type: "spheres", "boxes", "empty"
 	SphereGridSize  int    `json:"sphereGridSize"`  // Sphere grid size (e.g., 10, 20, 100)
+	MaterialFinish  string `json:"materialFinish"`  // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
 }
 
 // ProgressUpdate represents a single progressive update sent via SSE
@@ -274,6 +275,12 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 		return err
 	}
 
+	// Parse material finish
+	req.MaterialFinish = r.URL.Query().Get("materialFinish")
+	if req.MaterialFinish == "" {
+		req.MaterialFinish = "metallic" // Default
+	}
+
 	return nil
 }
 
@@ -305,7 +312,7 @@ func (s *Server) createScene(req *RenderRequest) *scene.Scene {
 	case "basic":
 		return scene.NewDefaultScene(cameraOverride)
 	case "sphere-grid":
-		return scene.NewSphereGridScene(req.SphereGridSize, cameraOverride)
+		return scene.NewSphereGridScene(req.SphereGridSize, req.MaterialFinish, cameraOverride)
 	default:
 		return nil
 	}
@@ -389,6 +396,7 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"adaptiveDarkThreshold":     config.AdaptiveDarkThreshold,
 			"cornellGeometry":           "spheres",
 			"sphereGridSize":            20,
+			"materialFinish":            "metallic",
 		},
 		"limits": map[string]interface{}{
 			"width": map[string]int{
@@ -451,6 +459,11 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"min":     5,
 				"max":     200,
 				"default": 20,
+			},
+			"materialFinish": map[string]interface{}{
+				"type":    "select",
+				"options": []string{"metallic", "matte", "glossy", "mirror", "glass", "mixed"},
+				"default": "metallic",
 			},
 		}
 	}
