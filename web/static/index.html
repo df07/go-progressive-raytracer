@@ -552,7 +552,11 @@
 
                 this.eventSource.onerror = (event) => {
                     console.error('SSE connection error:', event);
-                    this.setStatus('error', 'Connection error');
+                    // Only show generic connection error if we haven't already shown a specific error
+                    const statusElement = document.getElementById('status');
+                    if (!statusElement.classList.contains('error')) {
+                        this.setStatus('error', 'Connection lost - please check your parameters and try again');
+                    }
                     this.stopRendering();
                 };
             }
