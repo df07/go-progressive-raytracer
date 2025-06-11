@@ -131,14 +131,20 @@ func NewSphereGridScene(gridSize int, cameraOverrides ...renderer.CameraConfig) 
 			position := core.NewVec3(x, y, z)
 
 			// Calculate OKLCH color based on grid position
-			// Vary hue across X axis (0-360 degrees)
-			hue := (float64(i) / float64(gridSize-1)) * 360.0
+			// Primary hue varies across X axis (rainbow progression)
+			baseHue := (float64(i) / float64(gridSize-1)) * 330.0
 
-			// Vary chroma across Z axis (from desaturated to vivid)
-			chroma := minChroma + (float64(j)/float64(gridSize-1))*(maxChroma-minChroma)
+			// Add strong hue shift across Z axis for dramatic color changes
+			// This creates a much more noticeable color transformation from front to back
+			hueShift := (float64(j) / float64(gridSize-1)) * 120.0 // 120 degree shift (1/3 of color wheel)
+			hue := math.Mod(baseHue+hueShift, 360.0)
 
-			// Slight lightness variation for more interest
-			lightness := baseLightness + 0.1*math.Sin(float64(i+j)*0.5)
+			// Keep chroma relatively high throughout, with slight variation
+			// Instead of making back colors gray, make them slightly less saturated but still colorful
+			chroma := minChroma + 0.8*(maxChroma-minChroma) + 0.2*(maxChroma-minChroma)*(float64(j)/float64(gridSize-1))
+
+			// Keep lightness constant to eliminate moire pattern
+			lightness := baseLightness
 
 			// Convert OKLCH to RGB
 			color := oklchToRGB(lightness, chroma, hue)
