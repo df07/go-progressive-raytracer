@@ -133,6 +133,15 @@ func (s *Server) extractGeometryInfo(shape core.Shape) (string, map[string]inter
 		properties["area"] = geom.Area
 		return "quad_light", properties
 
+	case *geometry.TriangleMesh:
+		properties["triangleCount"] = geom.GetTriangleCount()
+		bbox := geom.BoundingBox()
+		properties["boundingBox"] = map[string]interface{}{
+			"min": [3]float64{bbox.Min.X, bbox.Min.Y, bbox.Min.Z},
+			"max": [3]float64{bbox.Max.X, bbox.Max.Y, bbox.Max.Z},
+		}
+		return "triangle_mesh", properties
+
 	default:
 		return "unknown", properties
 	}

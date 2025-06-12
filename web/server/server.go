@@ -313,6 +313,8 @@ func (s *Server) createScene(req *RenderRequest) *scene.Scene {
 		return scene.NewDefaultScene(cameraOverride)
 	case "sphere-grid":
 		return scene.NewSphereGridScene(req.SphereGridSize, req.MaterialFinish, cameraOverride)
+	case "triangle-mesh":
+		return scene.NewTriangleMeshScene(scene.TriangleMeshBasic, cameraOverride)
 	default:
 		return nil
 	}
@@ -466,6 +468,8 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"default": "metallic",
 			},
 		}
+	case "triangle-mesh":
+		// No scene-specific options for triangle mesh (only basic configuration)
 	}
 
 	w.WriteHeader(http.StatusOK)
