@@ -227,7 +227,7 @@
                     <option value="cornell-box">Cornell Box</option>
                     <option value="basic">Basic Scene</option>
                     <option value="sphere-grid">Sphere Grid</option>
-                    <option value="triangle-mesh">Triangle Mesh</option>
+                    <option value="triangle-mesh-sphere">Triangle Mesh Sphere</option>
                 </select>
             </div>
             
@@ -330,6 +330,11 @@
                 <div class="stats-item">
                     <span class="stats-label">Total Pixels:</span>
                     <span id="totalPixels" class="stats-value">-</span>
+                </div>
+                
+                <div class="stats-item">
+                    <span class="stats-label">Primitives:</span>
+                    <span id="primitiveCount" class="stats-value">-</span>
                 </div>
                 
                 <div class="stats-item">
@@ -617,6 +622,11 @@
                     params.materialFinish = materialFinish.value;
                 }
                 
+                const sphereComplexity = document.getElementById('sphereComplexity');
+                if (sphereComplexity) {
+                    params.sphereComplexity = sphereComplexity.value;
+                }
+                
                 return params;
             }
 
@@ -699,6 +709,7 @@
                 document.getElementById('avgSamples').textContent = data.stats.averageSamples.toFixed(1);
                 document.getElementById('totalSamples').textContent = data.stats.totalSamples.toLocaleString();
                 document.getElementById('totalPixels').textContent = data.stats.totalPixels.toLocaleString();
+                document.getElementById('primitiveCount').textContent = data.stats.primitiveCount.toLocaleString();
                 document.getElementById('elapsed').textContent = `${(data.elapsedMs / 1000).toFixed(1)}s`;
 
                 // Update status
@@ -719,6 +730,7 @@
                 document.getElementById('avgSamples').textContent = '-';
                 document.getElementById('totalSamples').textContent = '-';
                 document.getElementById('totalPixels').textContent = '-';
+                document.getElementById('primitiveCount').textContent = '-';
                 document.getElementById('elapsed').textContent = '-';
             }
 

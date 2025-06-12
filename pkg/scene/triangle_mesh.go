@@ -13,11 +13,16 @@ import (
 type TriangleMeshGeometryType int
 
 const (
-	TriangleMeshBasic TriangleMeshGeometryType = iota
+	TriangleMeshSphere TriangleMeshGeometryType = iota
 )
 
 // NewTriangleMeshScene creates a scene showcasing triangle mesh geometry
-func NewTriangleMeshScene(geometryType TriangleMeshGeometryType, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewTriangleMeshScene(complexity int, cameraOverrides ...renderer.CameraConfig) *Scene {
+	return NewTriangleMeshSceneWithComplexity(complexity, cameraOverrides...)
+}
+
+// NewTriangleMeshSceneWithComplexity creates a scene with configurable sphere complexity
+func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...renderer.CameraConfig) *Scene {
 	// Setup camera and basic scene configuration
 	cameraConfig := setupTriangleMeshCamera(cameraOverrides...)
 	camera := renderer.NewCamera(cameraConfig)
@@ -38,8 +43,8 @@ func NewTriangleMeshScene(geometryType TriangleMeshGeometryType, cameraOverrides
 	// Add ground plane
 	addTriangleMeshGround(s)
 
-	// Add geometry based on type
-	addTriangleMeshGeometry(s, geometryType)
+	// Add sphere comparison geometry
+	addSphereTriangleMeshGeometryWithComplexity(s, complexity)
 
 	return s
 }
@@ -79,20 +84,27 @@ func createTriangleMeshSamplingConfig() core.SamplingConfig {
 	}
 }
 
-// addTriangleMeshLighting adds lighting to the scene
+// addTriangleMeshLighting adds symmetrical lighting to the scene
 func addTriangleMeshLighting(s *Scene) {
-	// Main overhead light
+	// Main overhead light - centered above both spheres
 	s.AddSphereLight(
-		core.NewVec3(2, 6, 3),          // position
+		core.NewVec3(0, 6, 0),          // position (centered above spheres)
 		1.5,                            // radius
-		core.NewVec3(12.0, 11.0, 10.0), // warm white emission
+		core.NewVec3(15.0, 15.0, 15.0), // bright white emission
 	)
 
-	// Secondary fill light
+	// Left fill light - symmetrical to right
 	s.AddSphereLight(
-		core.NewVec3(-3, 4, 2),      // position
+		core.NewVec3(-4, 4, 3),      // position (left side)
 		0.8,                         // radius
-		core.NewVec3(6.0, 7.0, 8.0), // cool blue emission
+		core.NewVec3(8.0, 8.0, 8.0), // neutral white emission
+	)
+
+	// Right fill light - symmetrical to left
+	s.AddSphereLight(
+		core.NewVec3(4, 4, 3),       // position (right side, mirrored)
+		0.8,                         // radius
+		core.NewVec3(8.0, 8.0, 8.0), // neutral white emission (same as left)
 	)
 }
 
@@ -107,160 +119,83 @@ func addTriangleMeshGround(s *Scene) {
 	s.Shapes = append(s.Shapes, groundPlane)
 }
 
-// addTriangleMeshGeometry adds the specified geometry type to the scene
-func addTriangleMeshGeometry(s *Scene, geometryType TriangleMeshGeometryType) {
-	switch geometryType {
-	case TriangleMeshBasic:
-		addBasicTriangleMeshGeometry(s)
-	default:
-		addBasicTriangleMeshGeometry(s)
+// addSphereTriangleMeshGeometryWithComplexity adds triangle mesh and regular spheres for comparison
+func addSphereTriangleMeshGeometryWithComplexity(s *Scene, complexity int) {
+	// Create material - use a nice gold metal that shows off the mesh structure
+	goldMetal := material.NewMetal(core.NewVec3(0.8, 0.6, 0.2), 0.05)
+
+	// Calculate latitude subdivisions proportionally (3/4 of longitude for good sphere proportions)
+	latitudeSubdivisions := (complexity * 3) / 4
+	if latitudeSubdivisions < 3 {
+		latitudeSubdivisions = 3
 	}
-}
 
-// addBasicTriangleMeshGeometry adds simple triangle mesh objects
-func addBasicTriangleMeshGeometry(s *Scene) {
-	// Create materials
-	redMetal := material.NewMetal(core.NewVec3(0.8, 0.2, 0.2), 0.1)
-	blueLambertian := material.NewLambertian(core.NewVec3(0.2, 0.3, 0.8))
-	goldMetal := material.NewMetal(core.NewVec3(0.8, 0.6, 0.2), 0.05) // Changed from glass to gold
-
-	// Simple triangle mesh box - rotated to show multiple faces
-	boxMesh := createBoxMesh(
-		core.NewVec3(-2, 0.5, 0),      // center (sitting on ground)
-		core.NewVec3(1, 1, 1),         // size
-		core.NewVec3(0, math.Pi/6, 0), // rotation (30° around Y-axis)
-		redMetal,
+	// Triangle mesh sphere on the left
+	triangleMeshSphere := createSphereMesh(
+		core.NewVec3(-1.5, 1, 0), // center (left side, elevated above ground)
+		1.0,                      // radius
+		complexity,               // longitude subdivisions
+		latitudeSubdivisions,     // latitude subdivisions
+		goldMetal,
 	)
-	s.Shapes = append(s.Shapes, boxMesh)
+	s.Shapes = append(s.Shapes, triangleMeshSphere)
 
-	// Triangle mesh pyramid - rotated around Y-axis to show it's actually a pyramid
-	pyramidMesh := createPyramidMesh(
-		core.NewVec3(0, 1, 0),         // center
-		1.5,                           // base size
-		2.0,                           // height
-		core.NewVec3(0, math.Pi/4, 0), // rotation (45° around Y-axis only)
-		blueLambertian,
+	// Regular sphere on the right for comparison
+	regularSphere := geometry.NewSphere(
+		core.NewVec3(1.5, 1, 0), // center (right side, elevated above ground)
+		1.0,                     // radius (same as triangle mesh)
+		goldMetal,               // same material
 	)
-	s.Shapes = append(s.Shapes, pyramidMesh)
-
-	// Triangle mesh icosahedron - rotated to show its complex geometry
-	icosahedronMesh := createIcosahedronMesh(
-		core.NewVec3(2, 0.8, 0),       // center (sitting on ground)
-		0.8,                           // radius
-		core.NewVec3(0, math.Pi/3, 0), // rotation (60° around Y-axis)
-		goldMetal,                     // Changed to gold metal
-	)
-	s.Shapes = append(s.Shapes, icosahedronMesh)
+	s.Shapes = append(s.Shapes, regularSphere)
 }
 
-// Helper functions for creating triangle meshes (moved from geometry package)
+// createSphereMesh creates a triangle mesh representing a sphere using UV sphere generation
+// center: center point of the sphere
+// radius: radius of the sphere
+// longitudeSubdivisions: number of subdivisions around the sphere (longitude)
+// latitudeSubdivisions: number of subdivisions from pole to pole (latitude)
+// material: material for the sphere
+func createSphereMesh(center core.Vec3, radius float64, longitudeSubdivisions, latitudeSubdivisions int, material core.Material) *geometry.TriangleMesh {
+	vertices := make([]core.Vec3, 0)
+	faces := make([]int, 0)
 
-// createBoxMesh creates a triangle mesh representing a box
-func createBoxMesh(center, size core.Vec3, rotation core.Vec3, material core.Material) *geometry.TriangleMesh {
-	// Calculate the 8 corners of the box
-	halfSize := size.Multiply(0.5)
-	vertices := []core.Vec3{
-		center.Add(core.NewVec3(-halfSize.X, -halfSize.Y, -halfSize.Z)), // 0: left-bottom-back
-		center.Add(core.NewVec3(+halfSize.X, -halfSize.Y, -halfSize.Z)), // 1: right-bottom-back
-		center.Add(core.NewVec3(+halfSize.X, +halfSize.Y, -halfSize.Z)), // 2: right-top-back
-		center.Add(core.NewVec3(-halfSize.X, +halfSize.Y, -halfSize.Z)), // 3: left-top-back
-		center.Add(core.NewVec3(-halfSize.X, -halfSize.Y, +halfSize.Z)), // 4: left-bottom-front
-		center.Add(core.NewVec3(+halfSize.X, -halfSize.Y, +halfSize.Z)), // 5: right-bottom-front
-		center.Add(core.NewVec3(+halfSize.X, +halfSize.Y, +halfSize.Z)), // 6: right-top-front
-		center.Add(core.NewVec3(-halfSize.X, +halfSize.Y, +halfSize.Z)), // 7: left-top-front
+	// Generate vertices using spherical coordinates
+	for lat := 0; lat <= latitudeSubdivisions; lat++ {
+		// Latitude angle from 0 (north pole) to π (south pole)
+		theta := float64(lat) * math.Pi / float64(latitudeSubdivisions)
+		sinTheta := math.Sin(theta)
+		cosTheta := math.Cos(theta)
+
+		for lon := 0; lon <= longitudeSubdivisions; lon++ {
+			// Longitude angle from 0 to 2π
+			phi := float64(lon) * 2.0 * math.Pi / float64(longitudeSubdivisions)
+			sinPhi := math.Sin(phi)
+			cosPhi := math.Cos(phi)
+
+			// Convert spherical to cartesian coordinates
+			x := radius * sinTheta * cosPhi
+			y := radius * cosTheta
+			z := radius * sinTheta * sinPhi
+
+			vertex := center.Add(core.NewVec3(x, y, z))
+			vertices = append(vertices, vertex)
+		}
 	}
 
-	// Define the 12 triangles (2 per face, 6 faces)
-	faces := []int{
-		// Back face (Z-)
-		0, 1, 2, 0, 2, 3,
-		// Front face (Z+)
-		4, 6, 5, 4, 7, 6,
-		// Left face (X-)
-		0, 3, 7, 0, 7, 4,
-		// Right face (X+)
-		1, 5, 6, 1, 6, 2,
-		// Bottom face (Y-)
-		0, 4, 5, 0, 5, 1,
-		// Top face (Y+)
-		3, 2, 6, 3, 6, 7,
+	// Generate faces (triangles)
+	for lat := 0; lat < latitudeSubdivisions; lat++ {
+		for lon := 0; lon < longitudeSubdivisions; lon++ {
+			// Calculate vertex indices for the current quad
+			current := lat*(longitudeSubdivisions+1) + lon
+			next := current + longitudeSubdivisions + 1
+
+			// Create two triangles for each quad
+			// Triangle 1: current, next, current+1
+			faces = append(faces, current, next, current+1)
+			// Triangle 2: current+1, next, next+1
+			faces = append(faces, current+1, next, next+1)
+		}
 	}
 
-	if rotation.X == 0 && rotation.Y == 0 && rotation.Z == 0 {
-		return geometry.NewTriangleMesh(vertices, faces, material)
-	}
-	return geometry.NewTriangleMeshWithRotation(vertices, faces, material, center, rotation)
-}
-
-// createPyramidMesh creates a triangle mesh representing a pyramid
-func createPyramidMesh(center core.Vec3, baseSize, height float64, rotation core.Vec3, material core.Material) *geometry.TriangleMesh {
-	halfBase := baseSize * 0.5
-	halfHeight := height * 0.5
-
-	vertices := []core.Vec3{
-		// Base vertices (Y = center.Y - halfHeight)
-		center.Add(core.NewVec3(-halfBase, -halfHeight, -halfBase)), // 0: left-back
-		center.Add(core.NewVec3(+halfBase, -halfHeight, -halfBase)), // 1: right-back
-		center.Add(core.NewVec3(+halfBase, -halfHeight, +halfBase)), // 2: right-front
-		center.Add(core.NewVec3(-halfBase, -halfHeight, +halfBase)), // 3: left-front
-		// Apex (Y = center.Y + halfHeight)
-		center.Add(core.NewVec3(0, +halfHeight, 0)), // 4: apex
-	}
-
-	faces := []int{
-		// Base (2 triangles)
-		0, 2, 1, 0, 3, 2,
-		// Side faces
-		0, 1, 4, // back face
-		1, 2, 4, // right face
-		2, 3, 4, // front face
-		3, 0, 4, // left face
-	}
-
-	if rotation.X == 0 && rotation.Y == 0 && rotation.Z == 0 {
-		return geometry.NewTriangleMesh(vertices, faces, material)
-	}
-	return geometry.NewTriangleMeshWithRotation(vertices, faces, material, center, rotation)
-}
-
-// createIcosahedronMesh creates a triangle mesh representing an icosahedron (20-sided polyhedron)
-func createIcosahedronMesh(center core.Vec3, radius float64, rotation core.Vec3, material core.Material) *geometry.TriangleMesh {
-	// Golden ratio
-	phi := (1.0 + 1.618033988749895) / 2.0 // (1 + sqrt(5)) / 2
-
-	// Scale factor to achieve desired radius
-	scale := radius / 1.618033988749895 // radius / phi
-
-	// 12 vertices of icosahedron
-	vertices := []core.Vec3{
-		center.Add(core.NewVec3(-1, phi, 0).Multiply(scale)),  // 0
-		center.Add(core.NewVec3(1, phi, 0).Multiply(scale)),   // 1
-		center.Add(core.NewVec3(-1, -phi, 0).Multiply(scale)), // 2
-		center.Add(core.NewVec3(1, -phi, 0).Multiply(scale)),  // 3
-		center.Add(core.NewVec3(0, -1, phi).Multiply(scale)),  // 4
-		center.Add(core.NewVec3(0, 1, phi).Multiply(scale)),   // 5
-		center.Add(core.NewVec3(0, -1, -phi).Multiply(scale)), // 6
-		center.Add(core.NewVec3(0, 1, -phi).Multiply(scale)),  // 7
-		center.Add(core.NewVec3(phi, 0, -1).Multiply(scale)),  // 8
-		center.Add(core.NewVec3(phi, 0, 1).Multiply(scale)),   // 9
-		center.Add(core.NewVec3(-phi, 0, -1).Multiply(scale)), // 10
-		center.Add(core.NewVec3(-phi, 0, 1).Multiply(scale)),  // 11
-	}
-
-	// 20 triangular faces
-	faces := []int{
-		// 5 faces around point 0
-		0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11,
-		// 5 adjacent faces
-		1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8,
-		// 5 faces around point 3
-		3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9,
-		// 5 adjacent faces
-		4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1,
-	}
-
-	if rotation.X == 0 && rotation.Y == 0 && rotation.Z == 0 {
-		return geometry.NewTriangleMesh(vertices, faces, material)
-	}
-	return geometry.NewTriangleMeshWithRotation(vertices, faces, material, center, rotation)
+	return geometry.NewTriangleMesh(vertices, faces, material)
 }

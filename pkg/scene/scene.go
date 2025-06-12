@@ -124,6 +124,27 @@ func (s *Scene) GetSamplingConfig() core.SamplingConfig {
 	return s.SamplingConfig
 }
 
+// GetPrimitiveCount returns the total number of primitive objects in the scene
+func (s *Scene) GetPrimitiveCount() int {
+	count := 0
+	for _, shape := range s.Shapes {
+		count += s.countPrimitivesInShape(shape)
+	}
+	return count
+}
+
+// countPrimitivesInShape counts primitives in a single shape, handling complex objects
+func (s *Scene) countPrimitivesInShape(shape core.Shape) int {
+	switch obj := shape.(type) {
+	case *geometry.TriangleMesh:
+		// Triangle meshes contain multiple triangles
+		return obj.GetTriangleCount()
+	default:
+		// Regular shapes count as 1 primitive each
+		return 1
+	}
+}
+
 // AddSphereLight adds a spherical light to the scene
 func (s *Scene) AddSphereLight(center core.Vec3, radius float64, emission core.Vec3) {
 	emissiveMat := material.NewEmissive(emission)

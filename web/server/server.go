@@ -41,9 +41,10 @@ type RenderRequest struct {
 	AdaptiveDarkThreshold float64 `json:"adaptiveDarkThreshold"` // Adaptive sampling dark pixel threshold
 
 	// Scene-specific configuration
-	CornellGeometry string `json:"cornellGeometry"` // Cornell box geometry type: "spheres", "boxes", "empty"
-	SphereGridSize  int    `json:"sphereGridSize"`  // Sphere grid size (e.g., 10, 20, 100)
-	MaterialFinish  string `json:"materialFinish"`  // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
+	CornellGeometry  string `json:"cornellGeometry"`  // Cornell box geometry type: "spheres", "boxes", "empty"
+	SphereGridSize   int    `json:"sphereGridSize"`   // Sphere grid size (e.g., 10, 20, 100)
+	MaterialFinish   string `json:"materialFinish"`   // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
+	SphereComplexity int    `json:"sphereComplexity"` // Triangle mesh sphere complexity
 }
 
 // ProgressUpdate represents a single progressive update sent via SSE
@@ -64,6 +65,7 @@ type Stats struct {
 	MaxSamples     int     `json:"maxSamples"`
 	MinSamples     int     `json:"minSamples"`
 	MaxSamplesUsed int     `json:"maxSamplesUsed"`
+	PrimitiveCount int     `json:"primitiveCount"`
 }
 
 // Start starts the web server
@@ -155,6 +157,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 				MaxSamples:     result.Stats.MaxSamples,
 				MinSamples:     result.Stats.MinSamples,
 				MaxSamplesUsed: result.Stats.MaxSamplesUsed,
+				PrimitiveCount: sceneObj.GetPrimitiveCount(),
 			},
 			IsComplete: result.IsLast,
 			ElapsedMs:  time.Since(startTime).Milliseconds(),
@@ -281,6 +284,11 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 		req.MaterialFinish = "metallic" // Default
 	}
 
+	// Parse sphere complexity parameter
+	if req.SphereComplexity, err = parseIntParam(r.URL.Query(), "sphereComplexity", 32, 4, 512); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -313,8 +321,8 @@ func (s *Server) createScene(req *RenderRequest) *scene.Scene {
 		return scene.NewDefaultScene(cameraOverride)
 	case "sphere-grid":
 		return scene.NewSphereGridScene(req.SphereGridSize, req.MaterialFinish, cameraOverride)
-	case "triangle-mesh":
-		return scene.NewTriangleMeshScene(scene.TriangleMeshBasic, cameraOverride)
+	case "triangle-mesh-sphere":
+		return scene.NewTriangleMeshScene(req.SphereComplexity, cameraOverride)
 	default:
 		return nil
 	}
@@ -399,6 +407,7 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"cornellGeometry":           "spheres",
 			"sphereGridSize":            20,
 			"materialFinish":            "metallic",
+			"sphereComplexity":          32,
 		},
 		"limits": map[string]interface{}{
 			"width": map[string]int{
@@ -441,6 +450,10 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"min": 5,
 				"max": 200,
 			},
+			"sphereComplexity": map[string]int{
+				"min": 4,
+				"max": 512,
+			},
 		},
 	}
 
@@ -468,8 +481,16 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"default": "metallic",
 			},
 		}
-	case "triangle-mesh":
-		// No scene-specific options for triangle mesh (only basic configuration)
+	case "triangle-mesh-sphere":
+		response["sceneOptions"] = map[string]interface{}{
+			"sphereComplexity": map[string]interface{}{
+				"type":    "number",
+				"min":     4,
+				"max":     512,
+				"default": 32,
+				"label":   "Sphere Complexity",
+			},
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)

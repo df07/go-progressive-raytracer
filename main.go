@@ -131,7 +131,7 @@ func createScene(sceneType string) SceneInfo {
 		sceneObj = scene.NewSphereGridScene(20, "metallic") // Default grid size and material
 	case "trianglemesh":
 		fmt.Println("Using triangle mesh scene...")
-		sceneObj = scene.NewTriangleMeshScene(scene.TriangleMeshBasic) // Default triangle mesh geometry
+		sceneObj = scene.NewTriangleMeshScene(32) // Default complexity
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()
