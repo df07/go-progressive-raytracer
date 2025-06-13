@@ -96,6 +96,7 @@ func showHelp() {
 	fmt.Println("  cornell-boxes - Cornell box scene with rotated boxes")
 	fmt.Println("  spheregrid   - 10x10 grid of rainbow-colored metallic spheres (perfect for BVH testing)")
 	fmt.Println("  trianglemesh - Scene showcasing triangle mesh geometry (boxes, pyramids, icosahedrons)")
+	fmt.Println("  dragon       - Dragon PLY mesh from PBRT book")
 	fmt.Println()
 	fmt.Println("Available modes:")
 	fmt.Println("  normal      - Standard single-threaded rendering")
@@ -132,6 +133,9 @@ func createScene(sceneType string) SceneInfo {
 	case "trianglemesh":
 		fmt.Println("Using triangle mesh scene...")
 		sceneObj = scene.NewTriangleMeshScene(32) // Default complexity
+	case "dragon":
+		fmt.Println("Using dragon PLY mesh scene...")
+		sceneObj = scene.NewDragonScene(true)
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()
@@ -154,7 +158,7 @@ func createScene(sceneType string) SceneInfo {
 // createOutputDir creates the output directory for the scene type
 func createOutputDir(sceneType string) string {
 	// Normalize scene type
-	if sceneType != "cornell" && sceneType != "cornell-boxes" && sceneType != "default" && sceneType != "spheregrid" && sceneType != "trianglemesh" {
+	if sceneType != "cornell" && sceneType != "cornell-boxes" && sceneType != "default" && sceneType != "spheregrid" && sceneType != "trianglemesh" && sceneType != "dragon" {
 		sceneType = "default"
 	}
 

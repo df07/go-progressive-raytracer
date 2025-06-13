@@ -28,6 +28,22 @@ func NewTriangle(v0, v1, v2 core.Vec3, material core.Material) *Triangle {
 	return t
 }
 
+// NewTriangleWithNormal creates a new triangle from three vertices with a custom normal
+func NewTriangleWithNormal(v0, v1, v2 core.Vec3, normal core.Vec3, material core.Material) *Triangle {
+	t := &Triangle{
+		V0:       v0,
+		V1:       v1,
+		V2:       v2,
+		Material: material,
+		normal:   normal.Normalize(), // Ensure the normal is normalized
+	}
+
+	// Only compute bounding box, normal is provided
+	t.computeBoundingBox()
+
+	return t
+}
+
 // computeNormal calculates and caches the triangle's normal vector
 func (t *Triangle) computeNormal() {
 	// Calculate two edge vectors

@@ -107,7 +107,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create scene
-	sceneObj := s.createScene(req)
+	sceneObj := s.createScene(req, false)
 	if sceneObj == nil {
 		s.sendSSEError(w, "Unknown scene: "+req.Scene)
 		return
@@ -293,7 +293,7 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 }
 
 // createScene creates a scene based on the scene name and optionally updates camera for requested dimensions
-func (s *Server) createScene(req *RenderRequest) *scene.Scene {
+func (s *Server) createScene(req *RenderRequest, configOnly bool) *scene.Scene {
 	// Create camera override config (empty if width/height are 0, which means use defaults)
 	var cameraOverride renderer.CameraConfig
 	if req.Width > 0 && req.Height > 0 {
@@ -323,6 +323,9 @@ func (s *Server) createScene(req *RenderRequest) *scene.Scene {
 		return scene.NewSphereGridScene(req.SphereGridSize, req.MaterialFinish, cameraOverride)
 	case "triangle-mesh-sphere":
 		return scene.NewTriangleMeshScene(req.SphereComplexity, cameraOverride)
+	case "dragon":
+		loadMesh := !configOnly
+		return scene.NewDragonScene(loadMesh, cameraOverride)
 	default:
 		return nil
 	}
@@ -379,7 +382,7 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 		CornellGeometry: "spheres", // Default
 		SphereGridSize:  20,        // Default
 	}
-	sceneObj := s.createScene(defaultReq)
+	sceneObj := s.createScene(defaultReq, true)
 	if sceneObj == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + sceneName})
@@ -491,6 +494,10 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"label":   "Sphere Complexity",
 			},
 		}
+	case "dragon":
+		// Dragon scene has no configurable options currently
+		// The PLY file path and rotation are fixed in the scene
+		response["sceneOptions"] = map[string]interface{}{}
 	}
 
 	w.WriteHeader(http.StatusOK)

@@ -183,7 +183,9 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Pixel coordinates out of bounds"})
 		return
 	}
-	sceneObj := s.createScene(inspectReq)
+
+	const configOnly = true
+	sceneObj := s.createScene(inspectReq, configOnly)
 	if sceneObj == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + inspectReq.Scene})

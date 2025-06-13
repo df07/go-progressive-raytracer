@@ -197,5 +197,5 @@ func createSphereMesh(center core.Vec3, radius float64, longitudeSubdivisions, l
 		}
 	}
 
-	return geometry.NewTriangleMesh(vertices, faces, material)
+	return geometry.NewTriangleMesh(vertices, faces, material, nil)
 }

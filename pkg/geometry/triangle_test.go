@@ -148,7 +148,7 @@ func TestTriangleMesh_Creation(t *testing.T) {
 		0, 2, 3, // second triangle
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{})
+	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
 
 	if mesh.GetTriangleCount() != 2 {
 		t.Errorf("Expected 2 triangles, got %d", mesh.GetTriangleCount())
@@ -182,7 +182,7 @@ func TestTriangleMesh_Hit(t *testing.T) {
 		0, 2, 3, // second triangle
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{})
+	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
 
 	tests := []struct {
 		name      string
@@ -245,5 +245,5 @@ func TestTriangleMesh_ErrorHandling(t *testing.T) {
 	}()
 
 	invalidFaces := []int{0, 1} // Only 2 indices, not a multiple of 3
-	NewTriangleMesh(vertices, invalidFaces, MockTriangleMaterial{})
+	NewTriangleMesh(vertices, invalidFaces, MockTriangleMaterial{}, nil)
 }

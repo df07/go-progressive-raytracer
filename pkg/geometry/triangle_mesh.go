@@ -15,16 +15,53 @@ type TriangleMesh struct {
 	material  core.Material // Default material (can be overridden per triangle)
 }
 
+// TriangleMeshOptions contains optional parameters for triangle mesh creation
+type TriangleMeshOptions struct {
+	Normals   []core.Vec3     // Optional custom normals (one per triangle)
+	Materials []core.Material // Optional per-triangle materials
+	Rotation  *core.Vec3      // Optional rotation to apply to vertices
+	Center    *core.Vec3      // Optional center point for rotation
+}
+
 // NewTriangleMesh creates a new triangle mesh from vertices and face indices
 // vertices: array of 3D points
 // faces: array of triangle indices (each group of 3 indices forms a triangle)
 // material: default material for all triangles
-func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material) *TriangleMesh {
+// options: optional parameters (can be nil for basic mesh)
+func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material, options *TriangleMeshOptions) *TriangleMesh {
 	if len(faces)%3 != 0 {
 		panic("Face indices must be a multiple of 3")
 	}
 
 	numTriangles := len(faces) / 3
+
+	// Validate options if provided
+	if options != nil {
+		if options.Normals != nil && len(options.Normals) != numTriangles {
+			panic("Number of normals must match number of triangles")
+		}
+		if options.Materials != nil && len(options.Materials) != numTriangles {
+			panic("Number of materials must match number of triangles")
+		}
+	}
+
+	// Apply rotation if specified
+	workingVertices := vertices
+	if options != nil && options.Rotation != nil {
+		workingVertices = make([]core.Vec3, len(vertices))
+		for i, vertex := range vertices {
+			// Translate to center, rotate, then translate back
+			if options.Center != nil {
+				vertex = vertex.Subtract(*options.Center)
+			}
+			vertex = rotateVertex(vertex, *options.Rotation)
+			if options.Center != nil {
+				vertex = vertex.Add(*options.Center)
+			}
+			workingVertices[i] = vertex
+		}
+	}
+
 	triangles := make([]core.Shape, numTriangles)
 
 	// Create individual triangles
@@ -34,12 +71,24 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material) 
 		i2 := faces[i*3+2]
 
 		// Bounds check
-		if i0 >= len(vertices) || i1 >= len(vertices) || i2 >= len(vertices) ||
+		if i0 >= len(workingVertices) || i1 >= len(workingVertices) || i2 >= len(workingVertices) ||
 			i0 < 0 || i1 < 0 || i2 < 0 {
 			panic("Face index out of bounds")
 		}
 
-		triangle := NewTriangle(vertices[i0], vertices[i1], vertices[i2], material)
+		// Determine material for this triangle
+		triangleMaterial := material
+		if options != nil && options.Materials != nil {
+			triangleMaterial = options.Materials[i]
+		}
+
+		// Create triangle with or without custom normal
+		var triangle core.Shape
+		if options != nil && options.Normals != nil {
+			triangle = NewTriangleWithNormal(workingVertices[i0], workingVertices[i1], workingVertices[i2], options.Normals[i], triangleMaterial)
+		} else {
+			triangle = NewTriangle(workingVertices[i0], workingVertices[i1], workingVertices[i2], triangleMaterial)
+		}
 		triangles[i] = triangle
 	}
 
@@ -55,63 +104,17 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material) 
 		}
 	}
 
-	return &TriangleMesh{
-		triangles: triangles,
-		bvh:       bvh,
-		bbox:      bbox,
-		material:  material,
-	}
-}
-
-// NewTriangleMeshWithMaterials creates a triangle mesh where each triangle can have its own material
-// vertices: array of 3D points
-// faces: array of triangle indices (each group of 3 indices forms a triangle)
-// materials: array of materials, one per triangle (must match number of triangles)
-func NewTriangleMeshWithMaterials(vertices []core.Vec3, faces []int, materials []core.Material) *TriangleMesh {
-	if len(faces)%3 != 0 {
-		panic("Face indices must be a multiple of 3")
-	}
-
-	numTriangles := len(faces) / 3
-	if len(materials) != numTriangles {
-		panic("Number of materials must match number of triangles")
-	}
-
-	triangles := make([]core.Shape, numTriangles)
-
-	// Create individual triangles
-	for i := 0; i < numTriangles; i++ {
-		i0 := faces[i*3]
-		i1 := faces[i*3+1]
-		i2 := faces[i*3+2]
-
-		// Bounds check
-		if i0 >= len(vertices) || i1 >= len(vertices) || i2 >= len(vertices) ||
-			i0 < 0 || i1 < 0 || i2 < 0 {
-			panic("Face index out of bounds")
-		}
-
-		triangle := NewTriangle(vertices[i0], vertices[i1], vertices[i2], materials[i])
-		triangles[i] = triangle
-	}
-
-	// Build BVH for fast intersection
-	bvh := core.NewBVH(triangles)
-
-	// Calculate overall bounding box
-	var bbox core.AABB
-	if len(triangles) > 0 {
-		bbox = triangles[0].BoundingBox()
-		for i := 1; i < len(triangles); i++ {
-			bbox = bbox.Union(triangles[i].BoundingBox())
-		}
+	// Determine default material
+	defaultMaterial := material
+	if options != nil && options.Materials != nil && len(options.Materials) > 0 {
+		defaultMaterial = options.Materials[0]
 	}
 
 	return &TriangleMesh{
 		triangles: triangles,
 		bvh:       bvh,
 		bbox:      bbox,
-		material:  materials[0], // Use first material as default
+		material:  defaultMaterial,
 	}
 }
 
@@ -134,20 +137,6 @@ func (tm *TriangleMesh) GetTriangleCount() int {
 // GetTriangles returns the individual triangles (for debugging or special operations)
 func (tm *TriangleMesh) GetTriangles() []core.Shape {
 	return tm.triangles
-}
-
-// NewTriangleMeshWithRotation creates a triangle mesh with rotation applied to all vertices
-func NewTriangleMeshWithRotation(vertices []core.Vec3, faces []int, material core.Material, center, rotation core.Vec3) *TriangleMesh {
-	// Apply rotation to vertices
-	rotatedVertices := make([]core.Vec3, len(vertices))
-	for i, vertex := range vertices {
-		// Translate to origin, rotate, then translate back
-		localVertex := vertex.Subtract(center)
-		rotatedVertex := rotateVertex(localVertex, rotation)
-		rotatedVertices[i] = rotatedVertex.Add(center)
-	}
-
-	return NewTriangleMesh(rotatedVertices, faces, material)
 }
 
 // rotateVertex applies rotation around X, Y, Z axes (in that order)
