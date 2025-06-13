@@ -2,6 +2,7 @@ package loaders
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,19 +12,32 @@ import (
 	"time"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 )
 
 // PLYHeader represents the parsed header information from a PLY file
 type PLYHeader struct {
-	Format        string // "binary_little_endian", "binary_big_endian", or "ascii"
-	Version       string // Usually "1.0"
-	VertexCount   int
-	FaceCount     int
-	VertexProps   []PLYProperty
-	FaceProps     []PLYProperty
+	Format      string // "binary_little_endian", "binary_big_endian", or "ascii"
+	Version     string // Usually "1.0"
+	VertexCount int
+	FaceCount   int
+	VertexProps []PLYProperty
+	FaceProps   []PLYProperty
+
+	// Property detection flags
 	HasNormals    bool
-	NormalIndices [3]int // Indices of nx, ny, nz properties in vertex properties
+	HasColors     bool
+	HasTexCoords  bool
+	HasQuality    bool
+	HasConfidence bool
+	HasIntensity  bool
+
+	// Property indices for efficient access
+	NormalIndices   [3]int // Indices of nx, ny, nz properties
+	ColorIndices    [3]int // Indices of red, green, blue properties
+	TexCoordIndices [2]int // Indices of u, v or s, t properties
+	QualityIndex    int    // Index of quality property
+	ConfidenceIndex int    // Index of confidence property
+	IntensityIndex  int    // Index of intensity property
 }
 
 // PLYProperty represents a property definition in the PLY header
@@ -35,82 +49,29 @@ type PLYProperty struct {
 	DataType string // For list properties, the type of the data
 }
 
-// LoadPLYMesh loads a PLY file and returns a TriangleMesh
-func LoadPLYMesh(filename string, material core.Material) (*geometry.TriangleMesh, error) {
-	startTime := time.Now()
-	fmt.Printf("🔄 Opening PLY file: %s\n", filename)
+// PLYData contains the raw data loaded from a PLY file
+type PLYData struct {
+	Vertices   []core.Vec3 // Vertex positions (x, y, z)
+	Faces      []int       // Triangle indices (3 per triangle)
+	Normals    []core.Vec3 // Per-vertex normals (nx, ny, nz) - empty if not present
+	Colors     []core.Vec3 // Per-vertex colors (r, g, b) normalized to [0,1] - empty if not present
+	TexCoords  []core.Vec2 // Per-vertex texture coordinates (u, v) - empty if not present
+	Quality    []float64   // Per-vertex quality values - empty if not present
+	Confidence []float64   // Per-vertex confidence values - empty if not present
+	Intensity  []float64   // Per-vertex intensity values - empty if not present
 
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open PLY file: %v", err)
-	}
-	defer file.Close()
+	// Face properties
+	FaceColors    []core.Vec3 // Per-face colors - empty if not present
+	FaceMaterials []int       // Per-face material indices - empty if not present
 
-	// Parse header
-	fmt.Printf("🔄 Parsing PLY header...\n")
-	headerStart := time.Now()
-	header, headerSize, err := parsePLYHeader(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse PLY header: %v", err)
-	}
-	fmt.Printf("✅ Header parsed in %v (vertices: %d, faces: %d)\n",
-		time.Since(headerStart), header.VertexCount, header.FaceCount)
-
-	// Seek to start of binary data
-	_, err = file.Seek(int64(headerSize), io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("failed to seek to binary data: %v", err)
-	}
-
-	// Read vertices and faces based on format
-	fmt.Printf("🔄 Reading binary data (%s format)...\n", header.Format)
-	readStart := time.Now()
-
-	var vertices []core.Vec3
-	var faces []int
-	var normals []core.Vec3
-
-	switch header.Format {
-	case "binary_little_endian":
-		vertices, faces, normals, err = readBinaryLittleEndianWithNormals(file, header)
-	case "binary_big_endian":
-		vertices, faces, normals, err = readBinaryBigEndianWithNormals(file, header)
-	case "ascii":
-		return nil, fmt.Errorf("ASCII PLY format not yet supported")
-	default:
-		return nil, fmt.Errorf("unsupported PLY format: %s", header.Format)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to read PLY data: %v", err)
-	}
-
-	fmt.Printf("✅ Binary data read in %v (vertices: %d, triangles: %d, normals: %d)\n",
-		time.Since(readStart), len(vertices), len(faces)/3, len(normals))
-
-	// Create triangle mesh
-	fmt.Printf("🔄 Building triangle mesh with BVH...\n")
-	meshStart := time.Now()
-
-	var mesh *geometry.TriangleMesh
-	if len(normals) > 0 {
-		mesh = geometry.NewTriangleMesh(vertices, faces, material, &geometry.TriangleMeshOptions{
-			Normals: normals,
-		})
-	} else {
-		mesh = geometry.NewTriangleMesh(vertices, faces, material, nil)
-	}
-
-	fmt.Printf("✅ Triangle mesh built in %v\n", time.Since(meshStart))
-	fmt.Printf("🎉 Total PLY loading time: %v\n", time.Since(startTime))
-
-	return mesh, nil
+	// Additional vertex properties (stored as generic float64 slices)
+	CustomFloatProps map[string][]float64 // Custom float properties by name
+	CustomIntProps   map[string][]int     // Custom integer properties by name
 }
 
-// LoadPLYMeshWithRotation loads a PLY file and returns a TriangleMesh with rotation applied
-func LoadPLYMeshWithRotation(filename string, material core.Material, center, rotation core.Vec3) (*geometry.TriangleMesh, error) {
+// LoadPLY loads a PLY file and returns the raw vertex and face data
+func LoadPLY(filename string) (*PLYData, error) {
 	startTime := time.Now()
-	fmt.Printf("🔄 Opening PLY file: %s (with rotation)\n", filename)
 
 	file, err := os.Open(filename)
 	if err != nil {
@@ -119,14 +80,10 @@ func LoadPLYMeshWithRotation(filename string, material core.Material, center, ro
 	defer file.Close()
 
 	// Parse header
-	fmt.Printf("🔄 Parsing PLY header...\n")
-	headerStart := time.Now()
 	header, headerSize, err := parsePLYHeader(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse PLY header: %v", err)
 	}
-	fmt.Printf("✅ Header parsed in %v (vertices: %d, faces: %d)\n",
-		time.Since(headerStart), header.VertexCount, header.FaceCount)
 
 	// Seek to start of binary data
 	_, err = file.Seek(int64(headerSize), io.SeekStart)
@@ -135,18 +92,13 @@ func LoadPLYMeshWithRotation(filename string, material core.Material, center, ro
 	}
 
 	// Read vertices and faces based on format
-	fmt.Printf("🔄 Reading binary data (%s format)...\n", header.Format)
-	readStart := time.Now()
-
-	var vertices []core.Vec3
-	var faces []int
-	var normals []core.Vec3
+	var plyData *PLYData
 
 	switch header.Format {
 	case "binary_little_endian":
-		vertices, faces, normals, err = readBinaryLittleEndianWithNormals(file, header)
+		plyData, err = readBinaryLittleEndianWithNormals(file, header)
 	case "binary_big_endian":
-		vertices, faces, normals, err = readBinaryBigEndianWithNormals(file, header)
+		return nil, fmt.Errorf("binary big-endian PLY format not yet implemented")
 	case "ascii":
 		return nil, fmt.Errorf("ASCII PLY format not yet supported")
 	default:
@@ -157,33 +109,10 @@ func LoadPLYMeshWithRotation(filename string, material core.Material, center, ro
 		return nil, fmt.Errorf("failed to read PLY data: %v", err)
 	}
 
-	fmt.Printf("✅ Binary data read in %v (vertices: %d, triangles: %d, normals: %d)\n",
-		time.Since(readStart), len(vertices), len(faces)/3, len(normals))
+	fmt.Printf("✅ Loaded PLY data: %d vertices, %d triangles in %v\n",
+		len(plyData.Vertices), len(plyData.Faces)/3, time.Since(startTime))
 
-	// Create triangle mesh with rotation
-	fmt.Printf("🔄 Building triangle mesh with rotation and BVH...\n")
-	meshStart := time.Now()
-
-	var mesh *geometry.TriangleMesh
-	if len(normals) > 0 {
-		// Apply rotation to vertices and use custom normals
-		// TODO: Could also rotate the stored normals
-		mesh = geometry.NewTriangleMesh(vertices, faces, material, &geometry.TriangleMeshOptions{
-			Normals:  normals,
-			Rotation: &rotation,
-			Center:   &center,
-		})
-	} else {
-		mesh = geometry.NewTriangleMesh(vertices, faces, material, &geometry.TriangleMeshOptions{
-			Rotation: &rotation,
-			Center:   &center,
-		})
-	}
-
-	fmt.Printf("✅ Triangle mesh with rotation built in %v\n", time.Since(meshStart))
-	fmt.Printf("🎉 Total PLY loading time: %v\n", time.Since(startTime))
-
-	return mesh, nil
+	return plyData, nil
 }
 
 // parsePLYHeader parses the PLY header and returns header info and the byte offset where binary data starts
@@ -245,17 +174,49 @@ func parsePLYHeader(file *os.File) (*PLYHeader, int, error) {
 			switch currentElement {
 			case "vertex":
 				header.VertexProps = append(header.VertexProps, prop)
+				propIndex := len(header.VertexProps) - 1
+
 				// Check for normal properties
-				if prop.Name == "nx" || prop.Name == "ny" || prop.Name == "nz" {
+				switch prop.Name {
+				case "nx":
 					header.HasNormals = true
-					switch prop.Name {
-					case "nx":
-						header.NormalIndices[0] = len(header.VertexProps) - 1
-					case "ny":
-						header.NormalIndices[1] = len(header.VertexProps) - 1
-					case "nz":
-						header.NormalIndices[2] = len(header.VertexProps) - 1
-					}
+					header.NormalIndices[0] = propIndex
+				case "ny":
+					header.HasNormals = true
+					header.NormalIndices[1] = propIndex
+				case "nz":
+					header.HasNormals = true
+					header.NormalIndices[2] = propIndex
+
+				// Check for color properties
+				case "red", "r":
+					header.HasColors = true
+					header.ColorIndices[0] = propIndex
+				case "green", "g":
+					header.HasColors = true
+					header.ColorIndices[1] = propIndex
+				case "blue", "b":
+					header.HasColors = true
+					header.ColorIndices[2] = propIndex
+
+				// Check for texture coordinate properties
+				case "u", "s", "texture_u":
+					header.HasTexCoords = true
+					header.TexCoordIndices[0] = propIndex
+				case "v", "t", "texture_v":
+					header.HasTexCoords = true
+					header.TexCoordIndices[1] = propIndex
+
+				// Check for other common properties
+				case "quality":
+					header.HasQuality = true
+					header.QualityIndex = propIndex
+				case "confidence":
+					header.HasConfidence = true
+					header.ConfidenceIndex = propIndex
+				case "intensity":
+					header.HasIntensity = true
+					header.IntensityIndex = propIndex
 				}
 			case "face":
 				header.FaceProps = append(header.FaceProps, prop)
@@ -294,89 +255,93 @@ func parsePLYProperty(parts []string) (PLYProperty, error) {
 	return prop, nil
 }
 
-// readBinaryLittleEndianWithNormals reads binary little-endian PLY data with optimized face reading
-func readBinaryLittleEndianWithNormals(file *os.File, header *PLYHeader) ([]core.Vec3, []int, []core.Vec3, error) {
+// readBinaryLittleEndianWithNormals reads binary little-endian PLY data with all properties
+func readBinaryLittleEndianWithNormals(file *os.File, header *PLYHeader) (*PLYData, error) {
 	// Pre-allocate slices with exact capacity to avoid reallocations
 	vertices := make([]core.Vec3, 0, header.VertexCount)
 	faces := make([]int, 0, header.FaceCount*3) // Assuming triangular faces
+
 	var normals []core.Vec3
+	var colors []core.Vec3
+	var texCoords []core.Vec2
+	var quality []float64
+	var confidence []float64
+	var intensity []float64
+
 	if header.HasNormals {
 		normals = make([]core.Vec3, 0, header.VertexCount)
 	}
-
-	// Read vertices
-	fmt.Printf("🔄 Reading %d vertices...\n", header.VertexCount)
-	vertexStart := time.Now()
-	progressInterval := header.VertexCount / 10 // 10% intervals
-	if progressInterval == 0 {
-		progressInterval = 1
+	if header.HasColors {
+		colors = make([]core.Vec3, 0, header.VertexCount)
+	}
+	if header.HasTexCoords {
+		texCoords = make([]core.Vec2, 0, header.VertexCount)
+	}
+	if header.HasQuality {
+		quality = make([]float64, 0, header.VertexCount)
+	}
+	if header.HasConfidence {
+		confidence = make([]float64, 0, header.VertexCount)
+	}
+	if header.HasIntensity {
+		intensity = make([]float64, 0, header.VertexCount)
 	}
 
+	// Read vertices using optimized bulk approach
+	// Calculate vertex size and read all vertex data at once
+	vertexSize := calculateVertexSize(header.VertexProps)
+	totalVertexBytes := vertexSize * header.VertexCount
+	vertexData := make([]byte, totalVertexBytes)
+	_, err := io.ReadFull(file, vertexData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read vertex data: %v", err)
+	}
+
+	// Parse vertices from bulk data
 	for i := 0; i < header.VertexCount; i++ {
-		if i%progressInterval == 0 {
-			progress := float64(i) / float64(header.VertexCount) * 100
-			fmt.Printf("   📊 Vertex progress: %.1f%% (%d/%d)\n", progress, i, header.VertexCount)
-		}
+		offset := i * vertexSize
+		vertex := parseVertexFromBytes(vertexData[offset:offset+vertexSize], header.VertexProps)
 
-		var x, y, z float32
-		var nx, ny, nz float32
+		vertices = append(vertices, core.NewVec3(float64(vertex.X), float64(vertex.Y), float64(vertex.Z)))
 
-		for j, prop := range header.VertexProps {
-			switch prop.Name {
-			case "x":
-				if err := binary.Read(file, binary.LittleEndian, &x); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to read vertex x: %v", err)
-				}
-			case "y":
-				if err := binary.Read(file, binary.LittleEndian, &y); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to read vertex y: %v", err)
-				}
-			case "z":
-				if err := binary.Read(file, binary.LittleEndian, &z); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to read vertex z: %v", err)
-				}
-			case "nx":
-				if err := binary.Read(file, binary.LittleEndian, &nx); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to read normal nx: %v", err)
-				}
-			case "ny":
-				if err := binary.Read(file, binary.LittleEndian, &ny); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to read normal ny: %v", err)
-				}
-			case "nz":
-				if err := binary.Read(file, binary.LittleEndian, &nz); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to read normal nz: %v", err)
-				}
-			default:
-				// Skip unknown properties
-				if err := skipProperty(file, prop, binary.LittleEndian); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to skip vertex property %s at vertex %d, prop %d: %v", prop.Name, i, j, err)
-				}
-			}
-		}
-
-		vertices = append(vertices, core.NewVec3(float64(x), float64(y), float64(z)))
 		if header.HasNormals {
-			normals = append(normals, core.NewVec3(float64(nx), float64(ny), float64(nz)))
+			normals = append(normals, core.NewVec3(float64(vertex.NX), float64(vertex.NY), float64(vertex.NZ)))
+		}
+
+		if header.HasColors {
+			// Convert from 0-255 to 0-1 range
+			colors = append(colors, core.NewVec3(
+				float64(vertex.R)/255.0,
+				float64(vertex.G)/255.0,
+				float64(vertex.B)/255.0,
+			))
+		}
+
+		if header.HasTexCoords {
+			texCoords = append(texCoords, core.NewVec2(float64(vertex.U), float64(vertex.V)))
+		}
+
+		if header.HasQuality {
+			quality = append(quality, float64(vertex.Quality))
+		}
+
+		if header.HasConfidence {
+			confidence = append(confidence, float64(vertex.Confidence))
+		}
+
+		if header.HasIntensity {
+			intensity = append(intensity, float64(vertex.Intensity))
 		}
 	}
-	fmt.Printf("✅ Vertices read in %v\n", time.Since(vertexStart))
 
-	// Read faces with optimized approach
-	fmt.Printf("🔄 Reading %d faces...\n", header.FaceCount)
-	faceStart := time.Now()
-	faceProgressInterval := header.FaceCount / 10 // 10% intervals
-	if faceProgressInterval == 0 {
-		faceProgressInterval = 1
-	}
+	// Read faces with buffered approach for better I/O performance
+
+	// Create buffered reader for more efficient I/O
+	bufReader := bufio.NewReaderSize(file, 1024*1024) // 1MB buffer
 
 	for i := 0; i < header.FaceCount; i++ {
-		if i%faceProgressInterval == 0 {
-			progress := float64(i) / float64(header.FaceCount) * 100
-			fmt.Printf("   📊 Face progress: %.1f%% (%d/%d)\n", progress, i, header.FaceCount)
-		}
 
-		// Read face data efficiently
+		// Read face data efficiently using buffered reader
 		for j, prop := range header.FaceProps {
 			if prop.IsList && prop.Name == "vertex_indices" {
 				// Read count based on the actual list type from header
@@ -384,22 +349,22 @@ func readBinaryLittleEndianWithNormals(file *os.File, header *PLYHeader) ([]core
 				switch prop.ListType {
 				case "uchar", "uint8":
 					var count uint8
-					if err := binary.Read(file, binary.LittleEndian, &count); err != nil {
-						return nil, nil, nil, fmt.Errorf("failed to read face vertex count (uchar) at face %d: %v", i, err)
+					if err := binary.Read(bufReader, binary.LittleEndian, &count); err != nil {
+						return nil, fmt.Errorf("failed to read face vertex count (uchar) at face %d: %v", i, err)
 					}
 					vertexCount = int(count)
 				case "int", "int32":
 					var count int32
-					if err := binary.Read(file, binary.LittleEndian, &count); err != nil {
-						return nil, nil, nil, fmt.Errorf("failed to read face vertex count (int32) at face %d: %v", i, err)
+					if err := binary.Read(bufReader, binary.LittleEndian, &count); err != nil {
+						return nil, fmt.Errorf("failed to read face vertex count (int32) at face %d: %v", i, err)
 					}
 					vertexCount = int(count)
 				default:
-					return nil, nil, nil, fmt.Errorf("unsupported list count type: %s", prop.ListType)
+					return nil, fmt.Errorf("unsupported list count type: %s", prop.ListType)
 				}
 
 				if vertexCount != 3 {
-					return nil, nil, nil, fmt.Errorf("only triangular faces supported, got %d vertices at face %d", vertexCount, i)
+					return nil, fmt.Errorf("only triangular faces supported, got %d vertices at face %d", vertexCount, i)
 				}
 
 				// Read indices based on the data type
@@ -407,43 +372,105 @@ func readBinaryLittleEndianWithNormals(file *os.File, header *PLYHeader) ([]core
 				switch prop.DataType {
 				case "int", "int32":
 					var indexBuffer [3]int32
-					if err := binary.Read(file, binary.LittleEndian, &indexBuffer); err != nil {
-						return nil, nil, nil, fmt.Errorf("failed to read face indices (int32) at face %d: %v", i, err)
+					if err := binary.Read(bufReader, binary.LittleEndian, &indexBuffer); err != nil {
+						return nil, fmt.Errorf("failed to read face indices (int32) at face %d: %v", i, err)
 					}
 					indices[0] = int(indexBuffer[0])
 					indices[1] = int(indexBuffer[1])
 					indices[2] = int(indexBuffer[2])
 				case "uint", "uint32":
 					var indexBuffer [3]uint32
-					if err := binary.Read(file, binary.LittleEndian, &indexBuffer); err != nil {
-						return nil, nil, nil, fmt.Errorf("failed to read face indices (uint32) at face %d: %v", i, err)
+					if err := binary.Read(bufReader, binary.LittleEndian, &indexBuffer); err != nil {
+						return nil, fmt.Errorf("failed to read face indices (uint32) at face %d: %v", i, err)
 					}
 					indices[0] = int(indexBuffer[0])
 					indices[1] = int(indexBuffer[1])
 					indices[2] = int(indexBuffer[2])
 				default:
-					return nil, nil, nil, fmt.Errorf("unsupported face index data type: %s", prop.DataType)
+					return nil, fmt.Errorf("unsupported face index data type: %s", prop.DataType)
 				}
 
 				// Append to faces slice
 				faces = append(faces, indices[0], indices[1], indices[2])
 			} else {
-				// Skip unknown face properties
-				if err := skipProperty(file, prop, binary.LittleEndian); err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to skip face property %s at face %d, prop %d: %v", prop.Name, i, j, err)
+				// Skip unknown face properties using buffered reader
+				if err := skipPropertyBuffered(bufReader, prop); err != nil {
+					return nil, fmt.Errorf("failed to skip face property %s at face %d, prop %d: %v", prop.Name, i, j, err)
 				}
 			}
 		}
 	}
-	fmt.Printf("✅ Faces read in %v\n", time.Since(faceStart))
 
-	return vertices, faces, normals, nil
+	return &PLYData{
+		Vertices:         vertices,
+		Faces:            faces,
+		Normals:          normals,
+		Colors:           colors,
+		TexCoords:        texCoords,
+		Quality:          quality,
+		Confidence:       confidence,
+		Intensity:        intensity,
+		CustomFloatProps: make(map[string][]float64),
+		CustomIntProps:   make(map[string][]int),
+	}, nil
 }
 
-// readBinaryBigEndianWithNormals reads binary big-endian PLY data (placeholder)
-func readBinaryBigEndianWithNormals(file *os.File, header *PLYHeader) ([]core.Vec3, []int, []core.Vec3, error) {
-	// TODO: Implement big-endian reading if needed
-	return nil, nil, nil, fmt.Errorf("binary big-endian PLY format not yet implemented")
+// skipPropertyBuffered skips a property in the buffered binary stream
+func skipPropertyBuffered(reader *bufio.Reader, prop PLYProperty) error {
+	if prop.IsList {
+		// Read list count
+		var count uint8
+		switch prop.ListType {
+		case "uchar", "uint8":
+			if err := binary.Read(reader, binary.LittleEndian, &count); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported list count type: %s", prop.ListType)
+		}
+
+		// Skip list elements
+		for i := 0; i < int(count); i++ {
+			if err := skipSimpleTypeBuffered(reader, prop.DataType); err != nil {
+				return err
+			}
+		}
+	} else {
+		return skipSimpleTypeBuffered(reader, prop.Type)
+	}
+	return nil
+}
+
+// skipSimpleTypeBuffered skips a simple data type in the buffered binary stream
+func skipSimpleTypeBuffered(reader *bufio.Reader, dataType string) error {
+	switch dataType {
+	case "float", "float32":
+		var dummy float32
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	case "double", "float64":
+		var dummy float64
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	case "int", "int32":
+		var dummy int32
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	case "uint", "uint32":
+		var dummy uint32
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	case "short", "int16":
+		var dummy int16
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	case "ushort", "uint16":
+		var dummy uint16
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	case "char", "int8":
+		var dummy int8
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	case "uchar", "uint8":
+		var dummy uint8
+		return binary.Read(reader, binary.LittleEndian, &dummy)
+	default:
+		return fmt.Errorf("unsupported data type: %s", dataType)
+	}
 }
 
 // skipProperty skips a property in the binary stream
@@ -502,4 +529,142 @@ func skipSimpleType(file *os.File, dataType string, byteOrder binary.ByteOrder) 
 	default:
 		return fmt.Errorf("unsupported data type: %s", dataType)
 	}
+}
+
+// calculateVertexSize calculates the size in bytes of a single vertex
+func calculateVertexSize(props []PLYProperty) int {
+	size := 0
+	for _, prop := range props {
+		if prop.IsList {
+			// Lists are variable size, can't pre-calculate
+			continue
+		}
+		size += getTypeSize(prop.Type)
+	}
+	return size
+}
+
+// getTypeSize returns the size in bytes of a PLY data type
+func getTypeSize(dataType string) int {
+	switch dataType {
+	case "float", "float32", "int", "int32", "uint", "uint32":
+		return 4
+	case "double", "float64":
+		return 8
+	case "short", "int16", "ushort", "uint16":
+		return 2
+	case "char", "int8", "uchar", "uint8":
+		return 1
+	default:
+		return 4 // Default to 4 bytes
+	}
+}
+
+// VertexData holds all possible vertex properties
+type VertexData struct {
+	X, Y, Z             float32
+	NX, NY, NZ          float32
+	R, G, B             uint8
+	U, V                float32
+	Quality, Confidence float32
+	Intensity           float32
+	CustomFloats        map[string]float32
+	CustomInts          map[string]int32
+}
+
+// parseVertexFromBytes extracts all vertex data from a byte slice
+func parseVertexFromBytes(data []byte, props []PLYProperty) VertexData {
+	vertex := VertexData{
+		CustomFloats: make(map[string]float32),
+		CustomInts:   make(map[string]int32),
+	}
+
+	offset := 0
+	for _, prop := range props {
+		if prop.IsList {
+			// Skip list properties in vertex data (shouldn't happen normally)
+			continue
+		}
+
+		size := getTypeSize(prop.Type)
+		if offset+size > len(data) {
+			break
+		}
+
+		buf := bytes.NewReader(data[offset : offset+size])
+
+		switch prop.Type {
+		case "float", "float32":
+			var value float32
+			if binary.Read(buf, binary.LittleEndian, &value) == nil {
+				switch prop.Name {
+				case "x":
+					vertex.X = value
+				case "y":
+					vertex.Y = value
+				case "z":
+					vertex.Z = value
+				case "nx":
+					vertex.NX = value
+				case "ny":
+					vertex.NY = value
+				case "nz":
+					vertex.NZ = value
+				case "u", "s", "texture_u":
+					vertex.U = value
+				case "v", "t", "texture_v":
+					vertex.V = value
+				case "quality":
+					vertex.Quality = value
+				case "confidence":
+					vertex.Confidence = value
+				case "intensity":
+					vertex.Intensity = value
+				default:
+					vertex.CustomFloats[prop.Name] = value
+				}
+			}
+		case "uchar", "uint8":
+			var value uint8
+			if binary.Read(buf, binary.LittleEndian, &value) == nil {
+				switch prop.Name {
+				case "red", "r":
+					vertex.R = value
+				case "green", "g":
+					vertex.G = value
+				case "blue", "b":
+					vertex.B = value
+				}
+			}
+		case "int", "int32":
+			var value int32
+			if binary.Read(buf, binary.LittleEndian, &value) == nil {
+				vertex.CustomInts[prop.Name] = value
+			}
+		case "uint", "uint32":
+			var value uint32
+			if binary.Read(buf, binary.LittleEndian, &value) == nil {
+				vertex.CustomInts[prop.Name] = int32(value) // Convert to signed for simplicity
+			}
+		case "short", "int16":
+			var value int16
+			if binary.Read(buf, binary.LittleEndian, &value) == nil {
+				vertex.CustomInts[prop.Name] = int32(value)
+			}
+		case "ushort", "uint16":
+			var value uint16
+			if binary.Read(buf, binary.LittleEndian, &value) == nil {
+				vertex.CustomInts[prop.Name] = int32(value)
+			}
+		case "double", "float64":
+			var value float64
+			if binary.Read(buf, binary.LittleEndian, &value) == nil {
+				vertex.CustomFloats[prop.Name] = float32(value) // Convert to float32 for simplicity
+			}
+		}
+
+		offset += size
+	}
+
+	return vertex
 }

@@ -10,9 +10,19 @@ type Vec3 struct {
 	X, Y, Z float64
 }
 
+// Vec2 represents a 2D vector (for texture coordinates, etc.)
+type Vec2 struct {
+	X, Y float64
+}
+
 // NewVec3 creates a new Vec3
 func NewVec3(x, y, z float64) Vec3 {
 	return Vec3{X: x, Y: y, Z: z}
+}
+
+// NewVec2 creates a new Vec2
+func NewVec2(x, y float64) Vec2 {
+	return Vec2{X: x, Y: y}
 }
 
 // Add returns the sum of two vectors
@@ -113,6 +123,14 @@ func (v Vec3) Negate() Vec3 {
 		Y: -v.Y,
 		Z: -v.Z,
 	}
+}
+
+// Equals compares two Vec3 values with a small tolerance for floating point precision
+func (v Vec3) Equals(other Vec3) bool {
+	const tolerance = 1e-9
+	return math.Abs(v.X-other.X) < tolerance &&
+		math.Abs(v.Y-other.Y) < tolerance &&
+		math.Abs(v.Z-other.Z) < tolerance
 }
 
 // Rotate applies rotation around X, Y, Z axes (in that order) to the vector

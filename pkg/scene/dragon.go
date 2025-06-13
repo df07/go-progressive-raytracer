@@ -167,22 +167,11 @@ func addDragonMesh(s *Scene) {
 	// Reduce brightness and adjust color to be more realistic
 	dragonMaterial := material.NewMetal(core.NewVec3(0.7, 0.5, 0.2), 0.002) // Darker gold color with very low roughness
 
-	// Load the PLY mesh
+	// Load the PLY data
 	fmt.Printf("Loading dragon mesh from %s...\n", dragonPath)
-	// Apply the exact rotation from PBRT scene: "Rotate -53 0 1 0"
-	// This means -53 degrees around Y axis (0 1 0)
-	rotationY := -53.0 * 3.14159265359 / 180.0 // -53 degrees in radians
-	rotation := core.NewVec3(0, rotationY, 0)  // Rotate around Y axis exactly like PBRT
-	center := core.NewVec3(0, 0, 0)            // Rotate around origin
-
-	// Alternative approaches if this doesn't match:
-	// 1. Try: rotationY := -53.0 * 3.14159265359 / 180.0 (original)
-	// 2. Try: rotation := core.NewVec3(0, 0, rotationY) (Z-axis rotation)
-	// 3. Try: additional 180° Y rotation: rotationY + math.Pi
-
-	dragonMesh, err := loaders.LoadPLYMeshWithRotation(dragonPath, dragonMaterial, center, rotation)
+	plyData, err := loaders.LoadPLY(dragonPath)
 	if err != nil {
-		fmt.Printf("Error loading dragon mesh: %v\n", err)
+		fmt.Printf("Error loading dragon PLY data: %v\n", err)
 		fmt.Println("Adding placeholder sphere instead")
 
 		// Add placeholder sphere
@@ -194,6 +183,30 @@ func addDragonMesh(s *Scene) {
 		s.Shapes = append(s.Shapes, placeholder)
 		return
 	}
+
+	// Create triangle mesh with rotation
+	// Apply the exact rotation from PBRT scene: "Rotate -53 0 1 0"
+	// This means -53 degrees around Y axis (0 1 0)
+	rotationY := -53.0 * 3.14159265359 / 180.0 // -53 degrees in radians
+	rotation := core.NewVec3(0, rotationY, 0)  // Rotate around Y axis exactly like PBRT
+	center := core.NewVec3(0, 0, 0)            // Rotate around origin
+
+	// Create mesh options
+	var meshOptions *geometry.TriangleMeshOptions
+	if len(plyData.Normals) > 0 {
+		meshOptions = &geometry.TriangleMeshOptions{
+			Normals:  plyData.Normals,
+			Rotation: &rotation,
+			Center:   &center,
+		}
+	} else {
+		meshOptions = &geometry.TriangleMeshOptions{
+			Rotation: &rotation,
+			Center:   &center,
+		}
+	}
+
+	dragonMesh := geometry.NewTriangleMesh(plyData.Vertices, plyData.Faces, dragonMaterial, meshOptions)
 
 	fmt.Printf("Successfully loaded dragon mesh with %d triangles\n", dragonMesh.GetTriangleCount())
 
