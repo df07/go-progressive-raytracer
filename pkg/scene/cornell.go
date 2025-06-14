@@ -49,12 +49,12 @@ func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...render
 // setupCornellCamera configures the camera for the Cornell box scene
 func setupCornellCamera(cameraOverrides ...renderer.CameraConfig) renderer.CameraConfig {
 	defaultCameraConfig := renderer.CameraConfig{
-		Center:        core.NewVec3(278, 278, -800), // Position camera outside the box looking in
+		Center:        core.NewVec3(278, 278, -800), // Centered camera position
 		LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
 		Up:            core.NewVec3(0, 1, 0),        // Standard up direction
 		Width:         400,
 		AspectRatio:   1.0,  // Square aspect ratio for Cornell box
-		VFov:          40.0, // Field of view
+		VFov:          40.0, // Official Cornell field of view
 		Aperture:      0.0,  // No depth of field for Cornell box
 		FocusDistance: 0.0,  // Auto-calculate focus distance
 	}
@@ -73,11 +73,11 @@ func createCornellSamplingConfig() core.SamplingConfig {
 	return core.SamplingConfig{
 		SamplesPerPixel:           150,
 		MaxDepth:                  40,
-		RussianRouletteMinBounces: 16,   // Need a lot of bounces for indirect lighting
-		RussianRouletteMinSamples: 8,    // Fewer samples before RR
-		AdaptiveMinSamples:        8,    // Lower minimum for simpler scene
-		AdaptiveThreshold:         0.01, // Slightly higher threshold (1%) for faster convergence
-		AdaptiveDarkThreshold:     1e-6, // Same absolute threshold for dark pixels
+		RussianRouletteMinBounces: 16,    // Need a lot of bounces for indirect lighting
+		RussianRouletteMinSamples: 8,     // Fewer samples before RR
+		AdaptiveMinSamples:        32,    // Higher minimum to avoid black pixels on front box
+		AdaptiveThreshold:         0.005, // Lower threshold (0.5%)
+		AdaptiveDarkThreshold:     1e-8,  // Same absolute threshold for dark pixels
 	}
 }
 
@@ -88,48 +88,51 @@ func addCornellWalls(s *Scene) {
 	red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
 	green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
 
-	// Cornell box dimensions (standard 555x555x555 units)
-	boxSize := 555.0
-
-	// Create the six walls of the Cornell box using quads
+	// Cornell box dimensions from official data (slightly irregular, not perfect 555x555x555)
+	// Using the actual measured dimensions from Cornell
 
 	// Floor (white) - XZ plane at y=0
+	// Extended to meet all walls properly
 	floor := geometry.NewQuad(
-		core.NewVec3(0, 0, 0),       // corner
-		core.NewVec3(boxSize, 0, 0), // u vector (X direction)
-		core.NewVec3(0, 0, boxSize), // v vector (Z direction)
+		core.NewVec3(0.0, 0.0, 0.0), // corner
+		core.NewVec3(556, 0.0, 0.0), // u vector (X direction) - extended to match other walls
+		core.NewVec3(0.0, 0.0, 556), // v vector (Z direction)
 		white,
 	)
 
-	// Ceiling (white) - XZ plane at y=boxSize
+	// Ceiling (white) - XZ plane at y=548.8
+	// From Cornell data: 556.0 548.8 0.0, 556.0 548.8 559.2, 0.0 548.8 559.2, 0.0 548.8 0.0
 	ceiling := geometry.NewQuad(
-		core.NewVec3(0, boxSize, 0), // corner
-		core.NewVec3(boxSize, 0, 0), // u vector (X direction)
-		core.NewVec3(0, 0, boxSize), // v vector (Z direction)
+		core.NewVec3(0.0, 556, 0.0), // corner
+		core.NewVec3(556, 0.0, 0.0), // u vector (X direction)
+		core.NewVec3(0.0, 0.0, 556), // v vector (Z direction)
 		white,
 	)
 
-	// Back wall (white) - XY plane at z=boxSize
+	// Back wall (white) - XY plane at z=559.2
+	// Extended to meet the left wall properly
 	backWall := geometry.NewQuad(
-		core.NewVec3(0, 0, boxSize), // corner
-		core.NewVec3(boxSize, 0, 0), // u vector (X direction)
-		core.NewVec3(0, boxSize, 0), // v vector (Y direction)
+		core.NewVec3(0.0, 0.0, 556),   // corner
+		core.NewVec3(556.0, 0.0, 0.0), // u vector (X direction) - extended to match ceiling
+		core.NewVec3(0.0, 556, 0.0),   // v vector (Y direction)
 		white,
 	)
 
-	// Left wall (red) - YZ plane at x=0
-	leftWall := geometry.NewQuad(
-		core.NewVec3(0, 0, 0),       // corner
-		core.NewVec3(0, 0, boxSize), // u vector (Z direction)
-		core.NewVec3(0, boxSize, 0), // v vector (Y direction)
+	// Right wall (red) - YZ plane at x=0
+	// From Cornell data: 0.0 0.0 559.2, 0.0 0.0 0.0, 0.0 548.8 0.0, 0.0 548.8 559.2
+	rightWall := geometry.NewQuad(
+		core.NewVec3(0.0, 0.0, 0.0), // corner
+		core.NewVec3(0.0, 0.0, 556), // u vector (Z direction)
+		core.NewVec3(0.0, 556, 0.0), // v vector (Y direction)
 		red,
 	)
 
-	// Right wall (green) - YZ plane at x=boxSize
-	rightWall := geometry.NewQuad(
-		core.NewVec3(boxSize, 0, 0), // corner
-		core.NewVec3(0, boxSize, 0), // u vector (Y direction)
-		core.NewVec3(0, 0, boxSize), // v vector (Z direction)
+	// Left wall (green) - YZ plane at x=556.0
+	// Simplified to use consistent X coordinate
+	leftWall := geometry.NewQuad(
+		core.NewVec3(556, 0.0, 0.0), // corner
+		core.NewVec3(0.0, 0.0, 556), // u vector (Z direction)
+		core.NewVec3(0.0, 556, 0.0), // v vector (Y direction)
 		green,
 	)
 
@@ -139,16 +142,18 @@ func addCornellWalls(s *Scene) {
 
 // addCornellLight adds the ceiling light to the Cornell box scene
 func addCornellLight(s *Scene) {
-	boxSize := 555.0
-	lightSize := 130.0
-	lightOffset := (boxSize - lightSize) / 2.0
+	// Cornell box light specifications from official data
+	// Light position: 343.0 548.8 227.0 to 213.0 548.8 332.0
+	// This gives us a 130x105 light (343-213=130, 332-227=105)
+	lightCorner := core.NewVec3(213.0, 548.8-1, 227.0) // Slightly below ceiling
+	lightU := core.NewVec3(130.0, 0, 0)                // U vector (X direction)
+	lightV := core.NewVec3(0, 0, 105.0)                // V vector (Z direction)
 
-	s.AddQuadLight(
-		core.NewVec3(lightOffset, boxSize-1, lightOffset), // corner (slightly below ceiling)
-		core.NewVec3(lightSize, 0, 0),                     // u vector (X direction)
-		core.NewVec3(0, 0, lightSize),                     // v vector (Z direction)
-		core.NewVec3(15.0, 15.0, 15.0),                    // bright white emission
-	)
+	// Warmer, more yellowish light based on Cornell emission spectrum
+	// The spectrum shows higher values at longer wavelengths (more yellow/orange)
+	lightEmission := core.NewVec3(18.0, 15.0, 8.0) // Warm yellowish white
+
+	s.AddQuadLight(lightCorner, lightU, lightV, lightEmission)
 }
 
 // addCornellGeometry adds the specified geometry type to the Cornell box scene
@@ -183,30 +188,33 @@ func addCornellSpheres(s *Scene) {
 	s.Shapes = append(s.Shapes, leftSphere, rightSphere)
 }
 
-// addCornellBoxes adds two boxes to the Cornell box scene (matching Ray Tracing in One Weekend tutorial)
+// addCornellBoxes adds two boxes to the Cornell box scene (custom configuration)
 func addCornellBoxes(s *Scene) {
 	white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+	// Mirror material for the tall block - highly reflective surface
+	mirror := material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0) // Very shiny mirror
 
-	// Box 1: 165×330×165, rotated 15°, translated to (265,0,295)
-	// Calculate center position: translation + half the box size
-	box1Center := core.NewVec3(265+82.5, 0+165, 295+82.5) // (347.5, 165, 377.5)
-	box1 := geometry.NewBox(
-		box1Center,                                          // center position
-		core.NewVec3(82.5, 165, 82.5),                       // size (half-extents: 165/2, 330/2, 165/2)
-		core.NewVec3(0, 15*math.Pi/180, 0),                  // rotation (15 degrees around Y axis)
-		material.NewMetal(core.NewVec3(0.8, 0.8, 0.9), 0.0), // shiny metal
+	// Custom configuration: tall mirrored box on left, short white box on right
+	// This should show the red wall reflection in the mirrored surface
+
+	// Short box (white, diffuse) - positioned on the RIGHT side
+	shortBoxCenter := core.NewVec3(370.0, 82.5, 169.0) // Right side, front
+	shortBox := geometry.NewBox(
+		shortBoxCenter,                     // center position
+		core.NewVec3(82.5, 82.5, 82.5),     // size (half-extents: 165/2 for each dimension)
+		core.NewVec3(0, 18*math.Pi/180, 0), // rotation (18 degrees around Y axis)
+		white,                              // white lambertian material
 	)
 
-	// Box 2: 165×165×165, rotated -18°, translated to (130,0,65)
-	// Calculate center position: translation + half the box size
-	box2Center := core.NewVec3(130+82.5, 0+82.5, 65+82.5) // (212.5, 82.5, 147.5)
-	box2 := geometry.NewBox(
-		box2Center,                          // center position
-		core.NewVec3(82.5, 82.5, 82.5),      // size (half-extents: 165/2, 165/2, 165/2)
-		core.NewVec3(0, -18*math.Pi/180, 0), // rotation (-18 degrees around Y axis)
-		white,                               // white lambertian material
+	// Tall box (mirrored) - positioned on the LEFT side
+	tallBoxCenter := core.NewVec3(185.0, 165.0, 351.0) // Left side, back
+	tallBox := geometry.NewBox(
+		tallBoxCenter,                       // center position
+		core.NewVec3(82.5, 165.0, 82.5),     // size (half-extents: 165/2, 330/2, 165/2)
+		core.NewVec3(0, -15*math.Pi/180, 0), // rotation (-15 degrees) - angled to catch red wall reflection
+		mirror,                              // mirror material
 	)
 
 	// Add boxes to scene
-	s.Shapes = append(s.Shapes, box1, box2)
+	s.Shapes = append(s.Shapes, shortBox, tallBox)
 }
