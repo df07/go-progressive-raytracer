@@ -135,7 +135,7 @@ func createScene(sceneType string) SceneInfo {
 		sceneObj = scene.NewTriangleMeshScene(32) // Default complexity
 	case "dragon":
 		fmt.Println("Using dragon PLY mesh scene...")
-		sceneObj = scene.NewDragonScene(true)
+		sceneObj = scene.NewDragonScene(true, "gold") // Default to gold material
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()

@@ -15,7 +15,7 @@ import (
 // NewDragonScene creates a scene with the dragon PLY mesh
 // If loadMesh is false, creates the scene structure without loading the PLY file
 // This is useful for getting scene configuration without the expensive mesh loading
-func NewDragonScene(loadMesh bool, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewDragonScene(loadMesh bool, materialFinish string, cameraOverrides ...renderer.CameraConfig) *Scene {
 	// Setup camera for dragon viewing
 	cameraConfig := setupDragonCamera(cameraOverrides...)
 	camera := renderer.NewCamera(cameraConfig)
@@ -38,7 +38,7 @@ func NewDragonScene(loadMesh bool, cameraOverrides ...renderer.CameraConfig) *Sc
 
 	// Load and add dragon mesh only if requested
 	if loadMesh {
-		addDragonMesh(s)
+		addDragonMesh(s, materialFinish)
 	} else {
 		// Add a placeholder for configuration purposes
 		fmt.Println("Dragon scene created without mesh for configuration")
@@ -123,7 +123,7 @@ func addDragonGround(s *Scene) {
 }
 
 // addDragonMesh loads the dragon PLY file and adds it to the scene
-func addDragonMesh(s *Scene) {
+func addDragonMesh(s *Scene, materialFinish string) {
 	// Try multiple possible paths for the dragon PLY file
 	// This allows the scene to work from both command line and web server contexts
 	possiblePaths := []string{
@@ -151,10 +151,34 @@ func addDragonMesh(s *Scene) {
 		return
 	}
 
-	// Create dragon material - mirror-like gold metal matching PBRT
-	// PBRT uses "float roughness" [.002] for very shiny metal
-	// Reduce brightness and adjust color to be more realistic
-	dragonMaterial := material.NewMetal(core.NewVec3(0.7, 0.5, 0.2), 0.2) // Darker gold color with very low roughness
+	// Create dragon material based on finish type
+	var dragonMaterial core.Material
+	switch materialFinish {
+	case "plastic":
+		// Light purple shiny plastic - layered material with dielectric outer and lambertian inner
+		purpleColor := core.NewVec3(0.7, 0.5, 0.8) // Light purple
+		inner := material.NewLambertian(purpleColor)
+		outerDielectric := material.NewDielectric(1.4) // Plastic-like refractive index
+		dragonMaterial = material.NewLayered(outerDielectric, inner)
+	case "matte":
+		// Unfired pottery/ceramic lambertian material
+		dragonMaterial = material.NewLambertian(core.NewVec3(0.75, 0.65, 0.55))
+	case "mirror":
+		// Perfect mirror - zero roughness metal with neutral color
+		mirrorColor := core.NewVec3(0.9, 0.9, 0.9) // Slightly tinted white
+		dragonMaterial = material.NewMetal(mirrorColor, 0.0)
+	case "glass":
+		// Clear glass dielectric
+		dragonMaterial = material.NewDielectric(1.5) // Glass refractive index
+	case "copper":
+		// Copper metal with slight roughness
+		copperColor := core.NewVec3(0.8, 0.4, 0.2) // Copper color
+		dragonMaterial = material.NewMetal(copperColor, 0.1)
+	default: // "gold" or any other value
+		// Default: mirror-like gold metal matching PBRT
+		// PBRT uses "float roughness" [.002] for very shiny metal
+		dragonMaterial = material.NewMetal(core.NewVec3(0.7, 0.5, 0.2), 0.02) // Darker gold color with very low roughness
+	}
 
 	// Load the PLY data
 	fmt.Printf("Loading dragon mesh from %s...\n", dragonPath)

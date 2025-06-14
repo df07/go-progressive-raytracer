@@ -40,10 +40,11 @@ type RenderRequest struct {
 	AdaptiveThreshold  float64 `json:"adaptiveThreshold"`  // Adaptive sampling relative error threshold
 
 	// Scene-specific configuration
-	CornellGeometry  string `json:"cornellGeometry"`  // Cornell box geometry type: "spheres", "boxes", "empty"
-	SphereGridSize   int    `json:"sphereGridSize"`   // Sphere grid size (e.g., 10, 20, 100)
-	MaterialFinish   string `json:"materialFinish"`   // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
-	SphereComplexity int    `json:"sphereComplexity"` // Triangle mesh sphere complexity
+	CornellGeometry      string `json:"cornellGeometry"`      // Cornell box geometry type: "spheres", "boxes", "empty"
+	SphereGridSize       int    `json:"sphereGridSize"`       // Sphere grid size (e.g., 10, 20, 100)
+	MaterialFinish       string `json:"materialFinish"`       // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
+	SphereComplexity     int    `json:"sphereComplexity"`     // Triangle mesh sphere complexity
+	DragonMaterialFinish string `json:"dragonMaterialFinish"` // Dragon material finish: "gold", "plastic", "matte", "mirror", "glass", "copper"
 }
 
 // ProgressUpdate represents a single progressive update sent via SSE
@@ -279,6 +280,12 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 		req.MaterialFinish = "metallic" // Default
 	}
 
+	// Parse dragon material finish
+	req.DragonMaterialFinish = r.URL.Query().Get("dragonMaterialFinish")
+	if req.DragonMaterialFinish == "" {
+		req.DragonMaterialFinish = "gold" // Default
+	}
+
 	// Parse sphere complexity parameter
 	if req.SphereComplexity, err = parseIntParam(r.URL.Query(), "sphereComplexity", 32, 4, 512); err != nil {
 		return err
@@ -320,7 +327,7 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool) *scene.Scene {
 		return scene.NewTriangleMeshScene(req.SphereComplexity, cameraOverride)
 	case "dragon":
 		loadMesh := !configOnly
-		return scene.NewDragonScene(loadMesh, cameraOverride)
+		return scene.NewDragonScene(loadMesh, req.DragonMaterialFinish, cameraOverride)
 	default:
 		return nil
 	}
@@ -405,6 +412,7 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"sphereGridSize":            20,
 			"materialFinish":            "metallic",
 			"sphereComplexity":          32,
+			"dragonMaterialFinish":      "gold",
 		},
 		"limits": map[string]interface{}{
 			"width": map[string]int{
@@ -485,9 +493,13 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 	case "dragon":
-		// Dragon scene has no configurable options currently
-		// The PLY file path and rotation are fixed in the scene
-		response["sceneOptions"] = map[string]interface{}{}
+		response["sceneOptions"] = map[string]interface{}{
+			"dragonMaterialFinish": map[string]interface{}{
+				"type":    "select",
+				"options": []string{"gold", "plastic", "matte", "mirror", "glass", "copper"},
+				"default": "gold",
+			},
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)

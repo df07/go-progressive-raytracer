@@ -479,6 +479,7 @@
                     case 'cornellGeometry': return 'Cornell Geometry';
                     case 'sphereGridSize': return 'Grid Size';
                     case 'materialFinish': return 'Material Finish';
+                    case 'dragonMaterialFinish': return 'Dragon Material';
                     default: return key.charAt(0).toUpperCase() + key.slice(1);
                 }
             }
@@ -495,6 +496,9 @@
                     case 'mirror': return 'Mirror';
                     case 'glass': return 'Glass';
                     case 'mixed': return 'Mixed';
+                    case 'gold': return 'Gold';
+                    case 'plastic': return 'Plastic';
+                    case 'copper': return 'Copper';
                     default: return value.charAt(0).toUpperCase() + value.slice(1);
                 }
             }
@@ -515,6 +519,10 @@
                 if (params.materialFinish) {
                     url += url.includes('?') ? '&' : '?';
                     url += `materialFinish=${params.materialFinish}`;
+                }
+                if (params.dragonMaterialFinish) {
+                    url += url.includes('?') ? '&' : '?';
+                    url += `dragonMaterialFinish=${params.dragonMaterialFinish}`;
                 }
                 
                 return url;
@@ -619,6 +627,11 @@
                 const sphereComplexity = document.getElementById('sphereComplexity');
                 if (sphereComplexity) {
                     params.sphereComplexity = sphereComplexity.value;
+                }
+                
+                const dragonMaterialFinish = document.getElementById('dragonMaterialFinish');
+                if (dragonMaterialFinish) {
+                    params.dragonMaterialFinish = dragonMaterialFinish.value;
                 }
                 
                 return params;
