@@ -3,6 +3,7 @@ package scene
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
@@ -169,7 +170,9 @@ func addDragonMesh(s *Scene) {
 
 	// Load the PLY data
 	fmt.Printf("Loading dragon mesh from %s...\n", dragonPath)
+	plyStart := time.Now()
 	plyData, err := loaders.LoadPLY(dragonPath)
+	plyLoadTime := time.Since(plyStart)
 	if err != nil {
 		fmt.Printf("Error loading dragon PLY data: %v\n", err)
 		fmt.Println("Adding placeholder sphere instead")
@@ -183,6 +186,9 @@ func addDragonMesh(s *Scene) {
 		s.Shapes = append(s.Shapes, placeholder)
 		return
 	}
+
+	fmt.Printf("PLY data loaded: %d vertices, %d triangles in %v\n",
+		len(plyData.Vertices), len(plyData.Faces)/3, plyLoadTime)
 
 	// Create triangle mesh with rotation
 	// Apply the exact rotation from PBRT scene: "Rotate -53 0 1 0"
@@ -206,20 +212,13 @@ func addDragonMesh(s *Scene) {
 		}
 	}
 
+	// Create triangle mesh with timing
+	fmt.Printf("Creating triangle mesh with %d vertices, %d triangles...\n", len(plyData.Vertices), len(plyData.Faces)/3)
+	meshStart := time.Now()
 	dragonMesh := geometry.NewTriangleMesh(plyData.Vertices, plyData.Faces, dragonMaterial, meshOptions)
+	fmt.Printf("Triangle mesh created in %v\n", time.Since(meshStart))
 
 	fmt.Printf("Successfully loaded dragon mesh with %d triangles\n", dragonMesh.GetTriangleCount())
-
-	// Print bounding box for debugging
-	bbox := dragonMesh.BoundingBox()
-	fmt.Printf("Dragon bounding box: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f)\n",
-		bbox.Min.X, bbox.Min.Y, bbox.Min.Z, bbox.Max.X, bbox.Max.Y, bbox.Max.Z)
-
-	// Calculate mesh size
-	size := bbox.Max.Subtract(bbox.Min)
-	center = bbox.Min.Add(bbox.Max).Multiply(0.5)
-	fmt.Printf("Dragon size: %.2f x %.2f x %.2f, center: (%.2f, %.2f, %.2f)\n",
-		size.X, size.Y, size.Z, center.X, center.Y, center.Z)
 
 	s.Shapes = append(s.Shapes, dragonMesh)
 }

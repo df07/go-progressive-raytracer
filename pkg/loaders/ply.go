@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -71,8 +70,6 @@ type PLYData struct {
 
 // LoadPLY loads a PLY file and returns the raw vertex and face data
 func LoadPLY(filename string) (*PLYData, error) {
-	startTime := time.Now()
-
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open PLY file: %v", err)
@@ -108,9 +105,6 @@ func LoadPLY(filename string) (*PLYData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read PLY data: %v", err)
 	}
-
-	fmt.Printf("✅ Loaded PLY data: %d vertices, %d triangles in %v\n",
-		len(plyData.Vertices), len(plyData.Faces)/3, time.Since(startTime))
 
 	return plyData, nil
 }
