@@ -38,7 +38,7 @@ type Camera struct {
 func NewCamera(config CameraConfig) *Camera {
 	// Calculate camera coordinate system
 	w := config.Center.Subtract(config.LookAt).Normalize() // Camera looks along -w
-	u := config.Up.Cross(w).Normalize()                    // Right vector
+	u := w.Cross(config.Up).Normalize()                    // Right vector (fixed: was config.Up.Cross(w))
 	v := w.Cross(u)                                        // Up vector
 
 	// Calculate focus distance - auto-calculate from LookAt if not specified
@@ -56,8 +56,8 @@ func NewCamera(config CameraConfig) *Camera {
 	viewportWidth := viewportHeight * config.AspectRatio
 
 	// Calculate the vectors across the horizontal and down the vertical viewport edges
-	viewportU := u.Multiply(viewportWidth)   // Vector across viewport horizontal edge
-	viewportV := v.Multiply(-viewportHeight) // Vector up viewport vertical edge
+	viewportU := u.Multiply(viewportWidth)  // Vector across viewport horizontal edge
+	viewportV := v.Multiply(viewportHeight) // Vector up viewport vertical edge
 
 	// Calculate the horizontal and vertical delta vectors from pixel to pixel
 	pixelDeltaU := viewportU.Multiply(1.0 / float64(config.Width))
