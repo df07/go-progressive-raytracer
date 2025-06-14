@@ -67,7 +67,7 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 	)
 
 	// Create materials
-	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0))
+	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
 	lambertianBlue := material.NewLambertian(core.NewVec3(0.1, 0.2, 0.5))
 	lambertianRed := material.NewLambertian(core.NewVec3(0.65, 0.25, 0.2))
 	metalSilver := material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0)
