@@ -145,9 +145,9 @@ func addCornellLight(s *Scene) {
 	// Cornell box light specifications from official data
 	// Light position: 343.0 548.8 227.0 to 213.0 548.8 332.0
 	// This gives us a 130x105 light (343-213=130, 332-227=105)
-	lightCorner := core.NewVec3(213.0, 548.8-1, 227.0) // Slightly below ceiling
-	lightU := core.NewVec3(130.0, 0, 0)                // U vector (X direction)
-	lightV := core.NewVec3(0, 0, 105.0)                // V vector (Z direction)
+	lightCorner := core.NewVec3(213.0, 556-0.001, 227.0) // Slightly below ceiling
+	lightU := core.NewVec3(130.0, 0, 0)            // U vector (X direction)
+	lightV := core.NewVec3(0, 0, 105.0)            // V vector (Z direction)
 
 	// Warmer, more yellowish light based on Cornell emission spectrum
 	// The spectrum shows higher values at longer wavelengths (more yellow/orange)
