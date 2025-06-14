@@ -145,12 +145,12 @@ func addCornellLight(s *Scene) {
 	// Light position: 343.0 548.8 227.0 to 213.0 548.8 332.0
 	// This gives us a 130x105 light (343-213=130, 332-227=105)
 	lightCorner := core.NewVec3(213.0, 556-0.001, 227.0) // Slightly below ceiling
-	lightU := core.NewVec3(130.0, 0, 0)            // U vector (X direction)
-	lightV := core.NewVec3(0, 0, 105.0)            // V vector (Z direction)
+	lightU := core.NewVec3(130.0, 0, 0)                  // U vector (X direction)
+	lightV := core.NewVec3(0, 0, 105.0)                  // V vector (Z direction)
 
 	// Warmer, more yellowish light based on Cornell emission spectrum
 	// The spectrum shows higher values at longer wavelengths (more yellow/orange)
-	lightEmission := core.NewVec3(18.0, 15.0, 8.0) // Warm yellowish white
+	lightEmission := core.NewVec3(18.0, 15.0, 8.0).Multiply(2.5) // Warm yellowish white
 
 	s.AddQuadLight(lightCorner, lightU, lightV, lightEmission)
 }
@@ -210,7 +210,7 @@ func addCornellBoxes(s *Scene) {
 	tallBox := geometry.NewBox(
 		tallBoxCenter,                       // center position
 		core.NewVec3(82.5, 165.0, 82.5),     // size (half-extents: 165/2, 330/2, 165/2)
-		core.NewVec3(0, -15*math.Pi/180, 0), // rotation (-15 degrees) - angled to catch red wall reflection
+		core.NewVec3(0, -20*math.Pi/180, 0), // rotation (-15 degrees) - angled to catch red wall reflection
 		mirror,                              // mirror material
 	)
 
