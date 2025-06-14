@@ -56,7 +56,7 @@ type SamplingConfig struct {
 	MaxDepth                  int     // Maximum ray bounce depth
 	RussianRouletteMinBounces int     // Minimum bounces before Russian Roulette can activate
 	RussianRouletteMinSamples int     // Minimum samples per pixel before Russian Roulette can activate
-	AdaptiveMinSamples        int     // Minimum samples before adaptive sampling can stop
+	AdaptiveMinSamples        float64 // Minimum samples as percentage of max samples (0.0-1.0)
 	AdaptiveThreshold         float64 // Relative error threshold for adaptive convergence (0.01 = 1%)
 }
 

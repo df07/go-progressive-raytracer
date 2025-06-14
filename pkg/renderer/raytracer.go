@@ -341,7 +341,8 @@ func (rt *Raytracer) adaptiveSamplePixel(camera core.Camera, i, j int, ps *Pixel
 
 // shouldStopSampling determines if adaptive sampling should stop based on perceptual relative error
 func (rt *Raytracer) shouldStopSampling(ps *PixelStats) bool {
-	minSamples := rt.config.AdaptiveMinSamples
+	// Calculate minimum samples as percentage of max samples, but ensure at least 1 sample
+	minSamples := max(1, int(float64(rt.config.SamplesPerPixel)*rt.config.AdaptiveMinSamples))
 
 	// Don't stop before minimum samples
 	if ps.SampleCount < minSamples {

@@ -271,8 +271,8 @@
             
             <div class="control-group">
                 <label for="adaptiveMinSamples">Adaptive Min Samples:</label>
-                <input type="number" id="adaptiveMinSamples" value="" step="1">
-                <small style="color: #666; font-size: 12px;">Min samples before adaptive convergence</small>
+                <input type="number" id="adaptiveMinSamples" value="" step="0.01" min="0.01" max="1.0">
+                <small style="color: #666; font-size: 12px;">Min samples as % of max (0.15 = 15%)</small>
             </div>
             
             <div class="control-group">
@@ -633,7 +633,7 @@
                     maxPasses: { min: 1, max: 100 },
                     russianRouletteMinBounces: { min: 1, max: 20 },
                     russianRouletteMinSamples: { min: 1, max: 50 },
-                    adaptiveMinSamples: { min: 1, max: 100 },
+                    adaptiveMinSamples: { min: 0.01, max: 1.0 },
                     adaptiveThreshold: { min: 0.001, max: 0.5 },
                 };
 
@@ -643,7 +643,7 @@
                 const maxPasses = parseInt(document.getElementById('maxPasses').value);
                 const rrMinBounces = parseInt(document.getElementById('rrMinBounces').value);
                 const rrMinSamples = parseInt(document.getElementById('rrMinSamples').value);
-                const adaptiveMinSamples = parseInt(document.getElementById('adaptiveMinSamples').value);
+                const adaptiveMinSamples = parseFloat(document.getElementById('adaptiveMinSamples').value);
                 const adaptiveThreshold = parseFloat(document.getElementById('adaptiveThreshold').value);
 
                 if (isNaN(width) || width < limits.width.min || width > limits.width.max) {
@@ -665,14 +665,14 @@
                     return { isValid: false, error: `RR Min Samples must be between ${limits.russianRouletteMinSamples.min} and ${limits.russianRouletteMinSamples.max}` };
                 }
                 if (isNaN(adaptiveMinSamples) || adaptiveMinSamples < limits.adaptiveMinSamples.min || adaptiveMinSamples > limits.adaptiveMinSamples.max) {
-                    return { isValid: false, error: `Adaptive Min Samples must be between ${limits.adaptiveMinSamples.min} and ${limits.adaptiveMinSamples.max}` };
+                    return { isValid: false, error: `Adaptive Min Samples must be between ${limits.adaptiveMinSamples.min} and ${limits.adaptiveMinSamples.max} (percentage of max samples)` };
                 }
                 if (isNaN(adaptiveThreshold) || adaptiveThreshold < limits.adaptiveThreshold.min || adaptiveThreshold > limits.adaptiveThreshold.max) {
                     return { isValid: false, error: `Adaptive Threshold must be between ${limits.adaptiveThreshold.min} and ${limits.adaptiveThreshold.max}` };
                 }
 
                 // Performance warnings
-                if (width * height > 800 * 600 && maxSamples > 100) {
+                if (width * height > 800 * 600 && maxSamples > 10000) {
                     return { isValid: false, error: 'Large images with high samples may be very slow. Try reducing resolution or samples.' };
                 }
 

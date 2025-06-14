@@ -71,7 +71,7 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 		MaxDepth:                  40,
 		RussianRouletteMinBounces: 12,    // Moderate bounces for metallic reflections
 		RussianRouletteMinSamples: 6,     // Standard samples before RR
-		AdaptiveMinSamples:        6,     // Standard minimum for adaptive sampling
+		AdaptiveMinSamples:        0.12,  // 12% of max samples minimum for adaptive sampling
 		AdaptiveThreshold:         0.015, // 1.5% relative error threshold
 	}
 

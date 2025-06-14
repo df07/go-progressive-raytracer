@@ -78,7 +78,7 @@ func createTriangleMeshSamplingConfig() core.SamplingConfig {
 		MaxDepth:                  40,
 		RussianRouletteMinBounces: 10,    // Good balance for triangle mesh scenes
 		RussianRouletteMinSamples: 6,     // Fewer samples before RR
-		AdaptiveMinSamples:        6,     // Lower minimum for efficient rendering
+		AdaptiveMinSamples:        0.10,  // 10% of max samples minimum for efficient rendering
 		AdaptiveThreshold:         0.015, // Slightly higher threshold for faster convergence
 	}
 }

@@ -45,7 +45,7 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 		MaxDepth:                  50,
 		RussianRouletteMinBounces: 16,   // Need a lot of bounces for complex glass
 		RussianRouletteMinSamples: 8,    // More samples before RR due to caustics
-		AdaptiveMinSamples:        8,    // Standard minimum for adaptive sampling
+		AdaptiveMinSamples:        0.15, // 15% of max samples minimum for adaptive sampling
 		AdaptiveThreshold:         0.01, // 1% relative error threshold
 	}
 

@@ -77,7 +77,7 @@ func createDragonSamplingConfig() core.SamplingConfig {
 		MaxDepth:                  50,   // Deep bounces for complex geometry
 		RussianRouletteMinBounces: 15,   // More bounces before Russian Roulette
 		RussianRouletteMinSamples: 8,    // More samples before RR
-		AdaptiveMinSamples:        8,    // Higher minimum for complex geometry
+		AdaptiveMinSamples:        0.15, // 15% of max samples minimum for complex geometry
 		AdaptiveThreshold:         0.01, // Lower threshold for better quality
 	}
 }

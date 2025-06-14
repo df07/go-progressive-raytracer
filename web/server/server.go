@@ -36,7 +36,7 @@ type RenderRequest struct {
 	MaxPasses          int     `json:"maxPasses"`          // Maximum number of passes
 	RRMinBounces       int     `json:"rrMinBounces"`       // Russian Roulette minimum bounces
 	RRMinSamples       int     `json:"rrMinSamples"`       // Russian Roulette minimum samples
-	AdaptiveMinSamples int     `json:"adaptiveMinSamples"` // Adaptive sampling minimum samples
+	AdaptiveMinSamples float64 `json:"adaptiveMinSamples"` // Adaptive sampling minimum samples as percentage (0.0-1.0)
 	AdaptiveThreshold  float64 `json:"adaptiveThreshold"`  // Adaptive sampling relative error threshold
 
 	// Scene-specific configuration
@@ -198,7 +198,7 @@ func (s *Server) parseRenderRequest(r *http.Request) (*RenderRequest, error) {
 	if req.RRMinSamples, err = parseIntParam(r.URL.Query(), "rrMinSamples", 8, 1, 1000); err != nil {
 		return nil, err
 	}
-	if req.AdaptiveMinSamples, err = parseIntParam(r.URL.Query(), "adaptiveMinSamples", 8, 1, 1000); err != nil {
+	if req.AdaptiveMinSamples, err = parseFloatParam(r.URL.Query(), "adaptiveMinSamples", 0.15, 0.01, 1.0); err != nil {
 		return nil, err
 	}
 	if req.AdaptiveThreshold, err = parseFloatParam(r.URL.Query(), "adaptiveThreshold", 0.01, 0.001, 0.5); err != nil {
@@ -431,9 +431,9 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"min": 1,
 				"max": 1000,
 			},
-			"adaptiveMinSamples": map[string]int{
-				"min": 1,
-				"max": 1000,
+			"adaptiveMinSamples": map[string]float64{
+				"min": 0.01,
+				"max": 1.0,
 			},
 			"adaptiveThreshold": map[string]float64{
 				"min": 0.001,
