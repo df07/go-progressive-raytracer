@@ -355,7 +355,7 @@ func (rt *Raytracer) shouldStopSampling(ps *PixelStats) bool {
 
 	// Avoid division by zero for black pixels
 	if mean <= 1e-8 {
-		return variance < rt.config.AdaptiveDarkThreshold
+		return variance < 1e-6 // Hardcoded epsilon for dark pixels
 	}
 
 	// Calculate coefficient of variation (relative error)

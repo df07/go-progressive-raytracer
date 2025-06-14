@@ -77,7 +77,6 @@ func createCornellSamplingConfig() core.SamplingConfig {
 		RussianRouletteMinSamples: 8,     // Fewer samples before RR
 		AdaptiveMinSamples:        32,    // Higher minimum to avoid black pixels on front box
 		AdaptiveThreshold:         0.005, // Lower threshold (0.5%)
-		AdaptiveDarkThreshold:     1e-8,  // Same absolute threshold for dark pixels
 	}
 }
 

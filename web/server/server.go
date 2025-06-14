@@ -29,16 +29,15 @@ func NewServer(port int) *Server {
 
 // RenderRequest represents a render request from the client
 type RenderRequest struct {
-	Scene                 string  `json:"scene"`                 // Scene name (e.g., "cornell-box")
-	Width                 int     `json:"width"`                 // Image width
-	Height                int     `json:"height"`                // Image height
-	MaxSamples            int     `json:"maxSamples"`            // Maximum samples per pixel
-	MaxPasses             int     `json:"maxPasses"`             // Maximum number of passes
-	RRMinBounces          int     `json:"rrMinBounces"`          // Russian Roulette minimum bounces
-	RRMinSamples          int     `json:"rrMinSamples"`          // Russian Roulette minimum samples
-	AdaptiveMinSamples    int     `json:"adaptiveMinSamples"`    // Adaptive sampling minimum samples
-	AdaptiveThreshold     float64 `json:"adaptiveThreshold"`     // Adaptive sampling relative error threshold
-	AdaptiveDarkThreshold float64 `json:"adaptiveDarkThreshold"` // Adaptive sampling dark pixel threshold
+	Scene              string  `json:"scene"`              // Scene name (e.g., "cornell-box")
+	Width              int     `json:"width"`              // Image width
+	Height             int     `json:"height"`             // Image height
+	MaxSamples         int     `json:"maxSamples"`         // Maximum samples per pixel
+	MaxPasses          int     `json:"maxPasses"`          // Maximum number of passes
+	RRMinBounces       int     `json:"rrMinBounces"`       // Russian Roulette minimum bounces
+	RRMinSamples       int     `json:"rrMinSamples"`       // Russian Roulette minimum samples
+	AdaptiveMinSamples int     `json:"adaptiveMinSamples"` // Adaptive sampling minimum samples
+	AdaptiveThreshold  float64 `json:"adaptiveThreshold"`  // Adaptive sampling relative error threshold
 
 	// Scene-specific configuration
 	CornellGeometry  string `json:"cornellGeometry"`  // Cornell box geometry type: "spheres", "boxes", "empty"
@@ -119,7 +118,6 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	sceneObj.SamplingConfig.RussianRouletteMinSamples = req.RRMinSamples
 	sceneObj.SamplingConfig.AdaptiveMinSamples = req.AdaptiveMinSamples
 	sceneObj.SamplingConfig.AdaptiveThreshold = req.AdaptiveThreshold
-	sceneObj.SamplingConfig.AdaptiveDarkThreshold = req.AdaptiveDarkThreshold
 
 	// Create progressive raytracer
 	config := renderer.ProgressiveConfig{
@@ -204,9 +202,6 @@ func (s *Server) parseRenderRequest(r *http.Request) (*RenderRequest, error) {
 		return nil, err
 	}
 	if req.AdaptiveThreshold, err = parseFloatParam(r.URL.Query(), "adaptiveThreshold", 0.01, 0.001, 0.5); err != nil {
-		return nil, err
-	}
-	if req.AdaptiveDarkThreshold, err = parseFloatParam(r.URL.Query(), "adaptiveDarkThreshold", 1e-6, 1e-10, 1e-3); err != nil {
 		return nil, err
 	}
 
@@ -406,7 +401,6 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"russianRouletteMinSamples": config.RussianRouletteMinSamples,
 			"adaptiveMinSamples":        config.AdaptiveMinSamples,
 			"adaptiveThreshold":         config.AdaptiveThreshold,
-			"adaptiveDarkThreshold":     config.AdaptiveDarkThreshold,
 			"cornellGeometry":           "spheres",
 			"sphereGridSize":            20,
 			"materialFinish":            "metallic",
@@ -444,10 +438,6 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"adaptiveThreshold": map[string]float64{
 				"min": 0.001,
 				"max": 0.5,
-			},
-			"adaptiveDarkThreshold": map[string]float64{
-				"min": 1e-10,
-				"max": 1e-3,
 			},
 			"sphereGridSize": map[string]int{
 				"min": 5,

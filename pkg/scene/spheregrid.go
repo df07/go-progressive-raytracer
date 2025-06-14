@@ -73,7 +73,6 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 		RussianRouletteMinSamples: 6,     // Standard samples before RR
 		AdaptiveMinSamples:        6,     // Standard minimum for adaptive sampling
 		AdaptiveThreshold:         0.015, // 1.5% relative error threshold
-		AdaptiveDarkThreshold:     1e-6,  // Standard absolute threshold
 	}
 
 	camera := renderer.NewCamera(cameraConfig)

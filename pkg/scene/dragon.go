@@ -79,7 +79,6 @@ func createDragonSamplingConfig() core.SamplingConfig {
 		RussianRouletteMinSamples: 8,    // More samples before RR
 		AdaptiveMinSamples:        8,    // Higher minimum for complex geometry
 		AdaptiveThreshold:         0.01, // Lower threshold for better quality
-		AdaptiveDarkThreshold:     1e-6, // Standard threshold for dark pixels
 	}
 }
 

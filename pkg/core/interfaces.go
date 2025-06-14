@@ -58,7 +58,6 @@ type SamplingConfig struct {
 	RussianRouletteMinSamples int     // Minimum samples per pixel before Russian Roulette can activate
 	AdaptiveMinSamples        int     // Minimum samples before adaptive sampling can stop
 	AdaptiveThreshold         float64 // Relative error threshold for adaptive convergence (0.01 = 1%)
-	AdaptiveDarkThreshold     float64 // Absolute threshold for dark pixels (1e-6)
 }
 
 // ScatterResult contains the result of material scattering

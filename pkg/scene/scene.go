@@ -47,7 +47,6 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 		RussianRouletteMinSamples: 8,    // More samples before RR due to caustics
 		AdaptiveMinSamples:        8,    // Standard minimum for adaptive sampling
 		AdaptiveThreshold:         0.01, // 1% relative error threshold
-		AdaptiveDarkThreshold:     1e-6, // Low absolute threshold for dark pixels
 	}
 
 	s := &Scene{

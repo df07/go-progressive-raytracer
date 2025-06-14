@@ -80,7 +80,6 @@ func createTriangleMeshSamplingConfig() core.SamplingConfig {
 		RussianRouletteMinSamples: 6,     // Fewer samples before RR
 		AdaptiveMinSamples:        6,     // Lower minimum for efficient rendering
 		AdaptiveThreshold:         0.015, // Slightly higher threshold for faster convergence
-		AdaptiveDarkThreshold:     1e-6,  // Standard threshold for dark pixels
 	}
 }
 

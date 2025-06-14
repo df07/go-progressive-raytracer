@@ -281,11 +281,7 @@
                 <small style="color: #666; font-size: 12px;">Relative error threshold (0.01 = 1%)</small>
             </div>
             
-            <div class="control-group">
-                <label for="adaptiveDarkThreshold">Adaptive Dark Threshold:</label>
-                <input type="number" id="adaptiveDarkThreshold" value="" step="1e-7" min="1e-10" max="1e-3">
-                <small style="color: #666; font-size: 12px;">Absolute threshold for dark pixels</small>
-            </div>
+
         </div>
 
         <div class="button-group">
@@ -385,7 +381,6 @@
                         document.getElementById('rrMinSamples').value = config.defaults.russianRouletteMinSamples;
                         document.getElementById('adaptiveMinSamples').value = config.defaults.adaptiveMinSamples;
                         document.getElementById('adaptiveThreshold').value = config.defaults.adaptiveThreshold;
-                        document.getElementById('adaptiveDarkThreshold').value = config.defaults.adaptiveDarkThreshold;
                         
                         // Apply validation limits from server
                         this.applyLimits(config.limits);
@@ -415,7 +410,6 @@
                     { id: 'rrMinSamples', limits: limits.russianRouletteMinSamples },
                     { id: 'adaptiveMinSamples', limits: limits.adaptiveMinSamples },
                     { id: 'adaptiveThreshold', limits: limits.adaptiveThreshold },
-                    { id: 'adaptiveDarkThreshold', limits: limits.adaptiveDarkThreshold },
                 ];
 
                 controls.forEach(control => {
@@ -603,8 +597,7 @@
                     rrMinBounces: document.getElementById('rrMinBounces').value,
                     rrMinSamples: document.getElementById('rrMinSamples').value,
                     adaptiveMinSamples: document.getElementById('adaptiveMinSamples').value,
-                    adaptiveThreshold: document.getElementById('adaptiveThreshold').value,
-                    adaptiveDarkThreshold: document.getElementById('adaptiveDarkThreshold').value
+                    adaptiveThreshold: document.getElementById('adaptiveThreshold').value
                 };
                 
                 // Add scene-specific parameters
@@ -642,7 +635,6 @@
                     russianRouletteMinSamples: { min: 1, max: 50 },
                     adaptiveMinSamples: { min: 1, max: 100 },
                     adaptiveThreshold: { min: 0.001, max: 0.5 },
-                    adaptiveDarkThreshold: { min: 1e-10, max: 1e-3 },
                 };
 
                 const width = parseInt(document.getElementById('width').value);
@@ -653,7 +645,6 @@
                 const rrMinSamples = parseInt(document.getElementById('rrMinSamples').value);
                 const adaptiveMinSamples = parseInt(document.getElementById('adaptiveMinSamples').value);
                 const adaptiveThreshold = parseFloat(document.getElementById('adaptiveThreshold').value);
-                const adaptiveDarkThreshold = parseFloat(document.getElementById('adaptiveDarkThreshold').value);
 
                 if (isNaN(width) || width < limits.width.min || width > limits.width.max) {
                     return { isValid: false, error: `Width must be between ${limits.width.min} and ${limits.width.max}` };
@@ -678,9 +669,6 @@
                 }
                 if (isNaN(adaptiveThreshold) || adaptiveThreshold < limits.adaptiveThreshold.min || adaptiveThreshold > limits.adaptiveThreshold.max) {
                     return { isValid: false, error: `Adaptive Threshold must be between ${limits.adaptiveThreshold.min} and ${limits.adaptiveThreshold.max}` };
-                }
-                if (isNaN(adaptiveDarkThreshold) || adaptiveDarkThreshold < limits.adaptiveDarkThreshold.min || adaptiveDarkThreshold > limits.adaptiveDarkThreshold.max) {
-                    return { isValid: false, error: `Adaptive Dark Threshold must be between ${limits.adaptiveDarkThreshold.min} and ${limits.adaptiveDarkThreshold.max}` };
                 }
 
                 // Performance warnings
