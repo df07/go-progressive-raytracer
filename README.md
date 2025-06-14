@@ -29,6 +29,13 @@ Watch how the image quality improves with more samples per pixel:
 
 ## Sample Renders
 
+### Dragon Mesh
+<img src="renders/dragon-512samples.png" alt="Dragon Mesh" width=400>
+
+*Dragon PLY mesh with 1.8 million triangles demonstrating BVH performance*  
+*Model by [Bernhard Vogl](https://dativ.at/lightprobes/index.html) via [PBRT scenes](https://www.pbrt.org/scenes-v3)*  
+*512 samples • 7m22s render time*
+
 ### Default Scene
 ![Default Scene](renders/default-4096samples.png)
 
@@ -52,12 +59,6 @@ Watch how the image quality improves with more samples per pixel:
 
 *Complex triangle mesh geometry with procedurally generated shapes*  
 *1024 samples • 1m37s render time*
-
-### Dragon Mesh
-![Dragon Mesh](renders/dragon-512samples.png)
-
-*Stanford Dragon PLY mesh with 1.8 million triangles demonstrating BVH performance*  
-*512 samples • 8m21s render time*
 
 ## Quick Start
 

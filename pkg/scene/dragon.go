@@ -23,7 +23,7 @@ func NewDragonScene(loadMesh bool, cameraOverrides ...renderer.CameraConfig) *Sc
 	s := &Scene{
 		Camera:         camera,
 		TopColor:       core.NewVec3(0.5, 0.7, 1.0), // Light blue sky
-		BottomColor:    core.NewVec3(1.0, 1.0, 1.0), // White horizon
+		BottomColor:    core.NewVec3(0.0, 0.0, 0.0), // Dark horizon
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: createDragonSamplingConfig(),
@@ -90,13 +90,13 @@ func addDragonLighting(s *Scene) {
 
 	// Main key light - position away from camera view (higher Z, more positive Y)
 	s.AddSphereLight(
-		core.NewVec3(350, 200, 300),    // position (right, behind dragon, high up)
-		15.0,                           // smaller radius for sharper shadows
-		core.NewVec3(15.0, 14.0, 12.0), // reduced intensity
+		core.NewVec3(0, 200, 800), // position (right, behind dragon, high up)
+		300.0,                     // smaller radius for sharper shadows
+		core.NewVec3(15.0, 14.0, 12.0).Multiply(0.25), // reduced intensity
 	)
 
 	// Soft fill light - position on opposite side, away from camera
-	s.AddSphereLight(
+	/*s.AddSphereLight(
 		core.NewVec3(-250, 150, 200), // position (left, behind dragon, elevated)
 		25.0,                         // larger radius for soft fill
 		core.NewVec3(2.0, 2.5, 3.0),  // much dimmer fill
@@ -107,7 +107,7 @@ func addDragonLighting(s *Scene) {
 		core.NewVec3(100, 300, 400), // position (behind dragon, very high up)
 		10.0,                        // small radius for sharp rim
 		core.NewVec3(6.0, 5.0, 4.0), // slightly dimmer rim light
-	)
+	)*/
 }
 
 // addDragonGround adds a ground plane (matching PBRT scene at Z = -40)
@@ -148,24 +148,13 @@ func addDragonMesh(s *Scene) {
 		for _, path := range possiblePaths {
 			fmt.Printf("  - %s\n", path)
 		}
-		fmt.Println("Please ensure dragon_remeshed.ply is in the models/ directory")
-
-		// Add a placeholder sphere instead
-		dragonMaterial := material.NewMetal(core.NewVec3(0.7, 0.5, 0.2), 0.002) // Darker gold color with very low roughness
-		placeholder := geometry.NewSphere(
-			core.NewVec3(0, 1, 0), // center
-			1.0,                   // radius
-			dragonMaterial,
-		)
-		s.Shapes = append(s.Shapes, placeholder)
-		fmt.Println("Added placeholder sphere instead of dragon mesh")
 		return
 	}
 
 	// Create dragon material - mirror-like gold metal matching PBRT
 	// PBRT uses "float roughness" [.002] for very shiny metal
 	// Reduce brightness and adjust color to be more realistic
-	dragonMaterial := material.NewMetal(core.NewVec3(0.7, 0.5, 0.2), 0.002) // Darker gold color with very low roughness
+	dragonMaterial := material.NewMetal(core.NewVec3(0.7, 0.5, 0.2), 0.2) // Darker gold color with very low roughness
 
 	// Load the PLY data
 	fmt.Printf("Loading dragon mesh from %s...\n", dragonPath)
