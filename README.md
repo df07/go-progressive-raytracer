@@ -49,13 +49,13 @@ Watch how the image quality improves with more samples per pixel:
 *4096 samples • 7m20s render time*
 
 ### Sphere Grid
-![Sphere Grid](renders/spheregrid-1024samples.png)
+<img src="renders/spheregrid-1024samples.png" alt="Sphere Grid" width=400>
 
 *Grid of metallic spheres showcasing BVH acceleration and parallel rendering*  
 *1024 samples • 7m27s render time*
 
 ### Triangle Mesh
-![Triangle Mesh](renders/trianglemesh-1024samples.png)
+<img src="renders/trianglemesh-1024samples.png" alt="Triangle Mesh" width=400>
 
 *Complex triangle mesh geometry with procedurally generated shapes*  
 *1024 samples • 1m37s render time*
@@ -109,7 +109,7 @@ go build -o web-server.exe main.go
 - **cornell-boxes** - Cornell box with rotated boxes
 - **spheregrid** - Grid of metallic spheres (perfect for BVH testing)
 - **trianglemesh** - Showcase of triangle mesh geometry
-- **dragon** - Dragon PLY mesh from PBRT book
+- **dragon** - Dragon PLY mesh from PBRT book (requires downloading PLY separately)
 
 ## Rendering Modes
 
@@ -141,7 +141,6 @@ go build -o web-server.exe main.go
 
 ## Architecture
 
-Built with clean separation of concerns:
 - `pkg/core/` - Foundation types and interfaces
 - `pkg/geometry/` - Shape primitives and acceleration structures
 - `pkg/material/` - Material implementations
