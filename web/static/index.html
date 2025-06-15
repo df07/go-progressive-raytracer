@@ -454,12 +454,12 @@
                     
                     <div class="control-group">
                         <label for="maxSamples" class="tooltip" data-tooltip="Higher values = better quality, slower render">Max Samples per Pixel:</label>
-                        <input type="number" id="maxSamples" value="50" step="10">
+                        <input type="number" id="maxSamples" value="800" step="10">
                     </div>
                     
                     <div class="control-group">
                         <label for="maxPasses" class="tooltip" data-tooltip="Number of progressive updates during render">Progressive Passes:</label>
-                        <input type="number" id="maxPasses" value="7" step="1">
+                        <input type="number" id="maxPasses" value="10" step="1">
                     </div>
                 </div>
             </div>
@@ -626,6 +626,8 @@
                         // Update form controls with scene defaults
                         document.getElementById('width').value = config.defaults.width;
                         document.getElementById('height').value = config.defaults.height;
+                        document.getElementById('maxSamples').value = config.defaults.samplesPerPixel;
+                        document.getElementById('maxPasses').value = config.defaults.maxPasses;
                         document.getElementById('rrMinBounces').value = config.defaults.russianRouletteMinBounces;
                         document.getElementById('rrMinSamples').value = config.defaults.russianRouletteMinSamples;
                         document.getElementById('adaptiveMinSamples').value = config.defaults.adaptiveMinSamples;

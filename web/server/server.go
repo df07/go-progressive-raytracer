@@ -266,7 +266,7 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 	// Parse Cornell geometry type
 	req.CornellGeometry = r.URL.Query().Get("cornellGeometry")
 	if req.CornellGeometry == "" {
-		req.CornellGeometry = "spheres" // Default
+		req.CornellGeometry = "boxes" // Default
 	}
 
 	// Parse sphere grid size
@@ -381,8 +381,8 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 		Scene:           sceneName,
 		Width:           0,
 		Height:          0,
-		CornellGeometry: "spheres", // Default
-		SphereGridSize:  20,        // Default
+		CornellGeometry: "boxes", // Default
+		SphereGridSize:  20,      // Default
 	}
 	sceneObj := s.createScene(defaultReq, true)
 	if sceneObj == nil {
@@ -397,18 +397,30 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Return the scene's sampling configuration with validation limits
 	config := sceneObj.GetSamplingConfig()
+
+	// Set web-specific defaults for samples and passes
+	webMaxSamples := config.SamplesPerPixel
+	webMaxPasses := 10 // Default for most scenes
+
+	// Override defaults for Cornell Box scene to show off the lighting better
+	if sceneName == "cornell-box" {
+		webMaxSamples = 800
+		webMaxPasses = 40
+	}
+
 	response := map[string]interface{}{
 		"scene": sceneName,
 		"defaults": map[string]interface{}{
 			"width":                     defaultWidth,
 			"height":                    defaultHeight,
-			"samplesPerPixel":           config.SamplesPerPixel,
+			"samplesPerPixel":           webMaxSamples,
+			"maxPasses":                 webMaxPasses,
 			"maxDepth":                  config.MaxDepth,
 			"russianRouletteMinBounces": config.RussianRouletteMinBounces,
 			"russianRouletteMinSamples": config.RussianRouletteMinSamples,
 			"adaptiveMinSamples":        config.AdaptiveMinSamples,
 			"adaptiveThreshold":         config.AdaptiveThreshold,
-			"cornellGeometry":           "spheres",
+			"cornellGeometry":           "boxes",
 			"sphereGridSize":            20,
 			"materialFinish":            "metallic",
 			"sphereComplexity":          32,
@@ -465,7 +477,7 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"cornellGeometry": map[string]interface{}{
 				"type":    "select",
 				"options": []string{"spheres", "boxes", "empty"},
-				"default": "spheres",
+				"default": "boxes",
 			},
 		}
 	case "sphere-grid":
