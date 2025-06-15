@@ -7,65 +7,224 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 0;
+            padding: 0;
             background-color: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        .container {
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 320px;
             background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
-
-        .control-group {
+            border-right: 1px solid #e9ecef;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
         }
 
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+
+
+        .render-area {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .image-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+
+        .render-image {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+            transition: opacity 0.3s;
+            cursor: crosshair;
+        }
+
+        .render-image:hover {
+            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+        }
+
+        .stats-panel {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .no-image {
+            color: #6c757d;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        /* Sidebar Controls */
+        .control-section {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .section-header {
+            padding: 15px 20px;
+            background: #e9ecef;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #6c757d;
+            transition: background-color 0.2s;
+        }
+
+        .section-header:hover {
+            background: #dee2e6;
+        }
+
+        .section-toggle {
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+
+        .section-header.active .section-toggle {
+            transform: rotate(180deg);
+        }
+
+        .section-content {
+            padding: 0 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+
+        .section-content.expanded {
+            max-height: 1000px;
+            padding: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
         label {
+            display: block;
             font-weight: 600;
             margin-bottom: 5px;
             color: #555;
+            font-size: 13px;
         }
 
         select, input[type="number"] {
+            width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        select:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip[data-tooltip]:not([data-tooltip=""])::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 5px;
+            background: #333;
+            color: white;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            z-index: 99999;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            max-width: 250px;
+            white-space: normal;
+        }
+
+        .tooltip[data-tooltip]:not([data-tooltip=""])::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 8px;
+            margin-top: 1px;
+            border: 4px solid transparent;
+            border-bottom-color: #333;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            z-index: 99999;
+        }
+
+        .tooltip[data-tooltip]:not([data-tooltip=""]):hover::after,
+        .tooltip[data-tooltip]:not([data-tooltip=""]):hover::before {
+            opacity: 1;
+            visibility: visible;
         }
 
         .button-group {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
             display: flex;
             gap: 10px;
-            justify-content: center;
-            margin: 20px 0;
+            flex-shrink: 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
         }
 
         button {
-            padding: 12px 24px;
+            flex: 1;
+            padding: 12px;
             border: none;
             border-radius: 6px;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: background-color 0.3s;
@@ -95,77 +254,13 @@
             cursor: not-allowed;
         }
 
-        .render-area {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
-
-        .image-container {
-            flex: 1;
-            text-align: center;
-        }
-
-        .render-image {
-            max-width: 100%;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            transition: opacity 0.3s;
-        }
-
-        .render-image:hover {
-            border-color: #007bff;
-            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
-        }
-
-        .stats-panel {
-            width: 300px;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 6px;
-            border: 1px solid #e9ecef;
-        }
-
-        .stats-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            padding: 4px 0;
-        }
-
-        .stats-label {
-            font-weight: 600;
-            color: #555;
-        }
-
-        .stats-value {
-            color: #333;
-            font-family: 'Courier New', monospace;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 20px;
-            background-color: #e9ecef;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 15px 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #007bff, #28a745);
-            transition: width 0.3s ease;
-            border-radius: 10px;
-        }
-
         .status {
-            text-align: center;
-            margin: 15px 0;
             padding: 10px;
-            border-radius: 6px;
+            margin: 15px 0;
             font-weight: 600;
+            font-size: 13px;
+            border-radius: 4px;
+            text-align: center;
         }
 
         .status.idle {
@@ -188,161 +283,282 @@
             color: #721c24;
         }
 
-        .no-image {
-            width: 400px;
-            height: 400px;
-            background: #f8f9fa;
-            border: 2px dashed #ddd;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6c757d;
-            font-size: 18px;
-            border-radius: 8px;
+        /* Stats Panel Styles */
+        .stats-panel h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 16px;
         }
 
-        @media (max-width: 768px) {
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #28a745);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .stats-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .stats-value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+        }
+
+        #inspectSection {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        #inspectSection h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        #inspectResult {
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .sidebar {
+                width: 280px;
+            }
+            
+            .stats-panel {
+                width: 250px;
+            }
+        }
+
+        @media (max-width: 1150px) {
             .render-area {
                 flex-direction: column;
             }
             
-            .stats-panel {
-                width: 100%;
+            .image-container {
+                min-height: 400px;
+                margin-bottom: 15px;
             }
             
-            .controls {
-                grid-template-columns: 1fr;
+            .stats-panel {
+                width: auto;
+                max-height: 300px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+            }
+            
+            .sidebar {
+                width: 100%;
+                order: 2;
+            }
+            
+            .main-content {
+                order: 1;
+            }
+            
+            .render-area {
+                flex-direction: column;
+                height: auto;
+                min-height: 400px;
+            }
+            
+            .image-container {
+                margin-bottom: 15px;
+            }
+            
+            .stats-panel {
+                width: auto;
+                max-height: none;
+            }
+            
+            body {
+                overflow: auto;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🌟 Progressive Raytracer</h1>
-        
-        <div class="controls">
-            <div class="control-group">
-                <label for="scene">Scene:</label>
-                <select id="scene">
-                    <option value="cornell-box">Cornell Box</option>
-                    <option value="basic">Basic Scene</option>
-                    <option value="sphere-grid">Sphere Grid</option>
-                    <option value="triangle-mesh-sphere">Triangle Mesh Sphere</option>
-                    <option value="dragon">Dragon PLY Mesh</option>
-                </select>
+    <div class="app-container">
+        <!-- Left Sidebar with Controls -->
+        <div class="sidebar">
+            <div class="sidebar-content">
+                <!-- Scene Configuration -->
+                <div class="control-section">
+                <div class="section-header active" data-section="scene">
+                    <span>Scene Configuration</span>
+                    <span class="section-toggle">▼</span>
+                </div>
+                <div class="section-content expanded" id="scene-content">
+                    <div class="control-group">
+                        <label for="scene">Scene Type:</label>
+                        <select id="scene">
+                            <option value="cornell-box">Cornell Box</option>
+                            <option value="basic">Basic Scene</option>
+                            <option value="sphere-grid">Sphere Grid</option>
+                            <option value="triangle-mesh-sphere">Triangle Mesh Sphere</option>
+                            <option value="dragon">Dragon PLY Mesh</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Scene-specific options will be inserted here -->
+                    <div id="sceneOptions"></div>
+                </div>
             </div>
-            
-            <!-- Scene-specific configuration options will be inserted here -->
-            <div id="sceneOptions"></div>
-            
-            <div class="control-group">
-                <label for="width">Width:</label>
-                <input type="number" id="width" value="400" step="50">
-            </div>
-            
-            <div class="control-group">
-                <label for="height">Height:</label>
-                <input type="number" id="height" value="400" step="50">
-            </div>
-            
-            <div class="control-group">
-                <label for="maxSamples">Max Samples:</label>
-                <input type="number" id="maxSamples" value="50" step="10">
-                <small style="color: #666; font-size: 12px;">Total samples per pixel</small>
-            </div>
-            
-            <div class="control-group">
-                <label for="maxPasses">Max Passes:</label>
-                <input type="number" id="maxPasses" value="7" step="1">
-                <small style="color: #666; font-size: 12px;">Number of progressive updates</small>
-            </div>
-            
-            <div class="control-group">
-                <label for="rrMinBounces">RR Min Bounces:</label>
-                <input type="number" id="rrMinBounces" value="" step="1">
-                <small style="color: #666; font-size: 12px;">Min bounces before Russian Roulette</small>
-            </div>
-            
-            <div class="control-group">
-                <label for="rrMinSamples">RR Min Samples:</label>
-                <input type="number" id="rrMinSamples" value="" step="1">
-                <small style="color: #666; font-size: 12px;">Min samples before Russian Roulette</small>
-            </div>
-            
-            <div class="control-group">
-                <label for="adaptiveMinSamples">Adaptive Min Samples:</label>
-                <input type="number" id="adaptiveMinSamples" value="" step="0.01" min="0.01" max="1.0">
-                <small style="color: #666; font-size: 12px;">Min samples as % of max (0.15 = 15%)</small>
-            </div>
-            
-            <div class="control-group">
-                <label for="adaptiveThreshold">Adaptive Threshold:</label>
-                <input type="number" id="adaptiveThreshold" value="" step="0.001" min="0.001" max="0.5">
-                <small style="color: #666; font-size: 12px;">Relative error threshold (0.01 = 1%)</small>
-            </div>
-            
 
+            <!-- Render Quality -->
+            <div class="control-section">
+                <div class="section-header active" data-section="quality">
+                    <span>Render Quality</span>
+                    <span class="section-toggle">▼</span>
+                </div>
+                <div class="section-content expanded" id="quality-content">
+                    <div class="control-group">
+                        <label for="width" class="tooltip" data-tooltip="Render width in pixels">Image Width:</label>
+                        <input type="number" id="width" value="400" step="50">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="height" class="tooltip" data-tooltip="Render height in pixels">Image Height:</label>
+                        <input type="number" id="height" value="400" step="50">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="maxSamples" class="tooltip" data-tooltip="Higher values = better quality, slower render">Max Samples per Pixel:</label>
+                        <input type="number" id="maxSamples" value="50" step="10">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="maxPasses" class="tooltip" data-tooltip="Number of progressive updates during render">Progressive Passes:</label>
+                        <input type="number" id="maxPasses" value="7" step="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Settings -->
+            <div class="control-section">
+                <div class="section-header" data-section="advanced">
+                    <span>Advanced Settings</span>
+                    <span class="section-toggle">▼</span>
+                </div>
+                <div class="section-content" id="advanced-content">
+                    <div class="control-group">
+                        <label for="rrMinBounces" class="tooltip" data-tooltip="Minimum ray bounces before termination probability">Russian Roulette Min Bounces:</label>
+                        <input type="number" id="rrMinBounces" value="" step="1">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="rrMinSamples" class="tooltip" data-tooltip="Minimum samples before Russian Roulette kicks in">Russian Roulette Min Samples:</label>
+                        <input type="number" id="rrMinSamples" value="" step="1">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="adaptiveMinSamples" class="tooltip" data-tooltip="Minimum samples as percentage of max (0.15 = 15%)">Adaptive Min Samples:</label>
+                        <input type="number" id="adaptiveMinSamples" value="" step="0.01" min="0.01" max="1.0">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="adaptiveThreshold" class="tooltip" data-tooltip="Relative error threshold for adaptive sampling">Adaptive Threshold:</label>
+                        <input type="number" id="adaptiveThreshold" value="" step="0.001" min="0.001" max="0.5">
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="button-group">
+                <button id="startBtn" class="btn-primary">Start Render</button>
+                <button id="stopBtn" class="btn-secondary" disabled>Stop</button>
+            </div>
         </div>
 
-        <div class="button-group">
-            <button id="startBtn" class="btn-primary">Start Rendering</button>
-            <button id="stopBtn" class="btn-secondary" disabled>Stop Rendering</button>
-        </div>
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <div class="render-area">
+                <div class="image-container">
+                    <div id="noImage" class="no-image">Click "Start Render" to begin</div>
+                    <img id="renderImage" class="render-image" style="display: none;" alt="Rendered image">
+                </div>
 
-        <div id="status" class="status idle">Ready to render</div>
-
-        <div class="render-area">
-            <div class="image-container">
-                <div id="noImage" class="no-image">Click "Start Rendering" to begin</div>
-                <img id="renderImage" class="render-image" style="display: none;" alt="Rendered image">
-            </div>
-
-            <div class="stats-panel">
-                <h3 style="margin-top: 0;">Render Statistics</h3>
-                
-                <div class="progress-bar">
-                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
-                </div>
-                
-                <div class="stats-item">
-                    <span class="stats-label">Pass:</span>
-                    <span id="currentPass" class="stats-value">-</span>
-                </div>
-                
-                <div class="stats-item">
-                    <span class="stats-label">Total Passes:</span>
-                    <span id="totalPasses" class="stats-value">-</span>
-                </div>
-                
-                <div class="stats-item">
-                    <span class="stats-label">Avg Samples:</span>
-                    <span id="avgSamples" class="stats-value">-</span>
-                </div>
-                
-                <div class="stats-item">
-                    <span class="stats-label">Total Samples:</span>
-                    <span id="totalSamples" class="stats-value">-</span>
-                </div>
-                
-                <div class="stats-item">
-                    <span class="stats-label">Total Pixels:</span>
-                    <span id="totalPixels" class="stats-value">-</span>
-                </div>
-                
-                <div class="stats-item">
-                    <span class="stats-label">Primitives:</span>
-                    <span id="primitiveCount" class="stats-value">-</span>
-                </div>
-                
-                <div class="stats-item">
-                    <span class="stats-label">Elapsed:</span>
-                    <span id="elapsed" class="stats-value">-</span>
-                </div>
-                
-                <div id="inspectSection" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
-                    <h4 style="margin-top: 0;">Object Inspector</h4>
-                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Click on the image to inspect objects</p>
-                    <div id="inspectResult" style="font-size: 12px;"></div>
+                <div class="stats-panel">
+                    <h3>Render Statistics</h3>
+                    
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    
+                    <!-- Status -->
+                    <div id="status" class="status idle">Ready to render</div>
+                    
+                    <div class="stats-item">
+                        <span class="stats-label">Pass:</span>
+                        <span id="currentPass" class="stats-value">-</span>
+                    </div>
+                    
+                    <div class="stats-item">
+                        <span class="stats-label">Total Passes:</span>
+                        <span id="totalPasses" class="stats-value">-</span>
+                    </div>
+                    
+                    <div class="stats-item">
+                        <span class="stats-label">Avg Samples:</span>
+                        <span id="avgSamples" class="stats-value">-</span>
+                    </div>
+                    
+                    <div class="stats-item">
+                        <span class="stats-label">Total Samples:</span>
+                        <span id="totalSamples" class="stats-value">-</span>
+                    </div>
+                    
+                    <div class="stats-item">
+                        <span class="stats-label">Total Pixels:</span>
+                        <span id="totalPixels" class="stats-value">-</span>
+                    </div>
+                    
+                    <div class="stats-item">
+                        <span class="stats-label">Primitives:</span>
+                        <span id="primitiveCount" class="stats-value">-</span>
+                    </div>
+                    
+                    <div class="stats-item">
+                        <span class="stats-label">Elapsed:</span>
+                        <span id="elapsed" class="stats-value">-</span>
+                    </div>
+                    
+                    <div id="inspectSection">
+                        <h4>Object Inspector</h4>
+                        <p style="font-size: 11px; color: #666; margin-bottom: 10px;">Click on the image to inspect objects</p>
+                        <div id="inspectResult"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -355,6 +571,7 @@
                 this.isRendering = false;
                 this.limits = null; // Store server-provided limits
                 this.bindEvents();
+                this.initializeSections();
                 this.loadSceneDefaults(); // Load initial defaults
             }
 
@@ -365,6 +582,38 @@
                 
                 // Add click handler to the rendered image for inspection
                 document.getElementById('renderImage').addEventListener('click', (event) => this.handleImageClick(event));
+                
+                // Add section toggle handlers
+                document.querySelectorAll('.section-header').forEach(header => {
+                    header.addEventListener('click', () => this.toggleSection(header));
+                });
+            }
+
+            initializeSections() {
+                // Initialize collapsible sections
+                document.querySelectorAll('.section-header').forEach(header => {
+                    const isActive = header.classList.contains('active');
+                    const sectionName = header.dataset.section;
+                    const content = document.getElementById(`${sectionName}-content`);
+                    
+                    if (!isActive && content) {
+                        content.classList.remove('expanded');
+                    }
+                });
+            }
+
+            toggleSection(header) {
+                const sectionName = header.dataset.section;
+                const content = document.getElementById(`${sectionName}-content`);
+                const isExpanded = content.classList.contains('expanded');
+                
+                if (isExpanded) {
+                    header.classList.remove('active');
+                    content.classList.remove('expanded');
+                } else {
+                    header.classList.add('active');
+                    content.classList.add('expanded');
+                }
             }
 
             async loadSceneDefaults() {
@@ -461,12 +710,9 @@
                         
                         controlGroup.appendChild(input);
                         
-                        // Add small description
-                        const small = document.createElement('small');
-                        small.style.color = '#666';
-                        small.style.fontSize = '12px';
-                        small.textContent = `Range: ${option.min} - ${option.max}`;
-                        controlGroup.appendChild(small);
+                        // Add tooltip to label
+                        label.className = 'tooltip';
+                        label.setAttribute('data-tooltip', `Range: ${option.min} - ${option.max}`);
                     }
                     
                     container.appendChild(controlGroup);
