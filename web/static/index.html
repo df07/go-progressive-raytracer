@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Theme Switcher -->
+    <div class="theme-switcher">
+        <button class="theme-toggle active" data-theme="light" title="Light mode">☀</button>
+        <button class="theme-toggle" data-theme="dark" title="Dark mode">☾</button>
+    </div>
+
     <div class="app-container">
         <!-- Left Sidebar with Controls -->
         <div class="sidebar">
@@ -169,9 +175,33 @@
                 this.eventSource = null;
                 this.isRendering = false;
                 this.limits = null; // Store server-provided limits
+                this.initializeTheme();
                 this.bindEvents();
                 this.initializeSections();
                 this.loadSceneDefaults(); // Load initial defaults
+            }
+
+            initializeTheme() {
+                // Load saved theme or default to light
+                const savedTheme = localStorage.getItem('raytracer-theme') || 'light';
+                this.setTheme(savedTheme);
+            }
+
+            setTheme(theme) {
+                // Update document theme
+                document.documentElement.setAttribute('data-theme', theme);
+                
+                // Update theme toggle buttons
+                document.querySelectorAll('.theme-toggle').forEach(toggle => {
+                    if (toggle.dataset.theme === theme) {
+                        toggle.classList.add('active');
+                    } else {
+                        toggle.classList.remove('active');
+                    }
+                });
+                
+                // Save theme preference
+                localStorage.setItem('raytracer-theme', theme);
             }
 
             bindEvents() {
@@ -185,6 +215,13 @@
                 // Add section toggle handlers
                 document.querySelectorAll('.section-header').forEach(header => {
                     header.addEventListener('click', () => this.toggleSection(header));
+                });
+
+                // Add theme toggle handlers
+                document.querySelectorAll('.theme-toggle').forEach(toggle => {
+                    toggle.addEventListener('click', () => {
+                        this.setTheme(toggle.dataset.theme);
+                    });
                 });
             }
 
@@ -637,138 +674,183 @@
                 
                 if (!result.hit) {
                     resultDiv.innerHTML = `
-                        <div style="padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #6c757d;">
-                            <strong>Pixel (${pixelX}, ${pixelY})</strong><br>
-                            No object hit - background/sky
+                        <div class="inspect-card no-hit">
+                            <div class="inspect-header">Pixel (${pixelX}, ${pixelY})</div>
+                            <div>No object hit - background/sky</div>
                         </div>
                     `;
                     return;
                 }
                 
-                // Extract material and geometry properties
                 const materialProps = result.properties.material || {};
                 const geometryProps = result.properties.geometry || {};
                 
-                // Format material information
-                let materialInfo = `<strong>Material:</strong> ${result.materialType}<br>`;
+                let content = `
+                    <div class="inspect-card hit">
+                        <div class="inspect-header">Pixel (${pixelX}, ${pixelY}) - Object Hit</div>
+                        
+                        <div class="inspect-section">
+                            <div class="inspect-property">
+                                <span class="inspect-label">Material:</span>
+                                <span class="inspect-value">${result.materialType}</span>
+                            </div>
+                            ${this.formatMaterialProperties(result.materialType, materialProps)}
+                        </div>
+                        
+                        <div class="inspect-section">
+                            <div class="inspect-property">
+                                <span class="inspect-label">Geometry:</span>
+                                <span class="inspect-value">${result.geometryType}</span>
+                            </div>
+                            ${this.formatGeometryProperties(result.geometryType, geometryProps)}
+                        </div>
+                        
+                        <div class="inspect-section">
+                            <div class="inspect-property">
+                                 <span class="inspect-label">Distance:</span>
+                                 <span class="inspect-value">${result.distance.toFixed(2)}</span>
+                             </div>
+                             <div class="inspect-property">
+                                 <span class="inspect-label">Position:</span>
+                                 <span class="inspect-value">(${result.point[0].toFixed(2)}, ${result.point[1].toFixed(2)}, ${result.point[2].toFixed(2)})</span>
+                             </div>
+                             <div class="inspect-property">
+                                 <span class="inspect-label">Normal:</span>
+                                 <span class="inspect-value">(${result.normal[0].toFixed(2)}, ${result.normal[1].toFixed(2)}, ${result.normal[2].toFixed(2)})</span>
+                             </div>
+                            <div class="inspect-property">
+                                <span class="inspect-label">Front Face:</span>
+                                <span class="inspect-value">${result.frontFace ? 'Yes' : 'No'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
                 
-                if (result.materialType === 'lambertian' && materialProps.albedo) {
-                    const albedo = materialProps.albedo;
-                    let colorSwatch = '';
-                    if (materialProps.color) {
-                        colorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
-                    }
-                    materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${colorSwatch}<br>`;
+                resultDiv.innerHTML = content;
+            }
+
+            formatMaterialProperties(materialType, props) {
+                let html = '';
+                
+                if (materialType === 'lambertian' && props.albedo) {
+                    html += this.createPropertyHTML('Albedo', props.albedo, props.color);
                 }
                 
-                if (result.materialType === 'metal') {
-                    if (materialProps.albedo) {
-                        const albedo = materialProps.albedo;
-                        let colorSwatch = '';
-                        if (materialProps.color) {
-                            colorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                if (materialType === 'metal') {
+                    if (props.albedo) {
+                        html += this.createPropertyHTML('Albedo', props.albedo, props.color);
+                    }
+                                         if (props.fuzzness !== undefined) {
+                         html += this.createPropertyHTML('Fuzzness', props.fuzzness.toFixed(2));
+                     }
+                }
+                
+                                 if (materialType === 'dielectric' && props.refractiveIndex) {
+                     html += this.createPropertyHTML('Refractive Index', props.refractiveIndex.toFixed(2));
+                 }
+                
+                if (materialType === 'emissive' && props.emission) {
+                    html += this.createPropertyHTML('Emission', props.emission);
+                }
+                
+                if (materialType === 'layered') {
+                    html += this.createPropertyHTML('Outer', props.outer?.type || 'unknown');
+                                         if (props.outer?.properties?.refractiveIndex) {
+                         html += `<div class="inspect-nested">`;
+                         html += this.createPropertyHTML('Refractive Index', props.outer.properties.refractiveIndex.toFixed(2));
+                         html += `</div>`;
+                     }
+                    
+                    html += this.createPropertyHTML('Inner', props.inner?.type || 'unknown');
+                    if (props.inner?.properties) {
+                        html += `<div class="inspect-nested">`;
+                        if (props.inner.properties.albedo) {
+                            html += this.createPropertyHTML('Albedo', props.inner.properties.albedo, props.inner.properties.color);
                         }
-                        materialInfo += `&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${colorSwatch}<br>`;
-                    }
-                    if (materialProps.fuzzness !== undefined) {
-                        materialInfo += `&nbsp;&nbsp;Fuzzness: ${materialProps.fuzzness.toFixed(3)}<br>`;
+                                                 if (props.inner.properties.fuzzness !== undefined) {
+                             html += this.createPropertyHTML('Fuzzness', props.inner.properties.fuzzness.toFixed(2));
+                         }
+                        html += `</div>`;
                     }
                 }
                 
-                if (result.materialType === 'dielectric' && materialProps.refractiveIndex) {
-                    materialInfo += `&nbsp;&nbsp;Refractive Index: ${materialProps.refractiveIndex.toFixed(3)}<br>`;
-                }
-                
-                if (result.materialType === 'emissive' && materialProps.emission) {
-                    const emission = materialProps.emission;
-                    materialInfo += `&nbsp;&nbsp;Emission: (${emission[0].toFixed(3)}, ${emission[1].toFixed(3)}, ${emission[2].toFixed(3)})<br>`;
-                }
-                
-                if (result.materialType === 'layered') {
-                    materialInfo += `&nbsp;&nbsp;Outer: ${materialProps.outer?.type || 'unknown'}<br>`;
-                    if (materialProps.outer?.properties?.refractiveIndex) {
-                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Refractive Index: ${materialProps.outer.properties.refractiveIndex.toFixed(3)}<br>`;
+                if (materialType === 'mixed') {
+                    if (props.description) {
+                        html += this.createPropertyHTML('Mix', props.description);
                     }
-                    materialInfo += `&nbsp;&nbsp;Inner: ${materialProps.inner?.type || 'unknown'}<br>`;
-                    if (materialProps.inner?.properties?.albedo) {
-                        const albedo = materialProps.inner.properties.albedo;
-                        let innerColorSwatch = '';
-                        if (materialProps.inner.properties.color) {
-                            innerColorSwatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.inner.properties.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
+                    
+                    html += this.createPropertyHTML('Material 1', props.material1?.type || 'unknown');
+                    if (props.material1?.properties?.albedo) {
+                        html += `<div class="inspect-nested">`;
+                        html += this.createPropertyHTML('Albedo', props.material1.properties.albedo, props.material1.properties.color);
+                        html += `</div>`;
+                    }
+                    
+                    html += this.createPropertyHTML('Material 2', props.material2?.type || 'unknown');
+                    if (props.material2?.properties) {
+                        html += `<div class="inspect-nested">`;
+                        if (props.material2.properties.albedo) {
+                            html += this.createPropertyHTML('Albedo', props.material2.properties.albedo, props.material2.properties.color);
                         }
-                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${innerColorSwatch}<br>`;
-                    }
-                    if (materialProps.inner?.properties?.fuzzness !== undefined) {
-                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Fuzzness: ${materialProps.inner.properties.fuzzness.toFixed(3)}<br>`;
-                    }
-                }
-                
-                if (result.materialType === 'mixed') {
-                    if (materialProps.description) {
-                        materialInfo += `&nbsp;&nbsp;Mix: ${materialProps.description}<br>`;
-                    }
-                    materialInfo += `&nbsp;&nbsp;Material 1: ${materialProps.material1?.type || 'unknown'}<br>`;
-                    if (materialProps.material1?.properties?.albedo) {
-                        const albedo = materialProps.material1.properties.albedo;
-                        let color1Swatch = '';
-                        if (materialProps.material1.properties.color) {
-                            color1Swatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.material1.properties.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
-                        }
-                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${color1Swatch}<br>`;
-                    }
-                    materialInfo += `&nbsp;&nbsp;Material 2: ${materialProps.material2?.type || 'unknown'}<br>`;
-                    if (materialProps.material2?.properties?.albedo) {
-                        const albedo = materialProps.material2.properties.albedo;
-                        let color2Swatch = '';
-                        if (materialProps.material2.properties.color) {
-                            color2Swatch = `<span style="display: inline-block; width: 16px; height: 16px; background: ${materialProps.material2.properties.color}; border: 1px solid #ccc; border-radius: 2px; margin-left: 8px; vertical-align: middle;"></span>`;
-                        }
-                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Albedo: (${albedo[0].toFixed(3)}, ${albedo[1].toFixed(3)}, ${albedo[2].toFixed(3)})${color2Swatch}<br>`;
-                    }
-                    if (materialProps.material2?.properties?.fuzzness !== undefined) {
-                        materialInfo += `&nbsp;&nbsp;&nbsp;&nbsp;Fuzzness: ${materialProps.material2.properties.fuzzness.toFixed(3)}<br>`;
+                                                 if (props.material2.properties.fuzzness !== undefined) {
+                             html += this.createPropertyHTML('Fuzzness', props.material2.properties.fuzzness.toFixed(2));
+                         }
+                        html += `</div>`;
                     }
                 }
                 
-                // Format geometry information
-                let geometryInfo = `<strong>Geometry:</strong> ${result.geometryType}<br>`;
+                return html;
+            }
+
+            formatGeometryProperties(geometryType, props) {
+                let html = '';
                 
-                if (result.geometryType === 'sphere') {
-                    if (geometryProps.center) {
-                        const center = geometryProps.center;
-                        geometryInfo += `&nbsp;&nbsp;Center: (${center[0].toFixed(3)}, ${center[1].toFixed(3)}, ${center[2].toFixed(3)})<br>`;
+                if (geometryType === 'sphere') {
+                    if (props.center) {
+                        html += this.createPropertyHTML('Center', props.center);
                     }
-                    if (geometryProps.radius !== undefined) {
-                        geometryInfo += `&nbsp;&nbsp;Radius: ${geometryProps.radius.toFixed(3)}<br>`;
+                                         if (props.radius !== undefined) {
+                         html += this.createPropertyHTML('Radius', props.radius.toFixed(2));
+                     }
+                }
+                
+                if (geometryType === 'quad' || geometryType === 'quad_light') {
+                    if (props.corner) {
+                        html += this.createPropertyHTML('Corner', props.corner);
+                    }
+                                         if (geometryType === 'quad_light' && props.area !== undefined) {
+                         html += this.createPropertyHTML('Area', props.area.toFixed(2));
+                     }
+                }
+                
+                if (geometryType === 'plane') {
+                    if (props.point) {
+                        html += this.createPropertyHTML('Point', props.point);
                     }
                 }
                 
-                if (result.geometryType === 'quad' || result.geometryType === 'quad_light') {
-                    if (geometryProps.corner) {
-                        const corner = geometryProps.corner;
-                        geometryInfo += `&nbsp;&nbsp;Corner: (${corner[0].toFixed(3)}, ${corner[1].toFixed(3)}, ${corner[2].toFixed(3)})<br>`;
-                    }
-                    if (result.geometryType === 'quad_light' && geometryProps.area !== undefined) {
-                        geometryInfo += `&nbsp;&nbsp;Area: ${geometryProps.area.toFixed(3)}<br>`;
-                    }
+                return html;
+            }
+
+            createPropertyHTML(label, value, color = null) {
+                let valueStr = '';
+                
+                if (Array.isArray(value)) {
+                    valueStr = `(${value.map(v => v.toFixed(2)).join(', ')})`;
+                } else {
+                    valueStr = value.toString();
                 }
                 
-                if (result.geometryType === 'plane') {
-                    if (geometryProps.point) {
-                        const point = geometryProps.point;
-                        geometryInfo += `&nbsp;&nbsp;Point: (${point[0].toFixed(3)}, ${point[1].toFixed(3)}, ${point[2].toFixed(3)})<br>`;
-                    }
+                let colorSwatch = '';
+                if (color) {
+                    colorSwatch = `<span class="color-swatch" style="background: ${color};" title="Color: ${color}"></span>`;
                 }
                 
-                resultDiv.innerHTML = `
-                    <div style="padding: 8px; background: #d4edda; border-radius: 4px; border-left: 3px solid #28a745;">
-                        <strong>Pixel (${pixelX}, ${pixelY}) - Object Hit</strong><br>
-                        ${materialInfo}
-                        ${geometryInfo}
-                        <strong>Distance:</strong> ${result.distance.toFixed(3)}<br>
-                        <strong>Position:</strong> (${result.point[0].toFixed(3)}, ${result.point[1].toFixed(3)}, ${result.point[2].toFixed(3)})<br>
-                        <strong>Normal:</strong> (${result.normal[0].toFixed(3)}, ${result.normal[1].toFixed(3)}, ${result.normal[2].toFixed(3)})<br>
-                        <strong>Front Face:</strong> ${result.frontFace ? 'Yes' : 'No'}
+                return `
+                    <div class="inspect-property">
+                        <span class="inspect-label">${label}:</span>
+                        <span class="inspect-value">${valueStr}</span>
+                        ${colorSwatch}
                     </div>
                 `;
             }
@@ -776,9 +858,9 @@
             displayInspectError(errorMessage) {
                 const resultDiv = document.getElementById('inspectResult');
                 resultDiv.innerHTML = `
-                    <div style="padding: 8px; background: #f8d7da; border-radius: 4px; border-left: 3px solid #dc3545;">
-                        <strong>Inspection Error:</strong><br>
-                        ${errorMessage}
+                    <div class="inspect-card error">
+                        <div class="inspect-header">Inspection Error</div>
+                        <div>${errorMessage}</div>
                     </div>
                 `;
             }
