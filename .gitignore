@@ -39,3 +39,6 @@ Thumbs.db
 *.prof
 /models
 *.log
+.claude/settings.local.json
+web/web-server
+raytracer
