@@ -707,6 +707,20 @@ class ProgressiveRaytracer {
       document.getElementById('totalPasses').textContent = data.totalPasses;
       document.getElementById('elapsed').textContent = `${(data.elapsedMs / 1000).toFixed(1)}s`;
       
+      // Update render statistics if available
+      if (data.totalPixels !== undefined) {
+          document.getElementById('totalPixels').textContent = data.totalPixels.toLocaleString();
+      }
+      if (data.totalSamples !== undefined) {
+          document.getElementById('totalSamples').textContent = data.totalSamples.toLocaleString();
+      }
+      if (data.averageSamples !== undefined) {
+          document.getElementById('avgSamples').textContent = data.averageSamples.toFixed(1);
+      }
+      if (data.primitiveCount !== undefined) {
+          document.getElementById('primitiveCount').textContent = data.primitiveCount.toLocaleString();
+      }
+      
       // Update status
       this.setStatus('rendering', `Pass ${data.passNumber}/${data.totalPasses} completed`);
   }

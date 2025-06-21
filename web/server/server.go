@@ -152,18 +152,34 @@ renderLoop:
 				continue
 			}
 
-			// Send pass completion notification
+			// Send pass completion notification with full render statistics
 			elapsed := time.Since(startTime)
+			primitiveCount := sceneObj.GetPrimitiveCount()
+
 			passUpdate := struct {
-				Event       string `json:"event"`
-				PassNumber  int    `json:"passNumber"`
-				TotalPasses int    `json:"totalPasses"`
-				ElapsedMs   int64  `json:"elapsedMs"`
+				Event          string  `json:"event"`
+				PassNumber     int     `json:"passNumber"`
+				TotalPasses    int     `json:"totalPasses"`
+				ElapsedMs      int64   `json:"elapsedMs"`
+				TotalPixels    int     `json:"totalPixels"`
+				TotalSamples   int     `json:"totalSamples"`
+				AverageSamples float64 `json:"averageSamples"`
+				MaxSamples     int     `json:"maxSamples"`
+				MinSamples     int     `json:"minSamples"`
+				MaxSamplesUsed int     `json:"maxSamplesUsed"`
+				PrimitiveCount int     `json:"primitiveCount"`
 			}{
-				Event:       "passComplete",
-				PassNumber:  passResult.PassNumber,
-				TotalPasses: req.MaxPasses,
-				ElapsedMs:   elapsed.Milliseconds(),
+				Event:          "passComplete",
+				PassNumber:     passResult.PassNumber,
+				TotalPasses:    req.MaxPasses,
+				ElapsedMs:      elapsed.Milliseconds(),
+				TotalPixels:    passResult.Stats.TotalPixels,
+				TotalSamples:   passResult.Stats.TotalSamples,
+				AverageSamples: passResult.Stats.AverageSamples,
+				MaxSamples:     passResult.Stats.MaxSamples,
+				MinSamples:     passResult.Stats.MinSamples,
+				MaxSamplesUsed: passResult.Stats.MaxSamplesUsed,
+				PrimitiveCount: primitiveCount,
 			}
 
 			data, err := json.Marshal(passUpdate)
