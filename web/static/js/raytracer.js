@@ -449,43 +449,7 @@ class ProgressiveRaytracer {
       document.getElementById('stopBtn').disabled = !this.isRendering;
   }
 
-  async handleImageClick(event) {
-      const img = event.target;
-      const rect = img.getBoundingClientRect();
-      
-      // Calculate click coordinates relative to the image
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      
-      // Convert to pixel coordinates based on image scale
-      const scaleX = img.naturalWidth / rect.width;
-      const scaleY = img.naturalHeight / rect.height;
-      
-      const pixelX = Math.floor(x * scaleX);
-      const pixelY = Math.floor(y * scaleY);
-      
-      // Get current render parameters
-      const params = this.getParameters();
-      
-      try {
-          // Build inspect URL with scene-specific parameters
-          const baseUrl = `/api/inspect?scene=${params.scene}&width=${params.width}&height=${params.height}&x=${pixelX}&y=${pixelY}`;
-          const url = this.buildUrlWithSceneParams(baseUrl, params);
-          
-          const response = await fetch(url);
-          
-          if (response.ok) {
-              const result = await response.json();
-              this.displayInspectResult(result, pixelX, pixelY);
-          } else {
-              const error = await response.json();
-              this.displayInspectError(error.error || 'Inspection failed');
-          }
-      } catch (error) {
-          console.error('Inspection error:', error);
-          this.displayInspectError('Network error during inspection');
-      }
-  }
+
 
   displayInspectResult(result, pixelX, pixelY) {
       const resultDiv = document.getElementById('inspectResult');
@@ -730,12 +694,32 @@ class ProgressiveRaytracer {
       if (!this.renderCanvas) return;
       
       this.renderCanvas.handleClick(event, (x, y) => {
-          this.handleImageClick({
-              target: event.target,
-              clientX: event.clientX,
-              clientY: event.clientY
-          });
+          this.handlePixelInspection(x, y);
       });
+  }
+
+  async handlePixelInspection(pixelX, pixelY) {
+      // Get current render parameters
+      const params = this.getParameters();
+      
+      try {
+          // Build inspect URL with scene-specific parameters
+          const baseUrl = `/api/inspect?scene=${params.scene}&width=${params.width}&height=${params.height}&x=${pixelX}&y=${pixelY}`;
+          const url = this.buildUrlWithSceneParams(baseUrl, params);
+          
+          const response = await fetch(url);
+          
+          if (response.ok) {
+              const result = await response.json();
+              this.displayInspectResult(result, pixelX, pixelY);
+          } else {
+              const error = await response.json();
+              this.displayInspectError(error.error || 'Inspection failed');
+          }
+      } catch (error) {
+          console.error('Inspection error:', error);
+          this.displayInspectError('Network error during inspection');
+      }
   }
 
   displayInspectError(errorMessage) {
