@@ -162,6 +162,11 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(Til
 				TileY:      tileY,
 				TileImage:  tileImage,
 				PassNumber: passNumber,
+
+				// Progress information
+				TileNumber:  i + 1,
+				TotalTiles:  len(pr.tiles),
+				TotalPasses: pr.config.MaxPasses,
 			})
 		}
 	}
@@ -218,6 +223,11 @@ type TileCompletionResult struct {
 	TileY      int
 	TileImage  *image.RGBA // Image data for just this tile
 	PassNumber int         // Which pass this tile was rendered in
+
+	// Progress information
+	TileNumber  int // Current tile number in this pass (1-based)
+	TotalTiles  int // Total number of tiles in the image
+	TotalPasses int // Total number of passes planned
 }
 
 // RenderOptions configures progressive rendering behavior

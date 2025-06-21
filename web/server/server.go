@@ -67,9 +67,13 @@ type Stats struct {
 
 // TileUpdate represents a single tile update sent via SSE
 type TileUpdate struct {
-	TileX     int    `json:"tileX"`
-	TileY     int    `json:"tileY"`
-	ImageData string `json:"imageData"` // Base64 encoded PNG of just this tile
+	TileX       int    `json:"tileX"`
+	TileY       int    `json:"tileY"`
+	ImageData   string `json:"imageData"` // Base64 encoded PNG of just this tile
+	PassNumber  int    `json:"passNumber"`
+	TileNumber  int    `json:"tileNumber"`  // Current tile number in this pass (1-based)
+	TotalTiles  int    `json:"totalTiles"`  // Total number of tiles in the image
+	TotalPasses int    `json:"totalPasses"` // Total number of passes planned
 }
 
 // Start starts the web server
@@ -208,9 +212,13 @@ renderLoop:
 
 			// Create and send tile update
 			update := TileUpdate{
-				TileX:     tileResult.TileX,
-				TileY:     tileResult.TileY,
-				ImageData: tileData,
+				TileX:       tileResult.TileX,
+				TileY:       tileResult.TileY,
+				ImageData:   tileData,
+				PassNumber:  tileResult.PassNumber,
+				TileNumber:  tileResult.TileNumber,
+				TotalTiles:  tileResult.TotalTiles,
+				TotalPasses: tileResult.TotalPasses,
 			}
 
 			data, err := json.Marshal(update)

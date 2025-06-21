@@ -3,6 +3,7 @@ class ProgressiveRaytracer {
       this.eventSource = null;
       this.isRendering = false;
       this.limits = null; // Store server-provided limits
+      
       this.initializeTheme();
       this.bindEvents();
       this.initializeSections();
@@ -418,7 +419,6 @@ class ProgressiveRaytracer {
       return { isValid: true };
   }
 
-
   resetStats() {
       document.getElementById('progressFill').style.width = '0%';
       document.getElementById('currentPass').textContent = '-';
@@ -448,8 +448,6 @@ class ProgressiveRaytracer {
       document.getElementById('startBtn').disabled = this.isRendering;
       document.getElementById('stopBtn').disabled = !this.isRendering;
   }
-
-
 
   displayInspectResult(result, pixelX, pixelY) {
       const resultDiv = document.getElementById('inspectResult');
@@ -658,14 +656,26 @@ class ProgressiveRaytracer {
       if (this.renderCanvas) {
           this.renderCanvas.updateTile(data.tileX, data.tileY, `data:image/png;base64,${data.imageData}`);
       }
+      
+      // Update progress bar using server-provided progress information
+      if (data.totalPasses && data.totalTiles) {
+          // Calculate progress based on completed passes + current pass progress
+          const completedPasses = Math.max(0, data.passNumber - 1);
+          const currentPassProgress = data.tileNumber / data.totalTiles;
+          const totalProgress = (completedPasses + currentPassProgress) / data.totalPasses;
+          
+          // Update progress bar
+          const progressPercent = Math.min(totalProgress * 100, 100);
+          document.getElementById('progressFill').style.width = `${progressPercent.toFixed(1)}%`;
+          
+          // Update status with detailed tile progress
+          this.setStatus('rendering', 
+              `Pass ${data.passNumber}/${data.totalPasses} - Tile ${data.tileNumber}/${data.totalTiles}`);
+      }
   }
 
   // Handle pass completion in streaming mode
   updatePassComplete(data) {
-      // Update progress bar
-      const progress = (data.passNumber / data.totalPasses) * 100;
-      document.getElementById('progressFill').style.width = `${progress}%`;
-      
       // Update stats
       document.getElementById('currentPass').textContent = data.passNumber;
       document.getElementById('totalPasses').textContent = data.totalPasses;
@@ -685,7 +695,7 @@ class ProgressiveRaytracer {
           document.getElementById('primitiveCount').textContent = data.primitiveCount.toLocaleString();
       }
       
-      // Update status
+      // Update status for pass completion (tile updates will handle in-progress status)
       this.setStatus('rendering', `Pass ${data.passNumber}/${data.totalPasses} completed`);
   }
 

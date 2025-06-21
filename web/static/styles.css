@@ -483,6 +483,7 @@ button:disabled::before {
     transition: width 0.5s ease;
     border-radius: 12px;
     position: relative;
+    overflow: hidden;
 }
 
 .progress-fill::after {
@@ -492,16 +493,31 @@ button:disabled::before {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        transparent 40%,
+        rgba(255,255,255,0.4) 50%,
+        transparent 60%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    background-position: -200% 0;
+    opacity: 0;
 }
 
 .progress-fill.animating::after {
     animation: shimmer 2s infinite;
+    opacity: 1;
 }
 
 @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% { 
+        background-position: -200% 0;
+    }
+    100% { 
+        background-position: 200% 0;
+    }
 }
 
 .stats-item {
