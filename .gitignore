@@ -42,3 +42,5 @@ Thumbs.db
 .claude/settings.local.json
 web/web-server
 raytracer
+go-progressive-raytracer
+web/web

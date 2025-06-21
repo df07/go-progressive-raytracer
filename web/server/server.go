@@ -17,6 +17,13 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
+const (
+	// Streaming configuration constants
+	DefaultTileSize          = 64   // Size of each tile in pixels
+	TileUpdateChannelBuffer  = 100  // Buffer size for tile update channel
+	MaxConcurrentTileUpdates = 1000 // Maximum tiles that can be queued
+)
+
 // Server handles web requests for the progressive raytracer
 type Server struct {
 	port int
@@ -47,16 +54,6 @@ type RenderRequest struct {
 	DragonMaterialFinish string `json:"dragonMaterialFinish"` // Dragon material finish: "gold", "plastic", "matte", "mirror", "glass", "copper"
 }
 
-// ProgressUpdate represents a single progressive update sent via SSE
-type ProgressUpdate struct {
-	PassNumber  int    `json:"passNumber"`
-	TotalPasses int    `json:"totalPasses"`
-	ImageData   string `json:"imageData"` // Base64 encoded PNG
-	Stats       Stats  `json:"stats"`
-	IsComplete  bool   `json:"isComplete"`
-	ElapsedMs   int64  `json:"elapsedMs"`
-}
-
 // Stats represents render statistics
 type Stats struct {
 	TotalPixels    int     `json:"totalPixels"`
@@ -68,13 +65,20 @@ type Stats struct {
 	PrimitiveCount int     `json:"primitiveCount"`
 }
 
+// TileUpdate represents a single tile update sent via SSE
+type TileUpdate struct {
+	TileX     int    `json:"tileX"`
+	TileY     int    `json:"tileY"`
+	ImageData string `json:"imageData"` // Base64 encoded PNG of just this tile
+}
+
 // Start starts the web server
 func (s *Server) Start() error {
 	// Serve static files
 	http.Handle("/", http.FileServer(http.Dir("static/")))
 
 	// API endpoints
-	http.HandleFunc("/api/render", s.handleRender)
+	http.HandleFunc("/api/render", s.handleRender) // Real-time tile streaming
 	http.HandleFunc("/api/health", s.handleHealth)
 	http.HandleFunc("/api/scene-config", s.handleSceneConfig)
 	http.HandleFunc("/api/inspect", s.handleInspect)
@@ -91,7 +95,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-// handleRender handles progressive rendering requests with SSE
+// handleRender handles progressive rendering with real-time tile streaming via SSE
 func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -99,7 +103,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	// Parse request parameters
+	// Parse request parameters (reuse existing parser)
 	req, err := s.parseRenderRequest(r)
 	if err != nil {
 		s.sendSSEError(w, fmt.Sprintf("Invalid request: %v", err))
@@ -113,8 +117,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Override Russian Roulette settings from the web request
-	// Modify the scene's sampling config directly
+	// Override sampling settings
 	sceneObj.SamplingConfig.RussianRouletteMinBounces = req.RRMinBounces
 	sceneObj.SamplingConfig.RussianRouletteMinSamples = req.RRMinSamples
 	sceneObj.SamplingConfig.AdaptiveMinSamples = req.AdaptiveMinSamples
@@ -122,7 +125,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 
 	// Create progressive raytracer
 	config := renderer.ProgressiveConfig{
-		TileSize:           64,
+		TileSize:           DefaultTileSize,
 		InitialSamples:     1,
 		MaxSamplesPerPixel: req.MaxSamples,
 		MaxPasses:          req.MaxPasses,
@@ -131,44 +134,97 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 
 	raytracer := renderer.NewProgressiveRaytracer(sceneObj, req.Width, req.Height, config)
 
-	// Use request context to detect client disconnection
+	// Start progressive rendering with channels (idiomatic Go approach)
+	startTime := time.Now()
 	ctx := r.Context()
 
-	// Start progressive rendering with callback
-	startTime := time.Now()
+	// Start rendering and get event channels (enable tile updates for web interface)
+	renderOptions := renderer.RenderOptions{TileUpdates: true}
+	passChan, tileChan, errChan := raytracer.RenderProgressive(ctx, renderOptions)
 
-	err = raytracer.RenderProgressive(ctx, func(result renderer.PassResult) error {
-		// Convert image to base64 PNG
-		imageData, err := s.imageToBase64PNG(result.Image)
-		if err != nil {
-			return fmt.Errorf("failed to encode image: %v", err)
+	// Listen to events from channels
+renderLoop:
+	for {
+		select {
+		case passResult, ok := <-passChan:
+			if !ok {
+				passChan = nil // Channel closed
+				continue
+			}
+
+			// Send pass completion notification
+			elapsed := time.Since(startTime)
+			passUpdate := struct {
+				Event       string `json:"event"`
+				PassNumber  int    `json:"passNumber"`
+				TotalPasses int    `json:"totalPasses"`
+				ElapsedMs   int64  `json:"elapsedMs"`
+			}{
+				Event:       "passComplete",
+				PassNumber:  passResult.PassNumber,
+				TotalPasses: req.MaxPasses,
+				ElapsedMs:   elapsed.Milliseconds(),
+			}
+
+			data, err := json.Marshal(passUpdate)
+			if err != nil {
+				log.Printf("Error marshaling pass update: %v", err)
+				continue
+			}
+
+			fmt.Fprintf(w, "event: passComplete\ndata: %s\n\n", data)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+
+		case tileResult, ok := <-tileChan:
+			if !ok {
+				tileChan = nil // Channel closed
+				continue
+			}
+
+			// Convert tile image to base64 PNG
+			tileData, err := s.imageToBase64PNG(tileResult.TileImage)
+			if err != nil {
+				log.Printf("Error encoding tile image (%d, %d): %v", tileResult.TileX, tileResult.TileY, err)
+				continue
+			}
+
+			// Create and send tile update
+			update := TileUpdate{
+				TileX:     tileResult.TileX,
+				TileY:     tileResult.TileY,
+				ImageData: tileData,
+			}
+
+			data, err := json.Marshal(update)
+			if err != nil {
+				log.Printf("Error marshaling tile update: %v", err)
+				continue
+			}
+
+			fmt.Fprintf(w, "event: tile\ndata: %s\n\n", data)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+
+		case err := <-errChan:
+			if err != nil {
+				s.sendSSEError(w, fmt.Sprintf("Rendering failed: %v", err))
+				return
+			}
+			// errChan closed, rendering completed successfully
+			break renderLoop
+
+		case <-ctx.Done():
+			// Client disconnected
+			return
 		}
 
-		// Create progress update
-		update := ProgressUpdate{
-			PassNumber:  result.PassNumber,
-			TotalPasses: req.MaxPasses,
-			ImageData:   imageData,
-			Stats: Stats{
-				TotalPixels:    result.Stats.TotalPixels,
-				TotalSamples:   int64(result.Stats.TotalSamples),
-				AverageSamples: result.Stats.AverageSamples,
-				MaxSamples:     result.Stats.MaxSamples,
-				MinSamples:     result.Stats.MinSamples,
-				MaxSamplesUsed: result.Stats.MaxSamplesUsed,
-				PrimitiveCount: sceneObj.GetPrimitiveCount(),
-			},
-			IsComplete: result.IsLast,
-			ElapsedMs:  time.Since(startTime).Milliseconds(),
+		// If all channels are closed, we're done
+		if passChan == nil && tileChan == nil {
+			break renderLoop
 		}
-
-		// Send SSE event
-		return s.sendSSEUpdate(w, update)
-	})
-
-	if err != nil {
-		s.sendSSEError(w, fmt.Sprintf("Render error: %v", err))
-		return
 	}
 
 	// Send completion event
@@ -340,15 +396,6 @@ func (s *Server) imageToBase64PNG(img image.Image) (string, error) {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
-}
-
-// sendSSEUpdate sends a progress update via SSE
-func (s *Server) sendSSEUpdate(w http.ResponseWriter, update ProgressUpdate) error {
-	data, err := json.Marshal(update)
-	if err != nil {
-		return err
-	}
-	return s.sendSSEEvent(w, "progress", string(data))
 }
 
 // sendSSEError sends an error via SSE

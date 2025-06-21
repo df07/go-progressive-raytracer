@@ -40,10 +40,11 @@ type Worker struct {
 	taskQueue   chan TileTask
 	resultQueue chan TileResult
 	stopChan    chan bool
+	pool        *WorkerPool // Reference to parent pool for callback access
 }
 
 // NewWorkerPool creates a worker pool with the specified number of workers
-func NewWorkerPool(scene core.Scene, width, height int, numWorkers int) *WorkerPool {
+func NewWorkerPool(scene core.Scene, width, height, tileSize int, numWorkers int) *WorkerPool {
 	if numWorkers <= 0 {
 		numWorkers = runtime.NumCPU()
 	}
@@ -67,6 +68,7 @@ func NewWorkerPool(scene core.Scene, width, height int, numWorkers int) *WorkerP
 			taskQueue:   wp.taskQueue,
 			resultQueue: wp.resultQueue,
 			stopChan:    wp.stopChan,
+			pool:        wp,
 		}
 		wp.workers = append(wp.workers, worker)
 	}
@@ -104,6 +106,8 @@ func (wp *WorkerPool) GetResult() (TileResult, bool) {
 func (wp *WorkerPool) GetNumWorkers() int {
 	return wp.numWorkers
 }
+
+
 
 // run is the main worker loop
 func (w *Worker) run(wg *sync.WaitGroup) {

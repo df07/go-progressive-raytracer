@@ -201,32 +201,47 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 	var finalImage *image.RGBA
 	var finalStats renderer.RenderStats
 
-	// Use callback to save images immediately as they complete
-	err := progressiveRT.RenderProgressive(context.Background(), func(result renderer.PassResult) error {
-		// Save intermediate passes (not the final one)
-		if !result.IsLast {
-			passFilename := filepath.Join(outputDir, fmt.Sprintf("%s_pass_%02d.png", baseFilename, result.PassNumber))
-			if err := saveImageToFile(result.Image, passFilename); err != nil {
-				fmt.Printf("Warning: Failed to save pass %d image: %v\n", result.PassNumber, err)
+	// Start rendering and get event channels (disable tile updates for command-line)
+	renderOptions := renderer.RenderOptions{TileUpdates: false}
+	passChan, _, errChan := progressiveRT.RenderProgressive(context.Background(), renderOptions)
+
+	// Listen to events from channels
+renderLoop:
+	for {
+		select {
+		case passResult, ok := <-passChan:
+			if !ok {
+				passChan = nil // Channel closed
+				continue
 			}
-		} else {
-			// Save final image
-			finalFilename := filepath.Join(outputDir, fmt.Sprintf("%s.png", baseFilename))
-			if err := saveImageToFile(result.Image, finalFilename); err != nil {
-				return fmt.Errorf("failed to save final image: %v", err)
+
+			// Save intermediate passes (not the final one)
+			filename := filepath.Join(outputDir, fmt.Sprintf("%s.png", baseFilename))
+			if !passResult.IsLast {
+				filename = filepath.Join(outputDir, fmt.Sprintf("%s_pass_%02d.png", baseFilename, passResult.PassNumber))
 			}
+			if err := saveImageToFile(passResult.Image, filename); err != nil {
+				fmt.Printf("Error saving final image: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Keep track of final result
+			finalImage = passResult.Image
+			finalStats = passResult.Stats
+
+		case err := <-errChan:
+			if err != nil {
+				fmt.Printf("Error during progressive rendering: %v\n", err)
+				os.Exit(1)
+			}
+			// errChan closed, rendering completed successfully
+			break renderLoop
 		}
 
-		// Keep track of final result
-		finalImage = result.Image
-		finalStats = result.Stats
-
-		return nil
-	})
-
-	if err != nil {
-		fmt.Printf("Error during progressive rendering: %v\n", err)
-		os.Exit(1)
+		// If all channels are closed, we're done
+		if passChan == nil {
+			break renderLoop
+		}
 	}
 
 	if finalImage == nil {

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Progressive Raytracer</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="js/canvas.js"></script>
 </head>
 <body>
     <!-- Theme Switcher -->
@@ -111,7 +112,7 @@
             <div class="render-area">
                 <div class="image-container">
                     <div id="noImage" class="no-image">Click "Start Render" to begin</div>
-                    <img id="renderImage" class="render-image" style="display: none;" alt="Rendered image">
+                    <canvas id="renderCanvas" class="render-image" style="display: none;"></canvas>
                 </div>
 
                 <div class="stats-panel">
@@ -209,8 +210,7 @@
                 document.getElementById('stopBtn').addEventListener('click', () => this.stopRendering());
                 document.getElementById('scene').addEventListener('change', () => this.loadSceneDefaults());
                 
-                // Add click handler to the rendered image for inspection
-                document.getElementById('renderImage').addEventListener('click', (event) => this.handleImageClick(event));
+                // Canvas click handler is set up in initializeTileStreaming
                 
                 // Add section toggle handlers
                 document.querySelectorAll('.section-header').forEach(header => {
@@ -429,6 +429,9 @@
                 this.isRendering = true;
                 this.updateButtons();
                 this.resetStats();
+                
+                // Initialize tile streaming
+                this.initializeTileStreaming(params);
 
                 this.eventSource = new EventSource(url);
 
@@ -437,9 +440,16 @@
                     this.setStatus('rendering', 'Rendering...');
                 };
 
-                this.eventSource.addEventListener('progress', (event) => {
+                // Tile streaming event handler
+                this.eventSource.addEventListener('tile', (event) => {
                     const data = JSON.parse(event.data);
-                    this.updateProgress(data);
+                    this.updateTile(data);
+                });
+
+                // Pass completion handler
+                this.eventSource.addEventListener('passComplete', (event) => {
+                    const data = JSON.parse(event.data);
+                    this.updatePassComplete(data);
                 });
 
                 this.eventSource.addEventListener('complete', (event) => {
@@ -576,38 +586,6 @@
                 return { isValid: true };
             }
 
-            updateProgress(data) {
-                // Update image
-                const img = document.getElementById('renderImage');
-                const noImage = document.getElementById('noImage');
-                
-                img.src = `data:image/png;base64,${data.imageData}`;
-                img.style.display = 'block';
-                noImage.style.display = 'none';
-
-                // Update progress bar
-                const progress = (data.passNumber / data.totalPasses) * 100;
-                document.getElementById('progressFill').style.width = `${progress}%`;
-
-                // Update stats
-                document.getElementById('currentPass').textContent = data.passNumber;
-                document.getElementById('totalPasses').textContent = data.totalPasses;
-                document.getElementById('avgSamples').textContent = data.stats.averageSamples.toFixed(1);
-                document.getElementById('totalSamples').textContent = data.stats.totalSamples.toLocaleString();
-                document.getElementById('totalPixels').textContent = data.stats.totalPixels.toLocaleString();
-                document.getElementById('primitiveCount').textContent = data.stats.primitiveCount.toLocaleString();
-                document.getElementById('elapsed').textContent = `${(data.elapsedMs / 1000).toFixed(1)}s`;
-
-                // Update status
-                this.setStatus('rendering', `Pass ${data.passNumber}/${data.totalPasses} - ${data.stats.averageSamples.toFixed(1)} samples/pixel`);
-
-                if (data.isComplete) {
-                    setTimeout(() => {
-                        this.setStatus('complete', 'Rendering completed!');
-                        this.stopRendering();
-                    }, 100);
-                }
-            }
 
             resetStats() {
                 document.getElementById('progressFill').style.width = '0%';
@@ -853,6 +831,57 @@
                         ${colorSwatch}
                     </div>
                 `;
+            }
+
+            // Initialize tile streaming
+            initializeTileStreaming(params) {
+                const canvas = document.getElementById('renderCanvas');
+                const noImage = document.getElementById('noImage');
+                
+                // Initialize render canvas
+                this.renderCanvas = new RenderCanvas(canvas, 64);
+                this.renderCanvas.initCanvas(parseInt(params.width), parseInt(params.height));
+                
+                canvas.style.display = 'block';
+                noImage.style.display = 'none';
+                
+                // Add click handler for canvas
+                canvas.onclick = (event) => this.handleCanvasClick(event);
+            }
+
+            // Handle tile updates in streaming mode
+            updateTile(data) {
+                if (this.renderCanvas) {
+                    this.renderCanvas.updateTile(data.tileX, data.tileY, `data:image/png;base64,${data.imageData}`);
+                }
+            }
+
+            // Handle pass completion in streaming mode
+            updatePassComplete(data) {
+                // Update progress bar
+                const progress = (data.passNumber / data.totalPasses) * 100;
+                document.getElementById('progressFill').style.width = `${progress}%`;
+                
+                // Update stats
+                document.getElementById('currentPass').textContent = data.passNumber;
+                document.getElementById('totalPasses').textContent = data.totalPasses;
+                document.getElementById('elapsed').textContent = `${(data.elapsedMs / 1000).toFixed(1)}s`;
+                
+                // Update status
+                this.setStatus('rendering', `Pass ${data.passNumber}/${data.totalPasses} completed`);
+            }
+
+            // Handle canvas clicks for pixel inspection
+            handleCanvasClick(event) {
+                if (!this.renderCanvas) return;
+                
+                this.renderCanvas.handleClick(event, (x, y) => {
+                    this.handleImageClick({
+                        target: event.target,
+                        clientX: event.clientX,
+                        clientY: event.clientY
+                    });
+                });
             }
 
             displayInspectError(errorMessage) {

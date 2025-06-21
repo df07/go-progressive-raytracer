@@ -57,7 +57,7 @@ func NewProgressiveRaytracer(scene core.Scene, width, height int, config Progres
 	}
 
 	// Create worker pool
-	workerPool := NewWorkerPool(scene, width, height, config.NumWorkers)
+	workerPool := NewWorkerPool(scene, width, height, config.TileSize, config.NumWorkers)
 
 	return &ProgressiveRaytracer{
 		scene:       scene,
@@ -101,7 +101,7 @@ func (pr *ProgressiveRaytracer) getSamplesForPass(passNumber int) int {
 }
 
 // RenderPass renders a single progressive pass using parallel processing
-func (pr *ProgressiveRaytracer) RenderPass(passNumber int) (*image.RGBA, RenderStats, error) {
+func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(TileCompletionResult)) (*image.RGBA, RenderStats, error) {
 	pr.currentPass = passNumber
 
 	// Calculate target samples for this pass
@@ -120,6 +120,8 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int) (*image.RGBA, RenderS
 		pr.workerPool.Start()
 	}
 
+	// No need to clear tile callbacks since we handle them internally now
+
 	// Submit all tiles as tasks
 	taskID := 0
 	for _, tile := range pr.tiles {
@@ -134,7 +136,7 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int) (*image.RGBA, RenderS
 		taskID++
 	}
 
-	// Wait for all tiles to complete
+	// Wait for all tiles to complete and dispatch tile callbacks in thread-safe manner
 	for i := 0; i < len(pr.tiles); i++ {
 		result, ok := pr.workerPool.GetResult()
 		if !ok {
@@ -145,13 +147,61 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int) (*image.RGBA, RenderS
 		}
 
 		// Increment completed passes for the corresponding tile
-		pr.tiles[result.TaskID].PassesCompleted++
+		tile := pr.tiles[result.TaskID]
+		tile.PassesCompleted++
+
+		// Dispatch tile completion callback if provided (thread-safe, single-threaded dispatch)
+		if tileCallback != nil {
+			// Extract tile image from the shared pixel stats
+			tileImage := pr.extractTileImage(tile)
+			tileX := tile.Bounds.Min.X / pr.config.TileSize
+			tileY := tile.Bounds.Min.Y / pr.config.TileSize
+
+			tileCallback(TileCompletionResult{
+				TileX:      tileX,
+				TileY:      tileY,
+				TileImage:  tileImage,
+				PassNumber: passNumber,
+			})
+		}
 	}
 
 	// Assemble image and calculate final stats from actual pixel data
 	img, stats := pr.assembleCurrentImage(targetSamples)
 
 	return img, stats, nil
+}
+
+// extractTileImage extracts a tile image from the shared pixel stats array
+func (pr *ProgressiveRaytracer) extractTileImage(tile *Tile) *image.RGBA {
+	bounds := tile.Bounds
+	tileWidth := bounds.Dx()
+	tileHeight := bounds.Dy()
+
+	// Create RGBA image for this tile
+	tileImage := image.NewRGBA(image.Rect(0, 0, tileWidth, tileHeight))
+
+	// Copy pixels from shared stats array to tile image
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// Skip if coordinates are out of bounds
+			if y >= len(pr.pixelStats) || x >= len(pr.pixelStats[y]) {
+				continue
+			}
+
+			stats := &pr.pixelStats[y][x]
+			if stats.SampleCount > 0 {
+				// Get averaged color using existing method
+				colorVec := stats.GetColor()
+				pixelColor := pr.raytracer.vec3ToColor(colorVec)
+
+				// Set pixel in tile image (relative coordinates)
+				tileImage.SetRGBA(x-bounds.Min.X, y-bounds.Min.Y, pixelColor)
+			}
+		}
+	}
+
+	return tileImage
 }
 
 // PassResult contains the result of a single pass
@@ -162,59 +212,104 @@ type PassResult struct {
 	IsLast     bool
 }
 
-// PassCallback is called after each pass completes
-type PassCallback func(result PassResult) error
+// TileCompletionResult contains information about a completed tile for callbacks
+type TileCompletionResult struct {
+	TileX      int // Tile coordinates (not pixel coordinates)
+	TileY      int
+	TileImage  *image.RGBA // Image data for just this tile
+	PassNumber int         // Which pass this tile was rendered in
+}
 
-// RenderProgressive renders multiple progressive passes, calling the callback after each pass
-func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, callback PassCallback) error {
-	fmt.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
+// RenderOptions configures progressive rendering behavior
+type RenderOptions struct {
+	TileUpdates bool // Whether to generate tile completion events
+}
 
-	// Ensure worker pool is cleaned up when we're done
-	defer pr.workerPool.Stop()
+// RenderProgressive renders with channel-based communication (idiomatic Go)
+// Returns channels for events. The caller should read from these channels in separate goroutines.
+// If options.EnableTileUpdates is false, the tile channel will be closed immediately and no tile events will be generated.
+func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, options RenderOptions) (<-chan PassResult, <-chan TileCompletionResult, <-chan error) {
+	passChan := make(chan PassResult, 1)
+	tileChan := make(chan TileCompletionResult, 100) // Buffer for tiles
+	errChan := make(chan error, 1)
 
-	for pass := 1; pass <= pr.config.MaxPasses; pass++ {
-		// Check if client disconnected before starting this pass
-		select {
-		case <-ctx.Done():
-			fmt.Printf("Rendering cancelled before pass %d\n", pass)
-			return ctx.Err()
-		default:
-		}
-
-		startTime := time.Now()
-
-		img, stats, err := pr.RenderPass(pass)
-		if err != nil {
-			return err
-		}
-
-		passTime := time.Since(startTime)
-		actualSamples := int(stats.AverageSamples)
-
-		fmt.Printf("Pass %d completed in %v (actual: %d samples/pixel)\n",
-			pass, passTime, actualSamples)
-
-		// Call the callback with this pass result
-		isLast := pass == pr.config.MaxPasses || actualSamples >= pr.config.MaxSamplesPerPixel
-		result := PassResult{
-			PassNumber: pass,
-			Image:      img,
-			Stats:      stats,
-			IsLast:     isLast,
-		}
-
-		if err := callback(result); err != nil {
-			return fmt.Errorf("callback error: %v", err)
-		}
-
-		// Check if we've reached maximum samples
-		if actualSamples >= pr.config.MaxSamplesPerPixel {
-			fmt.Printf("Reached maximum samples per pixel (%d), stopping.\n", pr.config.MaxSamplesPerPixel)
-			break
-		}
+	// If tile updates are disabled, close the channel immediately
+	if !options.TileUpdates {
+		close(tileChan)
 	}
 
-	return nil
+	go func() {
+		defer close(passChan)
+		if options.TileUpdates {
+			defer close(tileChan)
+		}
+		defer close(errChan)
+		defer pr.workerPool.Stop()
+
+		fmt.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
+
+		for pass := 1; pass <= pr.config.MaxPasses; pass++ {
+			// Check if client disconnected before starting this pass
+			select {
+			case <-ctx.Done():
+				fmt.Printf("Rendering cancelled before pass %d\n", pass)
+				errChan <- ctx.Err()
+				return
+			default:
+			}
+
+			startTime := time.Now()
+
+			// Create tile callback only if tile updates are enabled
+			var tileCallback func(TileCompletionResult)
+			if options.TileUpdates {
+				tileCallback = func(result TileCompletionResult) {
+					select {
+					case tileChan <- result:
+					case <-ctx.Done():
+						return
+					default:
+						// Channel full, could log this
+					}
+				}
+			}
+
+			img, stats, err := pr.RenderPass(pass, tileCallback)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			passTime := time.Since(startTime)
+			actualSamples := int(stats.AverageSamples)
+
+			fmt.Printf("Pass %d completed in %v (actual: %d samples/pixel)\n",
+				pass, passTime, actualSamples)
+
+			// Send pass completion event
+			isLast := pass == pr.config.MaxPasses || actualSamples >= pr.config.MaxSamplesPerPixel
+			result := PassResult{
+				PassNumber: pass,
+				Image:      img,
+				Stats:      stats,
+				IsLast:     isLast,
+			}
+
+			select {
+			case passChan <- result:
+			case <-ctx.Done():
+				return
+			}
+
+			// Check if we've reached maximum samples
+			if actualSamples >= pr.config.MaxSamplesPerPixel {
+				fmt.Printf("Reached maximum samples per pixel (%d), stopping.\n", pr.config.MaxSamplesPerPixel)
+				break
+			}
+		}
+	}()
+
+	return passChan, tileChan, errChan
 }
 
 // assembleCurrentImage creates an image from the current state of the shared pixel stats
