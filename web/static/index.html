@@ -481,6 +481,11 @@
                     this.eventSource = null;
                 }
                 
+                // Force stop all canvas animations immediately
+                if (this.renderCanvas) {
+                    this.renderCanvas.stopAllAnimations();
+                }
+                
                 this.isRendering = false;
                 this.updateButtons();
                 
@@ -602,6 +607,14 @@
                 const status = document.getElementById('status');
                 status.className = `status ${type}`;
                 status.textContent = message;
+                
+                // Control progress bar animation based on status
+                const progressFill = document.getElementById('progressFill');
+                if (type === 'rendering') {
+                    progressFill.classList.add('animating');
+                } else {
+                    progressFill.classList.remove('animating');
+                }
             }
 
             updateButtons() {

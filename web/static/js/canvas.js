@@ -4,8 +4,6 @@ class RenderCanvas {
         this.ctx = canvas.getContext('2d');
         this.tileSize = tileSize;
         this.tileGrid = new Map(); // TileID -> ImageData
-        this.renderQueue = [];
-        this.renderScheduled = false;
         
         // Track canvas dimensions for proper scaling
         this.imageWidth = 0;
@@ -14,25 +12,39 @@ class RenderCanvas {
         // Error tracking for monitoring
         this.errorCount = 0;
         this.totalTileUpdates = 0;
+        
+        // Animation system for fade-in effects
+        this.animatingTiles = new Map(); // TileID -> {image, x, y, startTime, opacity, renderID}
+        this.animationDuration = 3000; // 3000ms fade-in
+        this.animationRunning = false;
+        this.currentRenderID = 0; // Used to invalidate old animations
     }
     
     // Initialize canvas for a new render
     initCanvas(width, height) {
         try {
+            // Increment render ID to invalidate any ongoing animations FIRST
+            this.currentRenderID++;
+            
+            // Stop any running animations immediately
+            this.animationRunning = false;
+            
+            // Clear previous tiles and animation state immediately
+            this.tileGrid.clear();
+            this.animatingTiles.clear();
+            
             this.imageWidth = width;
             this.imageHeight = height;
             
-            // Set canvas size
+            // Set canvas size (this also clears the canvas)
             this.canvas.width = width;
             this.canvas.height = height;
             
-            // Clear previous tiles and reset counters
-            this.tileGrid.clear();
-            this.renderQueue = [];
+            // Reset counters
             this.errorCount = 0;
             this.totalTileUpdates = 0;
             
-            // Clear canvas
+            // Explicitly clear canvas with background color
             this.ctx.fillStyle = '#1a1a1a'; // Dark background
             this.ctx.fillRect(0, 0, width, height);
         } catch (error) {
@@ -56,8 +68,8 @@ class RenderCanvas {
                     const tileID = `${tileX}_${tileY}`;
                     this.tileGrid.set(tileID, img);
                     
-                    // Queue for rendering (batched for performance)
-                    this.queueTileRender(pixelX, pixelY, img);
+                    // Start fade-in animation for this tile
+                    this.startTileAnimation(tileID, img, pixelX, pixelY);
                 } catch (error) {
                     this.handleTileError(tileX, tileY, 'Error processing tile image', error);
                 }
@@ -73,40 +85,87 @@ class RenderCanvas {
         }
     }
     
-    // Queue tile for batched rendering
-    queueTileRender(x, y, image) {
-        this.renderQueue.push({x, y, image});
+    // Start fade-in animation for a tile
+    startTileAnimation(tileID, image, x, y) {
+        const now = performance.now();
+        const renderID = this.currentRenderID;
         
-        if (!this.renderScheduled) {
-            this.renderScheduled = true;
-            requestAnimationFrame(() => this.processRenderQueue());
+        // If this tile is already animating, remove the old animation
+        if (this.animatingTiles.has(tileID)) {
+            this.animatingTiles.delete(tileID);
+        }
+        
+        this.animatingTiles.set(tileID, {
+            image: image,
+            x: x,
+            y: y,
+            startTime: now,
+            opacity: 0,
+            renderID: renderID // Tag with current render ID
+        });
+        
+        // Start animation loop if not already running
+        if (!this.animationRunning) {
+            this.animationRunning = true;
+            this.animationLoop(renderID);
         }
     }
     
-    // Process all queued tile renders in single frame
-    processRenderQueue() {
-        try {
-            const ctx = this.ctx;
-            
-            // Process all queued tile updates in single frame
-            for (const {x, y, image} of this.renderQueue) {
-                try {
-                    ctx.drawImage(image, x, y);
-                } catch (error) {
-                    console.warn('Error drawing tile at (' + x + ', ' + y + '):', error);
-                    this.errorCount++;
-                }
+    // Animation loop for fade-in effects
+    animationLoop(renderID) {
+        // Exit immediately if this animation loop is from an old render
+        if (renderID !== this.currentRenderID) {
+            return;
+        }
+        
+        const now = performance.now();
+        const ctx = this.ctx;
+        
+        // Draw animating tiles with their current opacity
+        let hasActiveAnimations = false;
+        
+        for (const [tileID, tileData] of this.animatingTiles) {
+            // Skip tiles from old renders
+            if (tileData.renderID !== this.currentRenderID) {
+                this.animatingTiles.delete(tileID);
+                continue;
             }
             
-            this.renderQueue.length = 0;
-            this.renderScheduled = false;
-        } catch (error) {
-            console.error('Error processing render queue:', error);
-            this.errorCount++;
-            this.renderQueue.length = 0;
-            this.renderScheduled = false;
+            const elapsed = now - tileData.startTime;
+            const progress = Math.min(elapsed / this.animationDuration, 1.0);
+            
+            // Smooth easing function (ease-out)
+            const easedProgress = 1 - Math.pow(1 - progress, 3);
+            
+            // Only redraw if opacity has changed significantly (avoid excessive redraws)
+            const newOpacity = easedProgress;
+            if (Math.abs(newOpacity - tileData.opacity) > 0.02 || progress >= 1.0) {
+                tileData.opacity = newOpacity;
+                
+                // Draw the tile with current opacity
+                ctx.save();
+                ctx.globalAlpha = tileData.opacity;
+                ctx.drawImage(tileData.image, tileData.x, tileData.y);
+                ctx.restore();
+            }
+            
+            // Remove completed animations
+            if (progress >= 1.0) {
+                this.animatingTiles.delete(tileID);
+            } else {
+                hasActiveAnimations = true;
+            }
+        }
+        
+        // Continue animation loop if there are active animations and this is still the current render
+        if (hasActiveAnimations && renderID === this.currentRenderID) {
+            requestAnimationFrame(() => this.animationLoop(renderID));
+        } else {
+            this.animationRunning = false;
         }
     }
+    
+
     
     // Get canvas as data URL for saving/display
     getDataURL() {
@@ -129,9 +188,16 @@ class RenderCanvas {
     
     // Clear the canvas
     clear() {
+        // Increment render ID to invalidate any ongoing animations
+        this.currentRenderID++;
+        
+        // Stop any running animations immediately
+        this.animationRunning = false;
+        
         this.ctx.fillStyle = '#1a1a1a';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         this.tileGrid.clear();
+        this.animatingTiles.clear();
     }
     
     // Handle tile errors with consistent logging and metrics
@@ -161,7 +227,29 @@ class RenderCanvas {
         return {
             totalTileUpdates: this.totalTileUpdates,
             errorCount: this.errorCount,
-            successRate: parseFloat(successRate)
+            successRate: parseFloat(successRate),
+            activeAnimations: this.animatingTiles.size
         };
+    }
+    
+    // Set animation duration (in milliseconds)
+    setAnimationDuration(duration) {
+        this.animationDuration = Math.max(50, Math.min(5000, duration)); // Clamp between 50ms and 5000ms
+    }
+    
+    // Get current animation status
+    getAnimationStatus() {
+        return {
+            isAnimating: this.animationRunning,
+            activeAnimations: this.animatingTiles.size,
+            animationDuration: this.animationDuration
+        };
+    }
+    
+    // Force stop all animations immediately (call when stopping render)
+    stopAllAnimations() {
+        this.currentRenderID++;
+        this.animationRunning = false;
+        this.animatingTiles.clear();
     }
 }
