@@ -202,6 +202,9 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 	case "dragon":
 		loadMesh := !configOnly
 		return scene.NewDragonScene(loadMesh, req.DragonMaterialFinish, logger, cameraOverride)
+	case "caustic-glass":
+		loadMesh := !configOnly
+		return scene.NewCausticGlassScene(loadMesh, logger, cameraOverride)
 	default:
 		return nil
 	}
@@ -247,6 +250,12 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 	if sceneName == "cornell-box" {
 		webMaxSamples = 800
 		webMaxPasses = 40
+	}
+	
+	// Override defaults for Caustic Glass scene for better quality
+	if sceneName == "caustic-glass" {
+		webMaxSamples = 1000  // Higher samples for caustics
+		webMaxPasses = 15     // More passes for progressive feedback
 	}
 
 	response := map[string]interface{}{

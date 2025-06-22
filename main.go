@@ -71,7 +71,7 @@ func main() {
 // parseFlags parses command line flags and returns configuration
 func parseFlags() Config {
 	config := Config{}
-	flag.StringVar(&config.SceneType, "scene", "default", "Scene type: 'default', 'cornell', or 'spheregrid'")
+	flag.StringVar(&config.SceneType, "scene", "default", "Scene type: 'default', 'cornell', 'spheregrid', 'trianglemesh', 'dragon', or 'caustic-glass'")
 	flag.StringVar(&config.RenderMode, "mode", "normal", "Render mode: 'normal' or 'progressive'")
 	flag.IntVar(&config.MaxPasses, "max-passes", 5, "Maximum number of progressive passes")
 	flag.IntVar(&config.MaxSamples, "max-samples", 50, "Maximum samples per pixel")
@@ -97,6 +97,7 @@ func showHelp() {
 	fmt.Println("  spheregrid   - 10x10 grid of rainbow-colored metallic spheres (perfect for BVH testing)")
 	fmt.Println("  trianglemesh - Scene showcasing triangle mesh geometry (boxes, pyramids, icosahedrons)")
 	fmt.Println("  dragon       - Dragon PLY mesh from PBRT book")
+	fmt.Println("  caustic-glass - Glass caustic geometry scene")
 	fmt.Println()
 	fmt.Println("Available modes:")
 	fmt.Println("  normal      - Standard single-threaded rendering")
@@ -136,6 +137,9 @@ func createScene(sceneType string) SceneInfo {
 	case "dragon":
 		fmt.Println("Using dragon PLY mesh scene...")
 		sceneObj = scene.NewDragonScene(true, "gold", renderer.NewDefaultLogger()) // Default to gold material
+	case "caustic-glass":
+		fmt.Println("Using caustic glass scene...")
+		sceneObj = scene.NewCausticGlassScene(true, renderer.NewDefaultLogger())
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()
@@ -158,7 +162,7 @@ func createScene(sceneType string) SceneInfo {
 // createOutputDir creates the output directory for the scene type
 func createOutputDir(sceneType string) string {
 	// Normalize scene type
-	if sceneType != "cornell" && sceneType != "cornell-boxes" && sceneType != "default" && sceneType != "spheregrid" && sceneType != "trianglemesh" && sceneType != "dragon" {
+	if sceneType != "cornell" && sceneType != "cornell-boxes" && sceneType != "default" && sceneType != "spheregrid" && sceneType != "trianglemesh" && sceneType != "dragon" && sceneType != "caustic-glass" {
 		sceneType = "default"
 	}
 

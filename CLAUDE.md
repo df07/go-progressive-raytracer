@@ -139,3 +139,13 @@ Comprehensive test coverage includes:
 **Progressive Quality**: Linear sample progression (1→2→4→8...) with adaptive final pass using perceptual luminance variance for quality assessment.
 
 **Resource Management**: Proper lifecycle management with graceful shutdown, comprehensive error handling, and memory cleanup throughout the rendering pipeline.
+
+## Critical Development Notes
+
+⚠️ **TWO main.go files**: `/main.go` (CLI) vs `/web/main.go` (web server) - check directory before building
+
+**Web dev**: Use `cd web && air > web-server.log 2>&1 &` for auto-reload
+
+**PLY gotcha**: TriangleMesh needs per-triangle normals, PLY files have per-vertex normals - skip normals and let mesh auto-calculate
+
+**New scenes**: Update `pkg/scene/`, `main.go`, `web/server/server.go`, `web/static/index.html`
