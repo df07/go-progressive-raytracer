@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -103,68 +104,101 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // handleRender handles progressive rendering with real-time tile streaming via SSE
 func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	// Set SSE headers
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	s.setSSEHeaders(w)
 
-	// Parse request parameters (reuse existing parser)
+	// Parse and validate request
 	req, err := s.parseRenderRequest(r)
 	if err != nil {
 		s.sendSSEError(w, fmt.Sprintf("Invalid request: %v", err))
 		return
 	}
 
-	// Create console channel and web logger for this render
+	ctx := r.Context()
+
+	// Setup console logging and streaming
+	consoleChan, webLogger := s.setupConsoleLogging(r)
+	go s.streamConsoleMessages(w, ctx, consoleChan)
+
+	pipeline, err := s.setupRenderingPipeline(req, webLogger)
+	if err != nil {
+		s.sendSSEError(w, err.Error())
+		return
+	}
+
+	// Start rendering and stream events
+	startTime := time.Now()
+	renderOptions := renderer.RenderOptions{TileUpdates: true}
+	passChan, tileChan, errChan := pipeline.Raytracer.RenderProgressive(ctx, renderOptions)
+
+	// Handle rendering events and stream to client
+	s.handleRenderingEvents(w, ctx, passChan, tileChan, errChan, pipeline.Scene, req, startTime)
+}
+
+// setSSEHeaders sets the required headers for Server-Sent Events
+func (s *Server) setSSEHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+}
+
+// setupConsoleLogging creates console channel and web logger for a render
+func (s *Server) setupConsoleLogging(r *http.Request) (chan ConsoleMessage, core.Logger) {
 	consoleChan := make(chan ConsoleMessage, 50)
 	renderID := fmt.Sprintf("render-%d", time.Now().UnixNano())
 	webLogger := NewWebLogger(renderID, consoleChan)
+	return consoleChan, webLogger
+}
 
-	// Get context early for goroutine
-	ctx := r.Context()
-
-	// Start listening for console messages immediately in a separate goroutine
-	go func() {
-		for {
-			select {
-			case consoleMsg, ok := <-consoleChan:
-				if !ok {
-					// Channel closed
-					return
-				}
-
-				// Send console message as SSE event
-				data, err := json.Marshal(consoleMsg)
-				if err != nil {
-					log.Printf("Error marshaling console message: %v", err)
-					continue
-				}
-
-				// Check if client is still connected before writing
-				select {
-				case <-ctx.Done():
-					// Client disconnected, stop sending messages
-					return
-				default:
-				}
-
-				fmt.Fprintf(w, "event: console\ndata: %s\n\n", data)
-				if flusher, ok := w.(http.Flusher); ok {
-					flusher.Flush()
-				}
-
-			case <-ctx.Done():
-				// Client disconnected
+// streamConsoleMessages handles the console message streaming goroutine
+func (s *Server) streamConsoleMessages(w http.ResponseWriter, ctx context.Context, consoleChan chan ConsoleMessage) {
+	for {
+		select {
+		case consoleMsg, ok := <-consoleChan:
+			if !ok {
+				// Channel closed
 				return
 			}
-		}
-	}()
 
+			// Send console message as SSE event
+			data, err := json.Marshal(consoleMsg)
+			if err != nil {
+				log.Printf("Error marshaling console message: %v", err)
+				continue
+			}
+
+			// Check if client is still connected before writing
+			select {
+			case <-ctx.Done():
+				// Client disconnected, stop sending messages
+				return
+			default:
+			}
+
+			fmt.Fprintf(w, "event: console\ndata: %s\n\n", data)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+
+		case <-ctx.Done():
+			// Client disconnected
+			return
+		}
+	}
+}
+
+// RenderingPipeline contains the configured scene and raytracer
+type RenderingPipeline struct {
+	Scene     *scene.Scene
+	Raytracer *renderer.ProgressiveRaytracer
+}
+
+// setupRenderingPipeline creates and configures the scene and raytracer
+func (s *Server) setupRenderingPipeline(req *RenderRequest, logger core.Logger) (*RenderingPipeline, error) {
 	// Create scene (logging will now go through WebLogger)
-	sceneObj := s.createScene(req, false, webLogger)
+	sceneObj := s.createScene(req, false, logger)
 	if sceneObj == nil {
-		s.sendSSEError(w, "Unknown scene: "+req.Scene)
-		return
+		return nil, fmt.Errorf("Unknown scene: %s", req.Scene)
 	}
 
 	// Override sampling settings
@@ -182,16 +216,18 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		NumWorkers:         0, // Auto-detect
 	}
 
-	raytracer := renderer.NewProgressiveRaytracer(sceneObj, req.Width, req.Height, config, webLogger)
+	raytracer := renderer.NewProgressiveRaytracer(sceneObj, req.Width, req.Height, config, logger)
+	return &RenderingPipeline{
+		Scene:     sceneObj,
+		Raytracer: raytracer,
+	}, nil
+}
 
-	// Start progressive rendering with channels (idiomatic Go approach)
-	startTime := time.Now()
+// handleRenderingEvents processes the main rendering event loop
+func (s *Server) handleRenderingEvents(w http.ResponseWriter, ctx context.Context,
+	passChan <-chan renderer.PassResult, tileChan <-chan renderer.TileCompletionResult, errChan <-chan error,
+	scene *scene.Scene, req *RenderRequest, startTime time.Time) {
 
-	// Start rendering and get event channels (enable tile updates for web interface)
-	renderOptions := renderer.RenderOptions{TileUpdates: true}
-	passChan, tileChan, errChan := raytracer.RenderProgressive(ctx, renderOptions)
-
-	// Listen to events from channels
 renderLoop:
 	for {
 		select {
@@ -200,96 +236,14 @@ renderLoop:
 				passChan = nil // Channel closed
 				continue
 			}
-
-			// Send pass completion notification with full render statistics
-			elapsed := time.Since(startTime)
-			primitiveCount := sceneObj.GetPrimitiveCount()
-
-			passUpdate := struct {
-				Event          string  `json:"event"`
-				PassNumber     int     `json:"passNumber"`
-				TotalPasses    int     `json:"totalPasses"`
-				ElapsedMs      int64   `json:"elapsedMs"`
-				TotalPixels    int     `json:"totalPixels"`
-				TotalSamples   int     `json:"totalSamples"`
-				AverageSamples float64 `json:"averageSamples"`
-				MaxSamples     int     `json:"maxSamples"`
-				MinSamples     int     `json:"minSamples"`
-				MaxSamplesUsed int     `json:"maxSamplesUsed"`
-				PrimitiveCount int     `json:"primitiveCount"`
-			}{
-				Event:          "passComplete",
-				PassNumber:     passResult.PassNumber,
-				TotalPasses:    req.MaxPasses,
-				ElapsedMs:      elapsed.Milliseconds(),
-				TotalPixels:    passResult.Stats.TotalPixels,
-				TotalSamples:   passResult.Stats.TotalSamples,
-				AverageSamples: passResult.Stats.AverageSamples,
-				MaxSamples:     passResult.Stats.MaxSamples,
-				MinSamples:     passResult.Stats.MinSamples,
-				MaxSamplesUsed: passResult.Stats.MaxSamplesUsed,
-				PrimitiveCount: primitiveCount,
-			}
-
-			data, err := json.Marshal(passUpdate)
-			if err != nil {
-				log.Printf("Error marshaling pass update: %v", err)
-				continue
-			}
-
-			// Check if client is still connected before writing
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			fmt.Fprintf(w, "event: passComplete\ndata: %s\n\n", data)
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
-			}
+			s.handlePassComplete(w, ctx, passResult, req, scene, startTime)
 
 		case tileResult, ok := <-tileChan:
 			if !ok {
 				tileChan = nil // Channel closed
 				continue
 			}
-
-			// Convert tile image to base64 PNG
-			tileData, err := s.imageToBase64PNG(tileResult.TileImage)
-			if err != nil {
-				log.Printf("Error encoding tile image (%d, %d): %v", tileResult.TileX, tileResult.TileY, err)
-				continue
-			}
-
-			// Create and send tile update
-			update := TileUpdate{
-				TileX:       tileResult.TileX,
-				TileY:       tileResult.TileY,
-				ImageData:   tileData,
-				PassNumber:  tileResult.PassNumber,
-				TileNumber:  tileResult.TileNumber,
-				TotalTiles:  tileResult.TotalTiles,
-				TotalPasses: tileResult.TotalPasses,
-			}
-
-			data, err := json.Marshal(update)
-			if err != nil {
-				log.Printf("Error marshaling tile update: %v", err)
-				continue
-			}
-
-			// Check if client is still connected before writing
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			fmt.Fprintf(w, "event: tile\ndata: %s\n\n", data)
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
-			}
+			s.handleTileUpdate(w, ctx, tileResult)
 
 		case err := <-errChan:
 			if err != nil {
@@ -312,6 +266,96 @@ renderLoop:
 
 	// Send completion event
 	s.sendSSEEvent(w, "complete", "Rendering completed")
+}
+
+// handlePassComplete processes and sends pass completion events
+func (s *Server) handlePassComplete(w http.ResponseWriter, ctx context.Context, passResult renderer.PassResult, req *RenderRequest, scene *scene.Scene, startTime time.Time) {
+	// Check if client is still connected
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
+	// Create pass completion data
+	elapsed := time.Since(startTime)
+	primitiveCount := scene.GetPrimitiveCount()
+
+	passUpdate := struct {
+		Event          string  `json:"event"`
+		PassNumber     int     `json:"passNumber"`
+		TotalPasses    int     `json:"totalPasses"`
+		ElapsedMs      int64   `json:"elapsedMs"`
+		TotalPixels    int     `json:"totalPixels"`
+		TotalSamples   int     `json:"totalSamples"`
+		AverageSamples float64 `json:"averageSamples"`
+		MaxSamples     int     `json:"maxSamples"`
+		MinSamples     int     `json:"minSamples"`
+		MaxSamplesUsed int     `json:"maxSamplesUsed"`
+		PrimitiveCount int     `json:"primitiveCount"`
+	}{
+		Event:          "passComplete",
+		PassNumber:     passResult.PassNumber,
+		TotalPasses:    req.MaxPasses,
+		ElapsedMs:      elapsed.Milliseconds(),
+		TotalPixels:    passResult.Stats.TotalPixels,
+		TotalSamples:   passResult.Stats.TotalSamples,
+		AverageSamples: passResult.Stats.AverageSamples,
+		MaxSamples:     passResult.Stats.MaxSamples,
+		MinSamples:     passResult.Stats.MinSamples,
+		MaxSamplesUsed: passResult.Stats.MaxSamplesUsed,
+		PrimitiveCount: primitiveCount,
+	}
+
+	data, err := json.Marshal(passUpdate)
+	if err != nil {
+		log.Printf("Error marshaling pass update: %v", err)
+		return
+	}
+
+	fmt.Fprintf(w, "event: passComplete\ndata: %s\n\n", data)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// handleTileUpdate processes and sends tile update events
+func (s *Server) handleTileUpdate(w http.ResponseWriter, ctx context.Context, tileResult renderer.TileCompletionResult) {
+	// Check if client is still connected
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
+	// Convert tile image to base64 PNG
+	tileData, err := s.imageToBase64PNG(tileResult.TileImage)
+	if err != nil {
+		log.Printf("Error encoding tile image (%d, %d): %v", tileResult.TileX, tileResult.TileY, err)
+		return
+	}
+
+	// Create and send tile update
+	update := TileUpdate{
+		TileX:       tileResult.TileX,
+		TileY:       tileResult.TileY,
+		ImageData:   tileData,
+		PassNumber:  tileResult.PassNumber,
+		TileNumber:  tileResult.TileNumber,
+		TotalTiles:  tileResult.TotalTiles,
+		TotalPasses: tileResult.TotalPasses,
+	}
+
+	data, err := json.Marshal(update)
+	if err != nil {
+		log.Printf("Error marshaling tile update: %v", err)
+		return
+	}
+
+	fmt.Fprintf(w, "event: tile\ndata: %s\n\n", data)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // parseRenderRequest parses request parameters
