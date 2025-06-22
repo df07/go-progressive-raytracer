@@ -280,6 +280,12 @@ class ProgressiveRaytracer {
           this.updatePassComplete(data);
       });
 
+      // Console message handler
+      this.eventSource.addEventListener('console', (event) => {
+          const data = JSON.parse(event.data);
+          this.handleConsoleMessage(data);
+      });
+
       this.eventSource.addEventListener('complete', (event) => {
           console.log('Rendering completed');
           this.setStatus('complete', 'Rendering completed!');
@@ -740,6 +746,28 @@ class ProgressiveRaytracer {
               <div>${errorMessage}</div>
           </div>
       `;
+  }
+
+  // Handle console messages from the server
+  handleConsoleMessage(data) {
+      // Format timestamp for display
+      const timestamp = new Date(data.timestamp).toLocaleTimeString();
+      
+      // Log to browser console with timestamp and level
+      const message = `[${timestamp}] ${data.message.trim()}`;
+      
+      switch (data.level) {
+          case 'error':
+              console.error(message);
+              break;
+          case 'warning':
+              console.warn(message);
+              break;
+          case 'info':
+          default:
+              console.log(message);
+              break;
+      }
   }
 }
 

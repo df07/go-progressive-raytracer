@@ -50,6 +50,11 @@ type Scene interface {
 	GetSamplingConfig() SamplingConfig
 }
 
+// Logger interface for raytracer logging
+type Logger interface {
+	Printf(format string, args ...interface{})
+}
+
 // SamplingConfig contains rendering configuration
 type SamplingConfig struct {
 	SamplesPerPixel           int     // Number of rays per pixel

@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -114,8 +115,53 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create scene
-	sceneObj := s.createScene(req, false)
+	// Create console channel and web logger for this render
+	consoleChan := make(chan ConsoleMessage, 50)
+	renderID := fmt.Sprintf("render-%d", time.Now().UnixNano())
+	webLogger := NewWebLogger(renderID, consoleChan)
+
+	// Get context early for goroutine
+	ctx := r.Context()
+
+	// Start listening for console messages immediately in a separate goroutine
+	go func() {
+		for {
+			select {
+			case consoleMsg, ok := <-consoleChan:
+				if !ok {
+					// Channel closed
+					return
+				}
+
+				// Send console message as SSE event
+				data, err := json.Marshal(consoleMsg)
+				if err != nil {
+					log.Printf("Error marshaling console message: %v", err)
+					continue
+				}
+
+				// Check if client is still connected before writing
+				select {
+				case <-ctx.Done():
+					// Client disconnected, stop sending messages
+					return
+				default:
+				}
+
+				fmt.Fprintf(w, "event: console\ndata: %s\n\n", data)
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
+				}
+
+			case <-ctx.Done():
+				// Client disconnected
+				return
+			}
+		}
+	}()
+
+	// Create scene (logging will now go through WebLogger)
+	sceneObj := s.createScene(req, false, webLogger)
 	if sceneObj == nil {
 		s.sendSSEError(w, "Unknown scene: "+req.Scene)
 		return
@@ -136,11 +182,10 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		NumWorkers:         0, // Auto-detect
 	}
 
-	raytracer := renderer.NewProgressiveRaytracer(sceneObj, req.Width, req.Height, config)
+	raytracer := renderer.NewProgressiveRaytracer(sceneObj, req.Width, req.Height, config, webLogger)
 
 	// Start progressive rendering with channels (idiomatic Go approach)
 	startTime := time.Now()
-	ctx := r.Context()
 
 	// Start rendering and get event channels (enable tile updates for web interface)
 	renderOptions := renderer.RenderOptions{TileUpdates: true}
@@ -192,6 +237,13 @@ renderLoop:
 				continue
 			}
 
+			// Check if client is still connected before writing
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			fmt.Fprintf(w, "event: passComplete\ndata: %s\n\n", data)
 			if flusher, ok := w.(http.Flusher); ok {
 				flusher.Flush()
@@ -225,6 +277,13 @@ renderLoop:
 			if err != nil {
 				log.Printf("Error marshaling tile update: %v", err)
 				continue
+			}
+
+			// Check if client is still connected before writing
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
 
 			fmt.Fprintf(w, "event: tile\ndata: %s\n\n", data)
@@ -375,7 +434,11 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 }
 
 // createScene creates a scene based on the scene name and optionally updates camera for requested dimensions
-func (s *Server) createScene(req *RenderRequest, configOnly bool) *scene.Scene {
+func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Logger) *scene.Scene {
+	// Use default logger if none provided
+	if logger == nil {
+		logger = renderer.NewDefaultLogger()
+	}
 	// Create camera override config (empty if width/height are 0, which means use defaults)
 	var cameraOverride renderer.CameraConfig
 	if req.Width > 0 && req.Height > 0 {
@@ -407,7 +470,7 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool) *scene.Scene {
 		return scene.NewTriangleMeshScene(req.SphereComplexity, cameraOverride)
 	case "dragon":
 		loadMesh := !configOnly
-		return scene.NewDragonScene(loadMesh, req.DragonMaterialFinish, cameraOverride)
+		return scene.NewDragonScene(loadMesh, req.DragonMaterialFinish, logger, cameraOverride)
 	default:
 		return nil
 	}
@@ -455,7 +518,7 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 		CornellGeometry: "boxes", // Default
 		SphereGridSize:  20,      // Default
 	}
-	sceneObj := s.createScene(defaultReq, true)
+	sceneObj := s.createScene(defaultReq, true, nil)
 	if sceneObj == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + sceneName})

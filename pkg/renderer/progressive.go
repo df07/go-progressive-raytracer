@@ -10,6 +10,18 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
+// DefaultLogger implements core.Logger by writing to stdout
+type DefaultLogger struct{}
+
+func (dl *DefaultLogger) Printf(format string, args ...interface{}) {
+	fmt.Printf(format, args...)
+}
+
+// NewDefaultLogger creates a new default logger
+func NewDefaultLogger() core.Logger {
+	return &DefaultLogger{}
+}
+
 // ProgressiveConfig contains configuration for progressive rendering
 type ProgressiveConfig struct {
 	TileSize           int // Size of each tile (64x64 recommended)
@@ -40,10 +52,11 @@ type ProgressiveRaytracer struct {
 	pixelStats    [][]PixelStats // Shared pixel statistics array (global image coordinates)
 	raytracer     *Raytracer     // Base raytracer for actual rendering
 	workerPool    *WorkerPool    // Worker pool for parallel processing
+	logger        core.Logger    // Logger for rendering output
 }
 
 // NewProgressiveRaytracer creates a new progressive raytracer
-func NewProgressiveRaytracer(scene core.Scene, width, height int, config ProgressiveConfig) *ProgressiveRaytracer {
+func NewProgressiveRaytracer(scene core.Scene, width, height int, config ProgressiveConfig, logger core.Logger) *ProgressiveRaytracer {
 	// Create base raytracer
 	raytracer := NewRaytracer(scene, width, height)
 
@@ -69,6 +82,7 @@ func NewProgressiveRaytracer(scene core.Scene, width, height int, config Progres
 		pixelStats:  pixelStats,
 		raytracer:   raytracer,
 		workerPool:  workerPool,
+		logger:      logger,
 	}
 }
 
@@ -107,7 +121,7 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(Til
 	// Calculate target samples for this pass
 	targetSamples := pr.getSamplesForPass(passNumber)
 
-	fmt.Printf("Pass %d: Target %d samples per pixel (using %d workers)...\n",
+	pr.logger.Printf("Pass %d: Target %d samples per pixel (using %d workers)...\n",
 		passNumber, targetSamples, pr.workerPool.GetNumWorkers())
 
 	// Configure base raytracer for this pass (for shared pixel stats processing)
@@ -237,7 +251,7 @@ type RenderOptions struct {
 
 // RenderProgressive renders with channel-based communication (idiomatic Go)
 // Returns channels for events. The caller should read from these channels in separate goroutines.
-// If options.EnableTileUpdates is false, the tile channel will be closed immediately and no tile events will be generated.
+// If options.TileUpdates is false, the tile channel will be closed immediately and no tile events will be generated.
 func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, options RenderOptions) (<-chan PassResult, <-chan TileCompletionResult, <-chan error) {
 	passChan := make(chan PassResult, 1)
 	tileChan := make(chan TileCompletionResult, 100) // Buffer for tiles
@@ -256,13 +270,13 @@ func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, options R
 		defer close(errChan)
 		defer pr.workerPool.Stop()
 
-		fmt.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
+		pr.logger.Printf("Starting progressive rendering with %d passes...\n", pr.config.MaxPasses)
 
 		for pass := 1; pass <= pr.config.MaxPasses; pass++ {
 			// Check if client disconnected before starting this pass
 			select {
 			case <-ctx.Done():
-				fmt.Printf("Rendering cancelled before pass %d\n", pass)
+				pr.logger.Printf("Rendering cancelled before pass %d\n", pass)
 				errChan <- ctx.Err()
 				return
 			default:
@@ -293,7 +307,7 @@ func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, options R
 			passTime := time.Since(startTime)
 			actualSamples := int(stats.AverageSamples)
 
-			fmt.Printf("Pass %d completed in %v (actual: %d samples/pixel)\n",
+			pr.logger.Printf("Pass %d completed in %v (actual: %d samples/pixel)\n",
 				pass, passTime, actualSamples)
 
 			// Send pass completion event
@@ -313,7 +327,7 @@ func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, options R
 
 			// Check if we've reached maximum samples
 			if actualSamples >= pr.config.MaxSamplesPerPixel {
-				fmt.Printf("Reached maximum samples per pixel (%d), stopping.\n", pr.config.MaxSamplesPerPixel)
+				pr.logger.Printf("Reached maximum samples per pixel (%d), stopping.\n", pr.config.MaxSamplesPerPixel)
 				break
 			}
 		}

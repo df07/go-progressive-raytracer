@@ -185,7 +185,7 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const configOnly = true
-	sceneObj := s.createScene(inspectReq, configOnly)
+	sceneObj := s.createScene(inspectReq, configOnly, nil)
 	if sceneObj == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unknown scene: " + inspectReq.Scene})

@@ -1,7 +1,6 @@
 package scene
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 // NewDragonScene creates a scene with the dragon PLY mesh
 // If loadMesh is false, creates the scene structure without loading the PLY file
 // This is useful for getting scene configuration without the expensive mesh loading
-func NewDragonScene(loadMesh bool, materialFinish string, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, cameraOverrides ...renderer.CameraConfig) *Scene {
 	// Setup camera for dragon viewing
 	cameraConfig := setupDragonCamera(cameraOverrides...)
 	camera := renderer.NewCamera(cameraConfig)
@@ -38,10 +37,10 @@ func NewDragonScene(loadMesh bool, materialFinish string, cameraOverrides ...ren
 
 	// Load and add dragon mesh only if requested
 	if loadMesh {
-		addDragonMesh(s, materialFinish)
+		addDragonMesh(s, materialFinish, logger)
 	} else {
 		// Add a placeholder for configuration purposes
-		fmt.Println("Dragon scene created without mesh for configuration")
+		logger.Printf("Dragon scene created without mesh for configuration\n")
 	}
 
 	return s
@@ -123,7 +122,7 @@ func addDragonGround(s *Scene) {
 }
 
 // addDragonMesh loads the dragon PLY file and adds it to the scene
-func addDragonMesh(s *Scene, materialFinish string) {
+func addDragonMesh(s *Scene, materialFinish string, logger core.Logger) {
 	// Try multiple possible paths for the dragon PLY file
 	// This allows the scene to work from both command line and web server contexts
 	possiblePaths := []string{
@@ -144,9 +143,9 @@ func addDragonMesh(s *Scene, materialFinish string) {
 	}
 
 	if !found {
-		fmt.Printf("Warning: Dragon PLY file not found at any of these locations:\n")
+		logger.Printf("Warning: Dragon PLY file not found at any of these locations:\n")
 		for _, path := range possiblePaths {
-			fmt.Printf("  - %s\n", path)
+			logger.Printf("  - %s\n", path)
 		}
 		return
 	}
@@ -181,13 +180,13 @@ func addDragonMesh(s *Scene, materialFinish string) {
 	}
 
 	// Load the PLY data
-	fmt.Printf("Loading dragon mesh from %s...\n", dragonPath)
+	logger.Printf("Loading dragon mesh from %s...\n", dragonPath)
 	plyStart := time.Now()
 	plyData, err := loaders.LoadPLY(dragonPath)
 	plyLoadTime := time.Since(plyStart)
 	if err != nil {
-		fmt.Printf("Error loading dragon PLY data: %v\n", err)
-		fmt.Println("Adding placeholder sphere instead")
+		logger.Printf("Error loading dragon PLY data: %v\n", err)
+		logger.Printf("Adding placeholder sphere instead\n")
 
 		// Add placeholder sphere
 		placeholder := geometry.NewSphere(
@@ -199,7 +198,7 @@ func addDragonMesh(s *Scene, materialFinish string) {
 		return
 	}
 
-	fmt.Printf("PLY data loaded: %d vertices, %d triangles in %v\n",
+	logger.Printf("PLY data loaded: %d vertices, %d triangles in %v\n",
 		len(plyData.Vertices), len(plyData.Faces)/3, plyLoadTime)
 
 	// Create triangle mesh with rotation
@@ -225,12 +224,12 @@ func addDragonMesh(s *Scene, materialFinish string) {
 	}
 
 	// Create triangle mesh with timing
-	fmt.Printf("Creating triangle mesh with %d vertices, %d triangles...\n", len(plyData.Vertices), len(plyData.Faces)/3)
+	logger.Printf("Creating triangle mesh with %d vertices, %d triangles...\n", len(plyData.Vertices), len(plyData.Faces)/3)
 	meshStart := time.Now()
 	dragonMesh := geometry.NewTriangleMesh(plyData.Vertices, plyData.Faces, dragonMaterial, meshOptions)
-	fmt.Printf("Triangle mesh created in %v\n", time.Since(meshStart))
+	logger.Printf("Triangle mesh created in %v\n", time.Since(meshStart))
 
-	fmt.Printf("Successfully loaded dragon mesh with %d triangles\n", dragonMesh.GetTriangleCount())
+	logger.Printf("Successfully loaded dragon mesh with %d triangles\n", dragonMesh.GetTriangleCount())
 
 	s.Shapes = append(s.Shapes, dragonMesh)
 }

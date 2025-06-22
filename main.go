@@ -135,7 +135,7 @@ func createScene(sceneType string) SceneInfo {
 		sceneObj = scene.NewTriangleMeshScene(32) // Default complexity
 	case "dragon":
 		fmt.Println("Using dragon PLY mesh scene...")
-		sceneObj = scene.NewDragonScene(true, "gold") // Default to gold material
+		sceneObj = scene.NewDragonScene(true, "gold", renderer.NewDefaultLogger()) // Default to gold material
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()
@@ -192,7 +192,7 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 	progressiveConfig.MaxSamplesPerPixel = config.MaxSamples
 	progressiveConfig.NumWorkers = config.NumWorkers
 
-	progressiveRT := renderer.NewProgressiveRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height, progressiveConfig)
+	progressiveRT := renderer.NewProgressiveRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height, progressiveConfig, renderer.NewDefaultLogger())
 
 	// Create output directory
 	outputDir := createOutputDir(config.SceneType)
