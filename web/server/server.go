@@ -78,6 +78,12 @@ type TileUpdate struct {
 	TotalPasses int    `json:"totalPasses"` // Total number of passes planned
 }
 
+// SSEEvent represents a unified SSE event for thread-safe writing
+type SSEEvent struct {
+	Type string `json:"type"` // "console", "tile", "passComplete", "error", "complete"
+	Data string `json:"data"` // JSON-encoded data
+}
+
 // Start starts the web server
 func (s *Server) Start() error {
 	// Serve static files
@@ -106,22 +112,28 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	// Set SSE headers
 	s.setSSEHeaders(w)
 
+	ctx := r.Context()
+
+	// Create unified SSE event channel for thread-safe writing
+	sseEventChan := make(chan SSEEvent, 100)
+
+	// Start single SSE writer goroutine
+	go s.writeSSEEvents(w, ctx, sseEventChan)
+
 	// Parse and validate request
 	req, err := s.parseRenderRequest(r)
 	if err != nil {
-		s.sendSSEError(w, fmt.Sprintf("Invalid request: %v", err))
+		s.handleError(ctx, sseEventChan, fmt.Sprintf("Invalid request: %v", err))
 		return
 	}
 
-	ctx := r.Context()
-
 	// Setup console logging and streaming
-	consoleChan, webLogger := s.setupConsoleLogging(r)
-	go s.streamConsoleMessages(w, ctx, consoleChan)
+	consoleChan, webLogger := s.setupConsoleLogging()
+	go s.streamConsoleMessages(ctx, consoleChan, sseEventChan)
 
 	pipeline, err := s.setupRenderingPipeline(req, webLogger)
 	if err != nil {
-		s.sendSSEError(w, err.Error())
+		s.handleError(ctx, sseEventChan, err.Error())
 		return
 	}
 
@@ -130,8 +142,8 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	renderOptions := renderer.RenderOptions{TileUpdates: true}
 	passChan, tileChan, errChan := pipeline.Raytracer.RenderProgressive(ctx, renderOptions)
 
-	// Handle rendering events and stream to client
-	s.handleRenderingEvents(w, ctx, passChan, tileChan, errChan, pipeline.Scene, req, startTime)
+	// Handle rendering events and send to unified channel
+	s.handleRenderingEvents(ctx, sseEventChan, passChan, tileChan, errChan, pipeline.Scene, req, startTime)
 }
 
 // setSSEHeaders sets the required headers for Server-Sent Events
@@ -143,15 +155,50 @@ func (s *Server) setSSEHeaders(w http.ResponseWriter) {
 }
 
 // setupConsoleLogging creates console channel and web logger for a render
-func (s *Server) setupConsoleLogging(r *http.Request) (chan ConsoleMessage, core.Logger) {
+func (s *Server) setupConsoleLogging() (chan ConsoleMessage, core.Logger) {
 	consoleChan := make(chan ConsoleMessage, 50)
 	renderID := fmt.Sprintf("render-%d", time.Now().UnixNano())
 	webLogger := NewWebLogger(renderID, consoleChan)
 	return consoleChan, webLogger
 }
 
+// writeSSEEvents handles writing all SSE events in a single goroutine (thread-safe)
+func (s *Server) writeSSEEvents(w http.ResponseWriter, ctx context.Context, sseEventChan chan SSEEvent) {
+	for {
+		select {
+		case event, ok := <-sseEventChan:
+			if !ok {
+				// Channel closed
+				return
+			}
+
+			// Check if client is still connected before writing
+			select {
+			case <-ctx.Done():
+				// Client disconnected, stop sending messages
+				return
+			default:
+			}
+
+			// Write SSE event
+			_, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Type, event.Data)
+			if err != nil {
+				// Client disconnected during write
+				return
+			}
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+
+		case <-ctx.Done():
+			// Client disconnected
+			return
+		}
+	}
+}
+
 // streamConsoleMessages handles the console message streaming goroutine
-func (s *Server) streamConsoleMessages(w http.ResponseWriter, ctx context.Context, consoleChan chan ConsoleMessage) {
+func (s *Server) streamConsoleMessages(ctx context.Context, consoleChan chan ConsoleMessage, sseEventChan chan SSEEvent) {
 	for {
 		select {
 		case consoleMsg, ok := <-consoleChan:
@@ -175,9 +222,13 @@ func (s *Server) streamConsoleMessages(w http.ResponseWriter, ctx context.Contex
 			default:
 			}
 
-			fmt.Fprintf(w, "event: console\ndata: %s\n\n", data)
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
+			// Send to unified SSE channel
+			select {
+			case sseEventChan <- SSEEvent{Type: "console", Data: string(data)}:
+			case <-ctx.Done():
+				return
+			default:
+				// Channel full, skip message to avoid blocking
 			}
 
 		case <-ctx.Done():
@@ -224,7 +275,7 @@ func (s *Server) setupRenderingPipeline(req *RenderRequest, logger core.Logger) 
 }
 
 // handleRenderingEvents processes the main rendering event loop
-func (s *Server) handleRenderingEvents(w http.ResponseWriter, ctx context.Context,
+func (s *Server) handleRenderingEvents(ctx context.Context, sseEventChan chan SSEEvent,
 	passChan <-chan renderer.PassResult, tileChan <-chan renderer.TileCompletionResult, errChan <-chan error,
 	scene *scene.Scene, req *RenderRequest, startTime time.Time) {
 
@@ -236,18 +287,18 @@ renderLoop:
 				passChan = nil // Channel closed
 				continue
 			}
-			s.handlePassComplete(w, ctx, passResult, req, scene, startTime)
+			s.handlePassComplete(ctx, sseEventChan, passResult, req, scene, startTime)
 
 		case tileResult, ok := <-tileChan:
 			if !ok {
 				tileChan = nil // Channel closed
 				continue
 			}
-			s.handleTileUpdate(w, ctx, tileResult)
+			s.handleTileUpdate(ctx, sseEventChan, tileResult)
 
 		case err := <-errChan:
 			if err != nil {
-				s.sendSSEError(w, fmt.Sprintf("Rendering failed: %v", err))
+				s.handleError(ctx, sseEventChan, fmt.Sprintf("Rendering failed: %v", err))
 				return
 			}
 			// errChan closed, rendering completed successfully
@@ -265,11 +316,14 @@ renderLoop:
 	}
 
 	// Send completion event
-	s.sendSSEEvent(w, "complete", "Rendering completed")
+	select {
+	case sseEventChan <- SSEEvent{Type: "complete", Data: "Rendering completed"}:
+	case <-ctx.Done():
+	}
 }
 
 // handlePassComplete processes and sends pass completion events
-func (s *Server) handlePassComplete(w http.ResponseWriter, ctx context.Context, passResult renderer.PassResult, req *RenderRequest, scene *scene.Scene, startTime time.Time) {
+func (s *Server) handlePassComplete(ctx context.Context, sseEventChan chan SSEEvent, passResult renderer.PassResult, req *RenderRequest, scene *scene.Scene, startTime time.Time) {
 	// Check if client is still connected
 	select {
 	case <-ctx.Done():
@@ -313,14 +367,14 @@ func (s *Server) handlePassComplete(w http.ResponseWriter, ctx context.Context, 
 		return
 	}
 
-	fmt.Fprintf(w, "event: passComplete\ndata: %s\n\n", data)
-	if flusher, ok := w.(http.Flusher); ok {
-		flusher.Flush()
+	select {
+	case sseEventChan <- SSEEvent{Type: "passComplete", Data: string(data)}:
+	case <-ctx.Done():
 	}
 }
 
 // handleTileUpdate processes and sends tile update events
-func (s *Server) handleTileUpdate(w http.ResponseWriter, ctx context.Context, tileResult renderer.TileCompletionResult) {
+func (s *Server) handleTileUpdate(ctx context.Context, sseEventChan chan SSEEvent, tileResult renderer.TileCompletionResult) {
 	// Check if client is still connected
 	select {
 	case <-ctx.Done():
@@ -352,9 +406,9 @@ func (s *Server) handleTileUpdate(w http.ResponseWriter, ctx context.Context, ti
 		return
 	}
 
-	fmt.Fprintf(w, "event: tile\ndata: %s\n\n", data)
-	if flusher, ok := w.(http.Flusher); ok {
-		flusher.Flush()
+	select {
+	case sseEventChan <- SSEEvent{Type: "tile", Data: string(data)}:
+	case <-ctx.Done():
 	}
 }
 
@@ -529,21 +583,6 @@ func (s *Server) imageToBase64PNG(img image.Image) (string, error) {
 	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
 }
 
-// sendSSEError sends an error via SSE
-func (s *Server) sendSSEError(w http.ResponseWriter, message string) error {
-	return s.sendSSEEvent(w, "error", message)
-}
-
-// sendSSEEvent sends a generic SSE event
-func (s *Server) sendSSEEvent(w http.ResponseWriter, event, data string) error {
-	if flusher, ok := w.(http.Flusher); ok {
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
-		flusher.Flush()
-		return nil
-	}
-	return fmt.Errorf("streaming not supported")
-}
-
 // handleSceneConfig returns the default configuration for a scene
 func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -694,4 +733,13 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+// handleError sends an error event to the SSE channel
+func (s *Server) handleError(ctx context.Context, sseEventChan chan SSEEvent, message string) {
+	select {
+	case sseEventChan <- SSEEvent{Type: "error", Data: message}:
+	case <-ctx.Done():
+		// Client disconnected, don't block
+	}
 }
