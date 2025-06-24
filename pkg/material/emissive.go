@@ -24,6 +24,6 @@ func (e *Emissive) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand
 }
 
 // Emit returns the emitted light for this material
-func (e *Emissive) Emit() core.Vec3 {
+func (e *Emissive) Emit(rayIn core.Ray, hit core.HitRecord) core.Vec3 {
 	return e.Emission
 }

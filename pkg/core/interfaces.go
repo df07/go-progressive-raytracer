@@ -17,7 +17,7 @@ type Material interface {
 
 // Emitter interface for materials that emit light
 type Emitter interface {
-	Emit() Vec3
+	Emit(rayIn Ray, hit HitRecord) Vec3
 }
 
 // Light interface for objects that can be sampled for direct lighting

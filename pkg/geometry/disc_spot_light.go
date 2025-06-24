@@ -1,0 +1,168 @@
+package geometry
+
+import (
+	"math"
+	"math/rand"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
+)
+
+// discSpotLightMaterial implements directional emission for disc spot lights
+type discSpotLightMaterial struct {
+	baseEmission    core.Vec3
+	spotDirection   core.Vec3 // Direction the spot light points
+	cosTotalWidth   float64   // Cosine of total cone angle (outer edge)
+	cosFalloffStart float64   // Cosine of falloff start angle (inner cone)
+}
+
+// Scatter implements the Material interface (spot lights don't scatter, only emit)
+func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+	return core.ScatterResult{}, false // No scattering, only emission
+}
+
+// Emit implements the Emitter interface with directional spot light falloff
+func (dslm *discSpotLightMaterial) Emit(rayIn core.Ray, hit core.HitRecord) core.Vec3 {
+	// Calculate directional emission for indirect rays (caustics)
+	// Check if we're hitting the "back" face of the disc (the emitting side)
+
+	// The ray direction should be roughly opposite to the spot direction for proper emission
+	rayDirection := rayIn.Direction
+	cosAngleToSpot := rayDirection.Dot(dslm.spotDirection)
+
+	// Only emit if the ray is coming from the "back" side (opposite to spot direction)
+	// Allow some tolerance since the disc has finite size
+	if cosAngleToSpot > -0.3 { // Increased tolerance for larger disc
+		return core.NewVec3(0, 0, 0) // No emission for rays from the front/side
+	}
+
+	// For caustics, emit full intensity to ensure they're visible
+	// The directional control happens primarily in direct light sampling
+	falloff := 1.0
+
+	return dslm.baseEmission.Multiply(falloff)
+}
+
+// DiscSpotLight represents a directional spot light implemented as a disc area light
+type DiscSpotLight struct {
+	position        core.Vec3  // Light position in world space
+	direction       core.Vec3  // Normalized direction vector (from -> to)
+	emission        core.Vec3  // Light intensity/color
+	cosTotalWidth   float64    // Cosine of total cone angle (outer edge)
+	cosFalloffStart float64    // Cosine of falloff start angle (inner cone)
+	discLight       *DiscLight // Disc representing the area light
+}
+
+// NewDiscSpotLight creates a new disc spot light
+// from: light position
+// to: point the light is aimed at
+// emission: light intensity/color
+// coneAngleDegrees: total cone angle in degrees
+// coneDeltaAngleDegrees: falloff transition angle in degrees
+// radius: radius of the disc light in world units
+func NewDiscSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaAngleDegrees, radius float64) *DiscSpotLight {
+	direction := to.Subtract(from).Normalize()
+
+	// Convert to radians and compute cosines
+	totalWidthRadians := coneAngleDegrees * math.Pi / 180.0
+	falloffStartRadians := (coneAngleDegrees - coneDeltaAngleDegrees) * math.Pi / 180.0
+
+	// Create directional material
+	material := &discSpotLightMaterial{
+		baseEmission:    emission,
+		spotDirection:   direction,
+		cosTotalWidth:   math.Cos(totalWidthRadians),
+		cosFalloffStart: math.Cos(falloffStartRadians),
+	}
+
+	// Create a circular disc light oriented towards the target
+	// The disc normal should point in the spot light direction
+	discLight := NewDiscLight(from, direction, radius, material)
+
+	return &DiscSpotLight{
+		position:        from,
+		direction:       direction,
+		emission:        emission,
+		cosTotalWidth:   math.Cos(totalWidthRadians),
+		cosFalloffStart: math.Cos(falloffStartRadians),
+		discLight:       discLight,
+	}
+}
+
+// Sample implements the Light interface - samples a point on the disc for direct lighting
+func (dsl *DiscSpotLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
+	// Sample the underlying disc light
+	sample := dsl.discLight.Sample(point, random)
+
+	// Apply spot light directional falloff
+	// Calculate direction from light position to shading point
+	lightToPoint := point.Subtract(dsl.position).Normalize()
+	cosAngle := dsl.direction.Dot(lightToPoint)
+	spotAttenuation := dsl.falloff(cosAngle)
+
+	// Modify the emission with spot light falloff
+	sample.Emission = sample.Emission.Multiply(spotAttenuation)
+
+	return sample
+}
+
+// PDF implements the Light interface - returns the probability density for sampling a given direction
+func (dsl *DiscSpotLight) PDF(point core.Vec3, direction core.Vec3) float64 {
+	return dsl.discLight.PDF(point, direction)
+}
+
+// falloff calculates the spot light falloff
+// Based on the cosine of the angle between light direction and direction to point
+func (dsl *DiscSpotLight) falloff(cosAngle float64) float64 {
+	// Outside the total cone width
+	if cosAngle < dsl.cosTotalWidth {
+		return 0.0
+	}
+
+	// Inside the inner cone (full intensity)
+	if cosAngle >= dsl.cosFalloffStart {
+		return 1.0
+	}
+
+	// In the falloff transition region
+	// Linear interpolation between falloff start and total width
+	delta := (cosAngle - dsl.cosTotalWidth) / (dsl.cosFalloffStart - dsl.cosTotalWidth)
+
+	// Smooth falloff using quartic curve
+	return delta * delta * delta * delta
+}
+
+// GetIntensityAt returns the light intensity at a given point
+// This is useful for debugging and visualization
+func (dsl *DiscSpotLight) GetIntensityAt(point core.Vec3) core.Vec3 {
+	toLightVec := dsl.position.Subtract(point)
+	distance := toLightVec.Length()
+
+	if distance == 0 {
+		return core.NewVec3(0, 0, 0)
+	}
+
+	toLight := toLightVec.Normalize()
+	lightToPoint := toLight.Multiply(-1)
+
+	// Calculate spot attenuation using falloff
+	cosAngle := dsl.direction.Dot(lightToPoint)
+	spotAttenuation := dsl.falloff(cosAngle)
+
+	// Return intensity with distance and spot falloff
+	return dsl.emission.Multiply(spotAttenuation / (distance * distance))
+}
+
+// Hit implements the Shape interface for caustic ray intersection
+func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
+	return dsl.discLight.Hit(ray, tMin, tMax)
+}
+
+// BoundingBox implements the Shape interface
+func (dsl *DiscSpotLight) BoundingBox() core.AABB {
+	return dsl.discLight.BoundingBox()
+}
+
+// GetDisc returns the underlying disc light for scene integration
+func (dsl *DiscSpotLight) GetDisc() *Disc {
+	return dsl.discLight.Disc
+}

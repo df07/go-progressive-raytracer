@@ -107,8 +107,6 @@ func (wp *WorkerPool) GetNumWorkers() int {
 	return wp.numWorkers
 }
 
-
-
 // run is the main worker loop
 func (w *Worker) run(wg *sync.WaitGroup) {
 	defer wg.Done()

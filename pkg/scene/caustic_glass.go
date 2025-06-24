@@ -21,8 +21,8 @@ func NewCausticGlassScene(loadMesh bool, logger core.Logger, cameraOverrides ...
 
 	s := &Scene{
 		Camera:         camera,
-		TopColor:       core.NewVec3(0.1, 0.1, 0.1), // Dark background like PBRT infinite light
-		BottomColor:    core.NewVec3(0.1, 0.1, 0.1), // Consistent dark background
+		TopColor:       core.NewVec3(0.2, 0.2, 0.2), // Dark background like PBRT infinite light
+		BottomColor:    core.NewVec3(0.2, 0.2, 0.2), // Consistent dark background
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: createCausticGlassSamplingConfig(),
@@ -49,14 +49,14 @@ func NewCausticGlassScene(loadMesh bool, logger core.Logger, cameraOverrides ...
 // PBRT scale parameter affects the effective field of view - scale > 1 means zoom out
 func setupCausticGlassCamera(cameraOverrides ...renderer.CameraConfig) renderer.CameraConfig {
 	defaultCameraConfig := renderer.CameraConfig{
-		Center:        core.NewVec3(-5.5, 7, -5.5),    // PBRT camera position
-		LookAt:        core.NewVec3(-4.75, 2.25, 0),   // PBRT look at point
-		Up:            core.NewVec3(0, 1, 0),           // Y-up coordinate system
-		Width:         1050,                            // PBRT film resolution width
-		AspectRatio:   1050.0 / 1500.0,                // PBRT aspect ratio (width/height)
-		VFov:          30.0 * 1.5,                      // PBRT FOV * scale (1.5 = zoom out)
-		Aperture:      0.0,                             // No depth of field
-		FocusDistance: 0.0,                             // Auto-calculate focus distance
+		Center:        core.NewVec3(-5.5, 7, -5.5),  // PBRT camera position
+		LookAt:        core.NewVec3(-4.75, 2.25, 0), // PBRT look at point
+		Up:            core.NewVec3(0, 1, 0),        // Y-up coordinate system
+		Width:         525,                          // PBRT film resolution width/2
+		AspectRatio:   525.0 / 750.0,                // PBRT aspect ratio (width/height)
+		VFov:          30.0 * 1.5,                   // PBRT FOV * scale (1.5 = zoom out)
+		Aperture:      0.0,                          // No depth of field
+		FocusDistance: 0.0,                          // Auto-calculate focus distance
 	}
 
 	// Apply any overrides
@@ -72,11 +72,11 @@ func setupCausticGlassCamera(cameraOverrides ...renderer.CameraConfig) renderer.
 // Based on PBRT scene using 8192 samples and max depth 20
 func createCausticGlassSamplingConfig() core.SamplingConfig {
 	return core.SamplingConfig{
-		SamplesPerPixel:           8192, // Match PBRT pixelsamples
-		MaxDepth:                  20,   // Match PBRT maxdepth
-		RussianRouletteMinBounces: 10,   // Conservative for caustics
-		RussianRouletteMinSamples: 16,   // More samples before RR for caustics
-		AdaptiveMinSamples:        0.2,  // 20% minimum samples for complex caustics
+		SamplesPerPixel:           8192,  // Match PBRT pixelsamples
+		MaxDepth:                  20,    // Match PBRT maxdepth
+		RussianRouletteMinBounces: 10,    // Conservative for caustics
+		RussianRouletteMinSamples: 16,    // More samples before RR for caustics
+		AdaptiveMinSamples:        0.2,   // 20% minimum samples for complex caustics
 		AdaptiveThreshold:         0.005, // Tighter threshold for caustic quality
 	}
 }
@@ -86,17 +86,13 @@ func createCausticGlassSamplingConfig() core.SamplingConfig {
 // "rgb I" [ 139.8113403320 118.6366500854 105.3887557983 ]
 // LightSource "infinite" "rgb L" [ 0.1000000015 0.1000000015 0.1000000015 ]
 func addCausticGlassLighting(s *Scene) {
-	// Main spot light approximated as sphere light
-	// Position at "from" point with direction towards "to" point
+	// Main spot light using exact PBRT parameters
 	spotFrom := core.NewVec3(0, 5, 9)
 	spotIntensity := core.NewVec3(139.8113403320, 118.6366500854, 105.3887557983)
-	
-	// Brighten the spot light for better visibility
-	s.AddSphereLight(
-		spotFrom,
-		0.8, // Slightly larger radius for better light distribution
-		spotIntensity.Multiply(0.5), // Increase intensity further for better brightness
-	)
+
+	// Use disc spot light
+	spotTo := core.NewVec3(-5, 2.7500000000, 0)
+	s.AddSpotLight(spotFrom, spotTo, spotIntensity, 30.0, 5.0, 0.7)
 
 	// Infinite light is handled by the background colors (already set to 0.1, 0.1, 0.1)
 }

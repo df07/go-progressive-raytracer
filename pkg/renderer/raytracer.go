@@ -176,7 +176,7 @@ func (rt *Raytracer) rayColorRecursive(r core.Ray, depth int, throughput core.Ve
 	}
 
 	// Start with emitted light from the hit material
-	colorEmitted := rt.getEmittedLight(hit)
+	colorEmitted := rt.getEmittedLight(r, hit)
 
 	// Try to scatter the ray
 	scatter, didScatter := hit.Material.Scatter(r, *hit, random)
@@ -207,9 +207,9 @@ func (rt *Raytracer) calculateDiffuseColor(scatter core.ScatterResult, hit *core
 }
 
 // getEmittedLight returns the emitted light from a material if it's emissive
-func (rt *Raytracer) getEmittedLight(hit *core.HitRecord) core.Vec3 {
+func (rt *Raytracer) getEmittedLight(ray core.Ray, hit *core.HitRecord) core.Vec3 {
 	if emitter, isEmissive := hit.Material.(core.Emitter); isEmissive {
-		return emitter.Emit()
+		return emitter.Emit(ray, *hit)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

@@ -251,11 +251,11 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 		webMaxSamples = 800
 		webMaxPasses = 40
 	}
-	
+
 	// Override defaults for Caustic Glass scene for better quality
 	if sceneName == "caustic-glass" {
-		webMaxSamples = 1000  // Higher samples for caustics
-		webMaxPasses = 15     // More passes for progressive feedback
+		webMaxSamples = 10000 // Higher samples for caustics
+		webMaxPasses = 1000   // More passes for progressive feedback
 	}
 
 	response := map[string]interface{}{

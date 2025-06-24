@@ -159,3 +159,11 @@ func (s *Scene) AddQuadLight(corner, u, v core.Vec3, emission core.Vec3) {
 	s.Lights = append(s.Lights, quadLight)
 	s.Shapes = append(s.Shapes, quadLight.Quad)
 }
+
+// AddSpotLightCustom adds a disc spot light with custom cone angle and falloff
+func (s *Scene) AddSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaAngleDegrees, radius float64) {
+	spotLight := geometry.NewDiscSpotLight(from, to, emission, coneAngleDegrees, coneDeltaAngleDegrees, radius)
+	s.Lights = append(s.Lights, spotLight)
+	// Add the underlying disc to shapes for caustic ray intersection
+	s.Shapes = append(s.Shapes, spotLight.GetDisc())
+}

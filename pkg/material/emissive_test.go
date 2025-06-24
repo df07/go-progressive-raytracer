@@ -84,7 +84,14 @@ func TestEmissive_Emit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			emissive := NewEmissive(tt.emission)
 
-			emitted := emissive.Emit()
+			// Create dummy ray and hit record for testing
+			dummyRay := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0))
+			dummyHit := core.HitRecord{
+				Point:    core.NewVec3(0, 0, 0),
+				Normal:   core.NewVec3(0, 1, 0),
+				Material: emissive,
+			}
+			emitted := emissive.Emit(dummyRay, dummyHit)
 
 			// Verify emission matches what was set
 			if abs(emitted.X-tt.emission.X) > tolerance {
