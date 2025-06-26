@@ -12,10 +12,10 @@ func TestDiscSpotLightFalloff(t *testing.T) {
 	from := core.NewVec3(0, 5, 0)
 	to := core.NewVec3(0, 0, 0)
 	emission := core.NewVec3(10, 10, 10)
-	coneAngle := 30.0    // degrees
-	deltaAngle := 5.0    // degrees
+	coneAngle := 30.0 // degrees
+	deltaAngle := 5.0 // degrees
 	radius := 0.1
-	
+
 	spotLight := NewDiscSpotLight(from, to, emission, coneAngle, deltaAngle, radius)
 
 	tests := []struct {
@@ -36,7 +36,7 @@ func TestDiscSpotLightFalloff(t *testing.T) {
 		{
 			name:           "In falloff region",
 			cosAngle:       math.Cos(27.5 * math.Pi / 180), // Halfway between 25 and 30
-			expectedResult: -1, // Will calculate dynamically
+			expectedResult: -1,                             // Will calculate dynamically
 		},
 		{
 			name:           "At total width edge",
@@ -53,14 +53,14 @@ func TestDiscSpotLightFalloff(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := spotLight.falloff(tt.cosAngle)
-			
+
 			if tt.expectedResult == -1 {
 				// Dynamic calculation for falloff region
 				cosTotalWidth := math.Cos(30 * math.Pi / 180)
 				cosFalloffStart := math.Cos(25 * math.Pi / 180)
 				delta := (tt.cosAngle - cosTotalWidth) / (cosFalloffStart - cosTotalWidth)
 				expected := delta * delta * delta * delta
-				
+
 				tolerance := 1e-6
 				if math.Abs(result-expected) > tolerance {
 					t.Errorf("Expected falloff=%v, got %v", expected, result)
@@ -82,32 +82,32 @@ func TestDiscSpotLightSample(t *testing.T) {
 	coneAngle := 45.0
 	deltaAngle := 10.0
 	radius := 0.2
-	
+
 	spotLight := NewDiscSpotLight(from, to, emission, coneAngle, deltaAngle, radius)
 
 	tests := []struct {
-		name         string
-		testPoint    core.Vec3
+		name           string
+		testPoint      core.Vec3
 		expectEmission bool
 	}{
 		{
-			name:         "Point directly below (center of cone)",
-			testPoint:    core.NewVec3(0, 0, 0),
+			name:           "Point directly below (center of cone)",
+			testPoint:      core.NewVec3(0, 0, 0),
 			expectEmission: true,
 		},
 		{
-			name:         "Point at edge of inner cone",
-			testPoint:    core.NewVec3(0.7, 0, 0), // ~35 degrees from vertical
+			name:           "Point at edge of inner cone",
+			testPoint:      core.NewVec3(0.7, 0, 0), // ~35 degrees from vertical
 			expectEmission: true,
 		},
 		{
-			name:         "Point in falloff region",
-			testPoint:    core.NewVec3(1.0, 0, 0), // ~45 degrees from vertical
+			name:           "Point in falloff region",
+			testPoint:      core.NewVec3(1.0, 0, 0), // ~45 degrees from vertical
 			expectEmission: true,
 		},
 		{
-			name:         "Point outside cone",
-			testPoint:    core.NewVec3(2.0, 0, 0), // ~63 degrees from vertical
+			name:           "Point outside cone",
+			testPoint:      core.NewVec3(2.0, 0, 0), // ~63 degrees from vertical
 			expectEmission: false,
 		},
 	}
@@ -150,13 +150,13 @@ func TestDiscSpotLightGetIntensityAt(t *testing.T) {
 	coneAngle := 60.0
 	deltaAngle := 15.0
 	radius := 0.1
-	
+
 	spotLight := NewDiscSpotLight(from, to, emission, coneAngle, deltaAngle, radius)
 
 	tests := []struct {
-		name         string
-		testPoint    core.Vec3
-		expectZero   bool
+		name       string
+		testPoint  core.Vec3
+		expectZero bool
 	}{
 		{
 			name:       "Point directly below",
@@ -192,13 +192,13 @@ func TestDiscSpotLightGetIntensityAt(t *testing.T) {
 				if intensity.Equals(core.NewVec3(0, 0, 0)) {
 					t.Errorf("Expected non-zero intensity, got %v", intensity)
 				}
-				
+
 				// Intensity should decrease with distance (inverse square law)
 				distance := tt.testPoint.Subtract(from).Length()
 				if distance > 0 {
 					expectedMagnitude := 1.0 / (distance * distance) // Base expectation
 					actualMagnitude := intensity.Length()
-					
+
 					// Should be reasonable magnitude (allowing for spot light falloff)
 					if actualMagnitude > expectedMagnitude*2 {
 						t.Errorf("Intensity magnitude too high: expected ~%v, got %v", expectedMagnitude, actualMagnitude)
@@ -217,17 +217,17 @@ func TestDiscSpotLightShapeInterface(t *testing.T) {
 	coneAngle := 30.0
 	deltaAngle := 5.0
 	radius := 0.5
-	
+
 	spotLight := NewDiscSpotLight(from, to, emission, coneAngle, deltaAngle, radius)
 
 	// Test Hit method
 	ray := core.NewRay(core.NewVec3(0, 2, 0), core.NewVec3(0, -1, 0))
 	hit, didHit := spotLight.Hit(ray, 0.001, 10.0)
-	
+
 	if !didHit {
 		t.Errorf("Expected ray to hit spot light disc")
 	}
-	
+
 	if hit != nil {
 		expectedT := 1.0
 		if math.Abs(hit.T-expectedT) > 1e-6 {
@@ -237,14 +237,14 @@ func TestDiscSpotLightShapeInterface(t *testing.T) {
 
 	// Test BoundingBox method
 	bbox := spotLight.BoundingBox()
-	
+
 	// Bounding box should contain the light position
 	if from.X < bbox.Min.X || from.X > bbox.Max.X ||
 		from.Y < bbox.Min.Y || from.Y > bbox.Max.Y ||
 		from.Z < bbox.Min.Z || from.Z > bbox.Max.Z {
 		t.Errorf("Bounding box should contain light position %v", from)
 	}
-	
+
 	// Bounding box should have reasonable size based on radius
 	size := bbox.Max.Subtract(bbox.Min)
 	expectedSize := 2 * radius
@@ -260,7 +260,7 @@ func TestDiscSpotLightCreation(t *testing.T) {
 	coneAngle := 25.0
 	deltaAngle := 8.0
 	radius := 0.3
-	
+
 	spotLight := NewDiscSpotLight(from, to, emission, coneAngle, deltaAngle, radius)
 
 	// Check position
@@ -282,11 +282,11 @@ func TestDiscSpotLightCreation(t *testing.T) {
 	// Check angle calculations
 	expectedCosTotalWidth := math.Cos(coneAngle * math.Pi / 180.0)
 	expectedCosFalloffStart := math.Cos((coneAngle - deltaAngle) * math.Pi / 180.0)
-	
+
 	if math.Abs(spotLight.cosTotalWidth-expectedCosTotalWidth) > 1e-6 {
 		t.Errorf("Expected cosTotalWidth %v, got %v", expectedCosTotalWidth, spotLight.cosTotalWidth)
 	}
-	
+
 	if math.Abs(spotLight.cosFalloffStart-expectedCosFalloffStart) > 1e-6 {
 		t.Errorf("Expected cosFalloffStart %v, got %v", expectedCosFalloffStart, spotLight.cosFalloffStart)
 	}
@@ -296,7 +296,7 @@ func TestDiscSpotLightCreation(t *testing.T) {
 	if disc == nil {
 		t.Errorf("Expected non-nil disc")
 	}
-	
+
 	if disc.Radius != radius {
 		t.Errorf("Expected disc radius %v, got %v", radius, disc.Radius)
 	}

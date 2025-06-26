@@ -150,7 +150,7 @@ func TestDiscLightSampleDistribution(t *testing.T) {
 
 	for i := 0; i < numSamples; i++ {
 		sample := discLight.Sample(testPoint, random)
-		
+
 		// Check if sample is in center circle (radius 0.5) or outer ring
 		distanceFromCenter := sample.Point.Subtract(center).Length()
 		if distanceFromCenter <= 0.5 {

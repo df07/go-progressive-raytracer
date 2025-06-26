@@ -18,10 +18,10 @@ func TestDiscHit(t *testing.T) {
 	disc := NewDisc(center, normal, radius, mat)
 
 	tests := []struct {
-		name     string
-		ray      core.Ray
-		tMin     float64
-		tMax     float64
+		name      string
+		ray       core.Ray
+		tMin      float64
+		tMax      float64
 		shouldHit bool
 		expectedT float64
 	}{
@@ -68,16 +68,16 @@ func TestDiscHit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hit, didHit := disc.Hit(tt.ray, tt.tMin, tt.tMax)
-			
+
 			if didHit != tt.shouldHit {
 				t.Errorf("Expected hit=%v, got hit=%v", tt.shouldHit, didHit)
 			}
-			
+
 			if tt.shouldHit && hit != nil {
 				if math.Abs(hit.T-tt.expectedT) > 1e-6 {
 					t.Errorf("Expected t=%v, got t=%v", tt.expectedT, hit.T)
 				}
-				
+
 				// Check that hit point is within radius
 				distance := hit.Point.Subtract(center).Length()
 				if distance > radius+1e-6 {
