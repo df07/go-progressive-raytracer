@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"image/color"
 	"math/rand"
 	"time"
 
@@ -44,23 +45,21 @@ func DefaultProgressiveConfig() ProgressiveConfig {
 
 // ProgressiveRaytracer manages progressive rendering with multiple passes
 type ProgressiveRaytracer struct {
-	scene         core.Scene
-	width, height int
-	config        ProgressiveConfig
-	tiles         []*Tile        // Tile management
-	currentPass   int            // Progressive state
-	pixelStats    [][]PixelStats // Shared pixel statistics array (global image coordinates)
-	raytracer     *Raytracer     // Base raytracer for actual rendering
-	workerPool    *WorkerPool    // Worker pool for parallel processing
-	logger        core.Logger    // Logger for rendering output
+	scene       core.Scene
+	config      ProgressiveConfig
+	tiles       []*Tile         // Tile management
+	currentPass int             // Progressive state
+	pixelStats  [][]PixelStats  // Shared pixel statistics array (global image coordinates)
+	integrator  core.Integrator // Light transport integrator for actual rendering
+	workerPool  *WorkerPool     // Worker pool for parallel processing
+	logger      core.Logger     // Logger for rendering output
 }
 
-// NewProgressiveRaytracer creates a new progressive raytracer
-func NewProgressiveRaytracer(scene core.Scene, width, height int, config ProgressiveConfig, logger core.Logger) *ProgressiveRaytracer {
-	// Create base raytracer
-	raytracer := NewRaytracer(scene, width, height)
-
+// NewProgressiveRaytracer creates a new progressive raytracer with a specific integrator
+func NewProgressiveRaytracer(scene core.Scene, config ProgressiveConfig, integratorInst core.Integrator, logger core.Logger) *ProgressiveRaytracer {
 	// Create tile grid
+	width := scene.GetSamplingConfig().Width
+	height := scene.GetSamplingConfig().Height
 	tiles := NewTileGrid(width, height, config.TileSize)
 
 	// Initialize shared pixel statistics array (global image coordinates)
@@ -70,17 +69,15 @@ func NewProgressiveRaytracer(scene core.Scene, width, height int, config Progres
 	}
 
 	// Create worker pool
-	workerPool := NewWorkerPool(scene, width, height, config.TileSize, config.NumWorkers)
+	workerPool := NewWorkerPool(scene, integratorInst, width, height, config.TileSize, config.NumWorkers)
 
 	return &ProgressiveRaytracer{
 		scene:       scene,
-		width:       width,
-		height:      height,
 		config:      config,
 		tiles:       tiles,
 		currentPass: 0,
 		pixelStats:  pixelStats,
-		raytracer:   raytracer,
+		integrator:  integratorInst,
 		workerPool:  workerPool,
 		logger:      logger,
 	}
@@ -124,10 +121,7 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(Til
 	pr.logger.Printf("Pass %d: Target %d samples per pixel (using %d workers)...\n",
 		passNumber, targetSamples, pr.workerPool.GetNumWorkers())
 
-	// Configure base raytracer for this pass (for shared pixel stats processing)
-	pr.raytracer.MergeSamplingConfig(core.SamplingConfig{
-		SamplesPerPixel: targetSamples,
-	})
+	// Target samples are handled by the worker pool task system
 
 	// Start worker pool if not already started
 	if passNumber == 1 {
@@ -212,7 +206,7 @@ func (pr *ProgressiveRaytracer) extractTileImage(tile *Tile) *image.RGBA {
 			if stats.SampleCount > 0 {
 				// Get averaged color using existing method
 				colorVec := stats.GetColor()
-				pixelColor := pr.raytracer.vec3ToColor(colorVec)
+				pixelColor := pr.vec3ToColor(colorVec)
 
 				// Set pixel in tile image (relative coordinates)
 				tileImage.SetRGBA(x-bounds.Min.X, y-bounds.Min.Y, pixelColor)
@@ -339,11 +333,13 @@ func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, options R
 // assembleCurrentImage creates an image from the current state of the shared pixel stats
 // and calculates render statistics in a single pass
 func (pr *ProgressiveRaytracer) assembleCurrentImage(targetSamples int) (*image.RGBA, RenderStats) {
-	img := image.NewRGBA(image.Rect(0, 0, pr.width, pr.height))
+	width := pr.scene.GetSamplingConfig().Width
+	height := pr.scene.GetSamplingConfig().Height
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
 	// Initialize statistics
 	stats := RenderStats{
-		TotalPixels:    pr.width * pr.height,
+		TotalPixels:    width * height,
 		TotalSamples:   0,
 		AverageSamples: 0,
 		MaxSamples:     targetSamples,
@@ -352,13 +348,13 @@ func (pr *ProgressiveRaytracer) assembleCurrentImage(targetSamples int) (*image.
 	}
 
 	// Single pass: create image and calculate stats
-	for y := 0; y < pr.height; y++ {
-		for x := 0; x < pr.width; x++ {
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
 			pixel := &pr.pixelStats[y][x]
 
 			// Create image pixel
 			colorVec := pixel.GetColor()
-			pixelColor := pr.raytracer.vec3ToColor(colorVec)
+			pixelColor := pr.vec3ToColor(colorVec)
 			img.SetRGBA(x, y, pixelColor)
 
 			// Update statistics
@@ -420,4 +416,20 @@ func NewTileGrid(width, height, tileSize int) []*Tile {
 	}
 
 	return tiles
+}
+
+// vec3ToColor converts a Vec3 color to RGBA with proper clamping and gamma correction
+func (pr *ProgressiveRaytracer) vec3ToColor(colorVec core.Vec3) color.RGBA {
+	// Apply gamma correction (gamma = 2.0)
+	colorVec = colorVec.GammaCorrect(2.0)
+
+	// Clamp to valid color range
+	colorVec = colorVec.Clamp(0.0, 1.0)
+
+	return color.RGBA{
+		R: uint8(255 * colorVec.X),
+		G: uint8(255 * colorVec.Y),
+		B: uint8(255 * colorVec.Z),
+		A: 255,
+	}
 }

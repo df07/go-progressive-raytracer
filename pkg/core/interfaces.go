@@ -4,6 +4,12 @@ import (
 	"math/rand"
 )
 
+// Integrator defines the interface for light transport algorithms
+type Integrator interface {
+	// RayColor computes the color for a single ray (matches current rayColorRecursive signature)
+	RayColor(ray Ray, scene Scene, random *rand.Rand, depth int, throughput Vec3, sampleIndex int) Vec3
+}
+
 // Shape interface for objects that can be hit by rays
 type Shape interface {
 	Hit(ray Ray, tMin, tMax float64) (*HitRecord, bool)
@@ -48,6 +54,7 @@ type Scene interface {
 	GetShapes() []Shape
 	GetLights() []Light
 	GetSamplingConfig() SamplingConfig
+	GetBVH() *BVH // For integrators to access acceleration structure
 }
 
 // Logger interface for raytracer logging
@@ -57,6 +64,8 @@ type Logger interface {
 
 // SamplingConfig contains rendering configuration
 type SamplingConfig struct {
+	Width                     int     // Image width
+	Height                    int     // Image height
 	SamplesPerPixel           int     // Number of rays per pixel
 	MaxDepth                  int     // Maximum ray bounce depth
 	RussianRouletteMinBounces int     // Minimum bounces before Russian Roulette can activate

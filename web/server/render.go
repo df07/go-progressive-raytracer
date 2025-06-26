@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/integrator"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -187,6 +188,8 @@ func (s *Server) setupRenderingPipeline(req *RenderRequest, logger core.Logger) 
 	}
 
 	// Override sampling settings
+	sceneObj.SamplingConfig.Width = req.Width
+	sceneObj.SamplingConfig.Height = req.Height
 	sceneObj.SamplingConfig.RussianRouletteMinBounces = req.RRMinBounces
 	sceneObj.SamplingConfig.RussianRouletteMinSamples = req.RRMinSamples
 	sceneObj.SamplingConfig.AdaptiveMinSamples = req.AdaptiveMinSamples
@@ -201,7 +204,8 @@ func (s *Server) setupRenderingPipeline(req *RenderRequest, logger core.Logger) 
 		NumWorkers:         0, // Auto-detect
 	}
 
-	raytracer := renderer.NewProgressiveRaytracer(sceneObj, req.Width, req.Height, config, logger)
+	pathIntegrator := integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+	raytracer := renderer.NewProgressiveRaytracer(sceneObj, config, pathIntegrator, logger)
 	return &RenderingPipeline{
 		Scene:     sceneObj,
 		Raytracer: raytracer,

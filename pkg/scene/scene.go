@@ -16,6 +16,7 @@ type Scene struct {
 	Lights         []core.Light // Lights in the scene
 	SamplingConfig core.SamplingConfig
 	CameraConfig   renderer.CameraConfig
+	bvh            *core.BVH // Acceleration structure for ray-object intersection
 }
 
 // NewDefaultScene creates a default scene with spheres, ground, and camera
@@ -121,6 +122,14 @@ func (s *Scene) GetLights() []core.Light {
 // GetSamplingConfig returns the scene's sampling configuration
 func (s *Scene) GetSamplingConfig() core.SamplingConfig {
 	return s.SamplingConfig
+}
+
+// GetBVH returns the scene's BVH acceleration structure, building it lazily if needed
+func (s *Scene) GetBVH() *core.BVH {
+	if s.bvh == nil {
+		s.bvh = core.NewBVH(s.Shapes)
+	}
+	return s.bvh
 }
 
 // GetPrimitiveCount returns the total number of primitive objects in the scene

@@ -35,16 +35,16 @@ type WorkerPool struct {
 
 // Worker handles individual tile rendering tasks
 type Worker struct {
-	ID          int
-	raytracer   *Raytracer
-	taskQueue   chan TileTask
-	resultQueue chan TileResult
-	stopChan    chan bool
-	pool        *WorkerPool // Reference to parent pool for callback access
+	ID           int
+	tileRenderer *TileRenderer
+	taskQueue    chan TileTask
+	resultQueue  chan TileResult
+	stopChan     chan bool
+	pool         *WorkerPool // Reference to parent pool for callback access
 }
 
 // NewWorkerPool creates a worker pool with the specified number of workers
-func NewWorkerPool(scene core.Scene, width, height, tileSize int, numWorkers int) *WorkerPool {
+func NewWorkerPool(scene core.Scene, integratorInst core.Integrator, width, height, tileSize int, numWorkers int) *WorkerPool {
 	if numWorkers <= 0 {
 		numWorkers = runtime.NumCPU()
 	}
@@ -62,13 +62,14 @@ func NewWorkerPool(scene core.Scene, width, height, tileSize int, numWorkers int
 
 	// Create workers
 	for i := 0; i < numWorkers; i++ {
+		tileRenderer := NewTileRenderer(scene, integratorInst)
 		worker := &Worker{
-			ID:          i,
-			raytracer:   NewRaytracer(scene, width, height),
-			taskQueue:   wp.taskQueue,
-			resultQueue: wp.resultQueue,
-			stopChan:    wp.stopChan,
-			pool:        wp,
+			ID:           i,
+			tileRenderer: tileRenderer,
+			taskQueue:    wp.taskQueue,
+			resultQueue:  wp.resultQueue,
+			stopChan:     wp.stopChan,
+			pool:         wp,
 		}
 		wp.workers = append(wp.workers, worker)
 	}
@@ -112,14 +113,9 @@ func (w *Worker) run(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for task := range w.taskQueue {
-		// Configure raytracer for this pass, merging only the target samples
-		w.raytracer.MergeSamplingConfig(core.SamplingConfig{
-			SamplesPerPixel: task.TargetSamples,
-		})
-
-		// Render the tile directly to the shared pixel stats array
+		// Render the tile using the tile renderer
 		// Each tile has non-overlapping bounds, so this is thread-safe
-		stats := w.raytracer.RenderBounds(task.Tile.Bounds, task.PixelStats, task.Tile.Random)
+		stats := w.tileRenderer.RenderTileBounds(task.Tile.Bounds, task.PixelStats, task.Tile.Random, task.TargetSamples)
 
 		// Send result back with just the stats
 		result := TileResult{

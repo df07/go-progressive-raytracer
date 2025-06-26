@@ -3,13 +3,14 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strconv"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // InspectResponse represents the JSON response for object inspection
@@ -102,6 +103,52 @@ func (s *Server) extractMaterialInfo(mat core.Material) (string, map[string]inte
 			return "emissive", properties
 		}
 		return "unknown", properties
+	}
+}
+
+// InspectResult contains rich information about an object hit by an inspection ray
+type InspectResult struct {
+	Hit       bool
+	HitRecord *core.HitRecord // Full hit record with material reference
+	Shape     core.Shape      // The actual shape that was hit
+}
+
+// inspectPixel casts a ray through the specified pixel coordinates and returns information about the first object hit
+func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) InspectResult {
+	// Get camera and create a ray for the pixel center (no jitter for inspection)
+	camera := sceneObj.GetCamera()
+
+	// Create a deterministic random generator for ray generation
+	// This ensures we get a consistent ray through the pixel center
+	inspectRandom := rand.New(rand.NewSource(0))
+	ray := camera.GetRay(pixelX, pixelY, inspectRandom)
+
+	// Cast the ray and find the first intersection using scene's BVH
+	hit, isHit := sceneObj.GetBVH().Hit(ray, 0.001, 1000.0)
+	if !isHit {
+		return InspectResult{Hit: false}
+	}
+
+	// Find the specific shape that was hit by testing all shapes
+	// (BVH doesn't return the shape, just the hit record)
+	shapes := sceneObj.GetShapes()
+	for _, shape := range shapes {
+		if shapeHit, shapeIsHit := shape.Hit(ray, 0.001, hit.T+0.001); shapeIsHit {
+			if shapeHit.T == hit.T { // Same intersection
+				return InspectResult{
+					Hit:       true,
+					HitRecord: hit,
+					Shape:     shape,
+				}
+			}
+		}
+	}
+
+	// Fallback: return hit without specific shape
+	return InspectResult{
+		Hit:       true,
+		HitRecord: hit,
+		Shape:     nil,
 	}
 }
 
@@ -199,11 +246,8 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a minimal raytracer for inspection
-	raytracer := renderer.NewRaytracer(sceneObj, inspectReq.Width, inspectReq.Height)
-
-	// Perform the inspection
-	result := raytracer.InspectPixel(pixelX, pixelY)
+	// Perform the inspection using the scene directly
+	result := inspectPixel(sceneObj, inspectReq.Width, inspectReq.Height, pixelX, pixelY)
 
 	// Convert to JSON response
 	if !result.Hit {

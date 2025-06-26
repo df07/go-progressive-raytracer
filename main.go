@@ -8,10 +8,9 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
-	"runtime/pprof"
 	"time"
 
-	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/integrator"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -19,27 +18,16 @@ import (
 // Config holds all the configuration for the raytracer
 type Config struct {
 	SceneType  string
-	RenderMode string
 	MaxPasses  int
 	MaxSamples int
 	NumWorkers int
-	Profile    string // CPU profile output file
 	Help       bool
-}
-
-// SceneInfo holds scene and its dimensions
-type SceneInfo struct {
-	Scene  *scene.Scene
-	Width  int
-	Height int
 }
 
 // RenderResult holds the final image and statistics
 type RenderResult struct {
 	Image     *image.RGBA
 	Stats     renderer.RenderStats
-	Images    []*image.RGBA // For progressive mode
-	AllStats  []renderer.RenderStats
 	Timestamp string
 }
 
@@ -53,13 +41,9 @@ func main() {
 	fmt.Println("Starting Progressive Raytracer...")
 	startTime := time.Now()
 
-	sceneInfo := createScene(config.SceneType)
-	raytracer := renderer.NewRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height)
-
+	sceneObj := createScene(config.SceneType)
 	outputDir := createOutputDir(config.SceneType)
-	result := renderImage(config, sceneInfo, raytracer)
-
-	saveResults(config, result, outputDir)
+	result := renderProgressive(config, sceneObj)
 
 	renderTime := time.Since(startTime)
 	fmt.Printf("Render completed in %v\n", renderTime)
@@ -72,11 +56,9 @@ func main() {
 func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.SceneType, "scene", "default", "Scene type: 'default', 'cornell', 'spheregrid', 'trianglemesh', 'dragon', or 'caustic-glass'")
-	flag.StringVar(&config.RenderMode, "mode", "normal", "Render mode: 'normal' or 'progressive'")
 	flag.IntVar(&config.MaxPasses, "max-passes", 5, "Maximum number of progressive passes")
 	flag.IntVar(&config.MaxSamples, "max-samples", 50, "Maximum samples per pixel")
 	flag.IntVar(&config.NumWorkers, "workers", 0, "Number of parallel workers (0 = auto-detect CPU count)")
-	flag.StringVar(&config.Profile, "profile", "", "CPU profile output file")
 	flag.BoolVar(&config.Help, "help", false, "Show help information")
 	flag.Parse()
 	return config
@@ -99,26 +81,16 @@ func showHelp() {
 	fmt.Println("  dragon       - Dragon PLY mesh from PBRT book")
 	fmt.Println("  caustic-glass - Glass caustic geometry scene")
 	fmt.Println()
-	fmt.Println("Available modes:")
-	fmt.Println("  normal      - Standard single-threaded rendering")
-	fmt.Println("  progressive - Progressive multi-pass parallel rendering")
-	fmt.Println()
-	fmt.Println("Profiling:")
-	fmt.Println("  Use --profile=cpu.prof to generate CPU profile for normal mode")
-	fmt.Println("  Analyze with: go tool pprof cpu.prof")
-	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  raytracer.exe --mode=progressive --max-passes=5 --max-samples=100")
-	fmt.Println("  raytracer.exe --scene=cornell --mode=progressive --workers=4")
-	fmt.Println("  raytracer.exe --mode=normal --max-samples=200")
-	fmt.Println("  raytracer.exe --mode=normal --max-samples=100 --profile=cpu.prof")
-	fmt.Println("  raytracer.exe --mode=progressive --max-passes=1 --max-samples=25")
+	fmt.Println("  raytracer.exe --max-passes=5 --max-samples=100")
+	fmt.Println("  raytracer.exe --scene=cornell --workers=4")
+	fmt.Println("  raytracer.exe --scene=caustic-glass --max-passes=1 --max-samples=25")
 	fmt.Println()
 	fmt.Println("Output will be saved to output/<scene_type>/render_<timestamp>.png")
 }
 
 // createScene creates the appropriate scene based on scene type
-func createScene(sceneType string) SceneInfo {
+func createScene(sceneType string) *scene.Scene {
 	var sceneObj *scene.Scene
 
 	switch sceneType {
@@ -152,11 +124,10 @@ func createScene(sceneType string) SceneInfo {
 	width := sceneObj.CameraConfig.Width
 	height := int(float64(width) / sceneObj.CameraConfig.AspectRatio)
 
-	return SceneInfo{
-		Scene:  sceneObj,
-		Width:  width,
-		Height: height,
-	}
+	sceneObj.SamplingConfig.Height = height
+	sceneObj.SamplingConfig.Width = width
+
+	return sceneObj
 }
 
 // createOutputDir creates the output directory for the scene type
@@ -175,20 +146,9 @@ func createOutputDir(sceneType string) string {
 	return outputDir
 }
 
-// renderImage performs the actual rendering based on the mode
-func renderImage(config Config, sceneInfo SceneInfo, raytracer *renderer.Raytracer) RenderResult {
-	timestamp := time.Now().Format("20060102_150405")
-
-	switch config.RenderMode {
-	case "progressive":
-		return renderProgressive(config, sceneInfo, timestamp)
-	default:
-		return renderNormal(config, raytracer, timestamp)
-	}
-}
-
 // renderProgressive handles progressive rendering with immediate file saving
-func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) RenderResult {
+func renderProgressive(config Config, sceneObj *scene.Scene) RenderResult {
+	timestamp := time.Now().Format("20060102_150405")
 	fmt.Println("Using progressive rendering...")
 
 	progressiveConfig := renderer.DefaultProgressiveConfig()
@@ -196,7 +156,8 @@ func renderProgressive(config Config, sceneInfo SceneInfo, timestamp string) Ren
 	progressiveConfig.MaxSamplesPerPixel = config.MaxSamples
 	progressiveConfig.NumWorkers = config.NumWorkers
 
-	progressiveRT := renderer.NewProgressiveRaytracer(sceneInfo.Scene, sceneInfo.Width, sceneInfo.Height, progressiveConfig, renderer.NewDefaultLogger())
+	pathIntegrator := integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+	progressiveRT := renderer.NewProgressiveRaytracer(sceneObj, progressiveConfig, pathIntegrator, renderer.NewDefaultLogger())
 
 	// Create output directory
 	outputDir := createOutputDir(config.SceneType)
@@ -257,78 +218,6 @@ renderLoop:
 		Image:     finalImage,
 		Stats:     finalStats,
 		Timestamp: timestamp,
-	}
-}
-
-// renderNormal handles normal rendering
-func renderNormal(config Config, raytracer *renderer.Raytracer, timestamp string) RenderResult {
-	// Start CPU profiling if requested
-	if config.Profile != "" {
-		fmt.Printf("Starting CPU profiling, output: %s\n", config.Profile)
-		f, err := os.Create(config.Profile)
-		if err != nil {
-			fmt.Printf("Error creating profile file: %v\n", err)
-			os.Exit(1)
-		}
-		defer f.Close()
-
-		if err := pprof.StartCPUProfile(f); err != nil {
-			fmt.Printf("Error starting CPU profile: %v\n", err)
-			os.Exit(1)
-		}
-		defer pprof.StopCPUProfile()
-	}
-
-	// Update raytracer config to use CLI max samples
-	raytracer.MergeSamplingConfig(core.SamplingConfig{
-		SamplesPerPixel: config.MaxSamples,
-		// Leave other settings (MaxDepth, Russian Roulette) from previous config
-	})
-
-	fmt.Println("Starting single-threaded render...")
-	img, stats := raytracer.RenderPass()
-
-	if config.Profile != "" {
-		fmt.Printf("CPU profiling complete. Analyze with: go tool pprof %s\n", config.Profile)
-	}
-
-	return RenderResult{
-		Image:     img,
-		Stats:     stats,
-		Timestamp: timestamp,
-	}
-}
-
-// saveResults saves all the rendered images
-func saveResults(config Config, result RenderResult, outputDir string) {
-	// Progressive mode handles its own file saving in the callback
-	if config.RenderMode == "progressive" {
-		return
-	}
-
-	// Save final image for normal mode
-	filename := filepath.Join(outputDir, fmt.Sprintf("render_%s.png", result.Timestamp))
-	err := saveImageToFile(result.Image, filename)
-	if err != nil {
-		fmt.Printf("Error saving PNG: %v\n", err)
-		os.Exit(1)
-	}
-}
-
-// saveProgressiveImages saves intermediate progressive images (excluding the final pass)
-func saveProgressiveImages(result RenderResult, outputDir string) {
-	baseFilename := fmt.Sprintf("render_%s", result.Timestamp)
-
-	// Save all passes except the last one (which gets saved as the final image)
-	for i := 0; i < len(result.Images)-1; i++ {
-		passImg := result.Images[i]
-		passNumber := i + 1
-		passFilename := filepath.Join(outputDir, fmt.Sprintf("%s_pass_%02d.png", baseFilename, passNumber))
-
-		err := saveImageToFile(passImg, passFilename)
-		if err != nil {
-			fmt.Printf("Warning: Failed to save pass %d image: %v\n", passNumber, err)
-		}
 	}
 }
 
