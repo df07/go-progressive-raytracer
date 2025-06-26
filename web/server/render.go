@@ -97,6 +97,13 @@ func (s *Server) setupConsoleLogging() (chan ConsoleMessage, core.Logger) {
 
 // writeSSEEvents handles writing all SSE events in a single goroutine (thread-safe)
 func (s *Server) writeSSEEvents(w http.ResponseWriter, ctx context.Context, sseEventChan chan SSEEvent) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Client disconnected during write, this is expected behavior when stopping renders
+			log.Printf("SSE writer recovered from panic (client disconnected): %v", r)
+		}
+	}()
+
 	for {
 		select {
 		case event, ok := <-sseEventChan:
