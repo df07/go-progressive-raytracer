@@ -204,8 +204,19 @@ func (s *Server) setupRenderingPipeline(req *RenderRequest, logger core.Logger) 
 		NumWorkers:         0, // Auto-detect
 	}
 
-	pathIntegrator := integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
-	raytracer := renderer.NewProgressiveRaytracer(sceneObj, config, pathIntegrator, logger)
+	// Create the appropriate integrator based on request
+	var selectedIntegrator core.Integrator
+	switch req.Integrator {
+	case "bdpt":
+		selectedIntegrator = integrator.NewBDPTIntegrator(sceneObj.GetSamplingConfig())
+	case "path-tracing":
+		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+	default:
+		// Default to path tracing for unknown integrator types
+		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+	}
+
+	raytracer := renderer.NewProgressiveRaytracer(sceneObj, config, selectedIntegrator, logger)
 	return &RenderingPipeline{
 		Scene:     sceneObj,
 		Raytracer: raytracer,

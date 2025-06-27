@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/integrator"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
@@ -17,11 +18,12 @@ import (
 
 // Config holds all the configuration for the raytracer
 type Config struct {
-	SceneType  string
-	MaxPasses  int
-	MaxSamples int
-	NumWorkers int
-	Help       bool
+	SceneType      string
+	MaxPasses      int
+	MaxSamples     int
+	NumWorkers     int
+	IntegratorType string
+	Help           bool
 }
 
 // RenderResult holds the final image and statistics
@@ -59,6 +61,7 @@ func parseFlags() Config {
 	flag.IntVar(&config.MaxPasses, "max-passes", 5, "Maximum number of progressive passes")
 	flag.IntVar(&config.MaxSamples, "max-samples", 50, "Maximum samples per pixel")
 	flag.IntVar(&config.NumWorkers, "workers", 0, "Number of parallel workers (0 = auto-detect CPU count)")
+	flag.StringVar(&config.IntegratorType, "integrator", "path-tracing", "Integrator type: 'path-tracing' or 'bdpt'")
 	flag.BoolVar(&config.Help, "help", false, "Show help information")
 	flag.Parse()
 	return config
@@ -85,6 +88,7 @@ func showHelp() {
 	fmt.Println("  raytracer.exe --max-passes=5 --max-samples=100")
 	fmt.Println("  raytracer.exe --scene=cornell --workers=4")
 	fmt.Println("  raytracer.exe --scene=caustic-glass --max-passes=1 --max-samples=25")
+	fmt.Println("  raytracer.exe --scene=caustic-glass --integrator=bdpt --max-samples=100")
 	fmt.Println()
 	fmt.Println("Output will be saved to output/<scene_type>/render_<timestamp>.png")
 }
@@ -156,8 +160,21 @@ func renderProgressive(config Config, sceneObj *scene.Scene) RenderResult {
 	progressiveConfig.MaxSamplesPerPixel = config.MaxSamples
 	progressiveConfig.NumWorkers = config.NumWorkers
 
-	pathIntegrator := integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
-	progressiveRT := renderer.NewProgressiveRaytracer(sceneObj, progressiveConfig, pathIntegrator, renderer.NewDefaultLogger())
+	// Create the appropriate integrator based on config
+	var selectedIntegrator core.Integrator
+	switch config.IntegratorType {
+	case "bdpt":
+		fmt.Println("Using BDPT integrator...")
+		selectedIntegrator = integrator.NewBDPTIntegrator(sceneObj.GetSamplingConfig())
+	case "path-tracing":
+		fmt.Println("Using path tracing integrator...")
+		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+	default:
+		fmt.Printf("Unknown integrator type: %s. Using path tracing.\n", config.IntegratorType)
+		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+	}
+
+	progressiveRT := renderer.NewProgressiveRaytracer(sceneObj, progressiveConfig, selectedIntegrator, renderer.NewDefaultLogger())
 
 	// Create output directory
 	outputDir := createOutputDir(config.SceneType)

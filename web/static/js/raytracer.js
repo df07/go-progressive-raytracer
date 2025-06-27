@@ -338,7 +338,8 @@ class ProgressiveRaytracer {
           rrMinBounces: document.getElementById('rrMinBounces').value,
           rrMinSamples: document.getElementById('rrMinSamples').value,
           adaptiveMinSamples: document.getElementById('adaptiveMinSamples').value,
-          adaptiveThreshold: document.getElementById('adaptiveThreshold').value
+          adaptiveThreshold: document.getElementById('adaptiveThreshold').value,
+          integrator: document.getElementById('integrator').value
       };
       
       // Add scene-specific parameters

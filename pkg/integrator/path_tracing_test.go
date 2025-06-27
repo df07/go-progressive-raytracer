@@ -73,11 +73,11 @@ func TestPathTracingBackgroundGradient(t *testing.T) {
 
 	// Test ray pointing up (should get top color)
 	upRay := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0))
-	upColor := integrator.backgroundGradient(upRay, scene)
+	upColor := integrator.BackgroundGradient(upRay, scene)
 
 	// Test ray pointing down (should get bottom color)
 	downRay := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, -1, 0))
-	downColor := integrator.backgroundGradient(downRay, scene)
+	downColor := integrator.BackgroundGradient(downRay, scene)
 
 	// Colors should be different
 	if upColor == downColor {
@@ -144,7 +144,7 @@ func TestPathTracingRussianRoulette(t *testing.T) {
 
 	for i := 0; i < testCount; i++ {
 		random := rand.New(rand.NewSource(int64(i)))
-		shouldTerminate, _ := integrator.applyRussianRoulette(10, lowThroughput, 5, random)
+		shouldTerminate, _ := integrator.ApplyRussianRoulette(10, lowThroughput, 5, random)
 		if shouldTerminate {
 			terminationCount++
 		}
@@ -166,7 +166,7 @@ func TestPathTracingRussianRoulette(t *testing.T) {
 
 	for i := 0; i < testCount; i++ {
 		random := rand.New(rand.NewSource(int64(i)))
-		shouldTerminate, _ := integrator.applyRussianRoulette(10, highThroughput, 5, random)
+		shouldTerminate, _ := integrator.ApplyRussianRoulette(10, highThroughput, 5, random)
 		if shouldTerminate {
 			highTerminationCount++
 		}
@@ -274,8 +274,8 @@ func TestPathTracingMissedRay(t *testing.T) {
 		t.Error("Expected background color, got black")
 	}
 
-	// Should be similar to what backgroundGradient returns
-	expectedBg := integrator.backgroundGradient(ray, scene)
+	// Should be similar to what BackgroundGradient returns
+	expectedBg := integrator.BackgroundGradient(ray, scene)
 	tolerance := 0.01
 	if math.Abs(color.X-expectedBg.X) > tolerance ||
 		math.Abs(color.Y-expectedBg.Y) > tolerance ||

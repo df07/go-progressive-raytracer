@@ -41,6 +41,7 @@ type RenderRequest struct {
 	RRMinSamples       int     `json:"rrMinSamples"`       // Russian Roulette minimum samples
 	AdaptiveMinSamples float64 `json:"adaptiveMinSamples"` // Adaptive sampling minimum samples as percentage (0.0-1.0)
 	AdaptiveThreshold  float64 `json:"adaptiveThreshold"`  // Adaptive sampling relative error threshold
+	Integrator         string  `json:"integrator"`         // Integrator type: "path-tracing" or "bdpt"
 
 	// Scene-specific configuration
 	CornellGeometry      string `json:"cornellGeometry"`      // Cornell box geometry type: "spheres", "boxes", "empty"
@@ -159,6 +160,12 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 	// Parse sphere complexity parameter
 	if req.SphereComplexity, err = parseIntParam(r.URL.Query(), "sphereComplexity", 32, 4, 512); err != nil {
 		return err
+	}
+
+	// Parse integrator type
+	req.Integrator = r.URL.Query().Get("integrator")
+	if req.Integrator == "" {
+		req.Integrator = "path-tracing" // Default integrator
 	}
 
 	return nil

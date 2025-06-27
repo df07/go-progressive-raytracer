@@ -27,7 +27,7 @@ func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random
 	}
 
 	// Apply Russian Roulette termination
-	shouldTerminate, rrCompensation := pt.applyRussianRoulette(depth, throughput, sampleIndex, random)
+	shouldTerminate, rrCompensation := pt.ApplyRussianRoulette(depth, throughput, sampleIndex, random)
 	if shouldTerminate {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -35,12 +35,12 @@ func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random
 	// Check for intersections with objects using scene's BVH
 	hit, isHit := scene.GetBVH().Hit(ray, 0.001, 1000.0)
 	if !isHit {
-		bgColor := pt.backgroundGradient(ray, scene)
+		bgColor := pt.BackgroundGradient(ray, scene)
 		return bgColor.Multiply(rrCompensation)
 	}
 
 	// Start with emitted light from the hit material
-	colorEmitted := pt.getEmittedLight(ray, hit)
+	colorEmitted := pt.GetEmittedLight(ray, hit)
 
 	// Try to scatter the ray
 	scatter, didScatter := hit.Material.Scatter(ray, *hit, random)
@@ -73,13 +73,13 @@ func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResu
 // calculateDiffuseColor handles diffuse material scattering with throughput tracking
 func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, scene core.Scene, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
-	directLight := pt.calculateDirectLighting(scene, scatter, hit, random)
-	indirectLight := pt.calculateIndirectLighting(scene, scatter, hit, depth, throughput, sampleIndex, random)
+	directLight := pt.CalculateDirectLighting(scene, scatter, hit, random)
+	indirectLight := pt.CalculateIndirectLighting(scene, scatter, hit, depth, throughput, sampleIndex, random)
 	return directLight.Add(indirectLight)
 }
 
 // getEmittedLight returns the emitted light from a material if it's emissive
-func (pt *PathTracingIntegrator) getEmittedLight(ray core.Ray, hit *core.HitRecord) core.Vec3 {
+func (pt *PathTracingIntegrator) GetEmittedLight(ray core.Ray, hit *core.HitRecord) core.Vec3 {
 	if emitter, isEmissive := hit.Material.(core.Emitter); isEmissive {
 		return emitter.Emit(ray, *hit)
 	}
@@ -87,7 +87,7 @@ func (pt *PathTracingIntegrator) getEmittedLight(ray core.Ray, hit *core.HitReco
 }
 
 // calculateDirectLighting samples lights directly for direct illumination with the provided random generator
-func (pt *PathTracingIntegrator) calculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, random *rand.Rand) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, random *rand.Rand) core.Vec3 {
 	lights := scene.GetLights()
 
 	// Sample a light
@@ -129,7 +129,7 @@ func (pt *PathTracingIntegrator) calculateDirectLighting(scene core.Scene, scatt
 }
 
 // calculateIndirectLighting handles indirect illumination via material sampling with throughput tracking
-func (pt *PathTracingIntegrator) calculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	if scatter.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -160,7 +160,7 @@ func (pt *PathTracingIntegrator) calculateIndirectLighting(scene core.Scene, sca
 
 // applyRussianRoulette determines if a ray should be terminated and returns the compensation factor
 // Returns (shouldTerminate, compensationFactor)
-func (pt *PathTracingIntegrator) applyRussianRoulette(depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) (bool, float64) {
+func (pt *PathTracingIntegrator) ApplyRussianRoulette(depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) (bool, float64) {
 	// Apply Russian Roulette after minimum bounces AND minimum samples per pixel
 	initialDepth := pt.config.MaxDepth
 	currentBounce := initialDepth - depth
@@ -190,7 +190,7 @@ func (pt *PathTracingIntegrator) applyRussianRoulette(depth int, throughput core
 }
 
 // backgroundGradient returns a gradient color based on ray direction
-func (pt *PathTracingIntegrator) backgroundGradient(r core.Ray, scene core.Scene) core.Vec3 {
+func (pt *PathTracingIntegrator) BackgroundGradient(r core.Ray, scene core.Scene) core.Vec3 {
 	// Get colors from the scene
 	topColor, bottomColor := scene.GetBackgroundColors()
 

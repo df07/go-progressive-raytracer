@@ -67,6 +67,14 @@
                         <label for="maxPasses" class="tooltip" data-tooltip="Number of progressive updates during render">Progressive Passes:</label>
                         <input type="number" id="maxPasses" value="10" step="1">
                     </div>
+                    
+                    <div class="control-group">
+                        <label for="integrator" class="tooltip" data-tooltip="Rendering algorithm: Path Tracing (fast) or BDPT (better for caustics)">Integrator:</label>
+                        <select id="integrator">
+                            <option value="path-tracing">Path Tracing</option>
+                            <option value="bdpt">Bidirectional Path Tracing (BDPT)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
