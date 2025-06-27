@@ -42,6 +42,17 @@ func (dslm *discSpotLightMaterial) Emit(rayIn core.Ray, hit core.HitRecord) core
 	return dslm.baseEmission.Multiply(falloff)
 }
 
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
+func (dslm *discSpotLightMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	// Lights don't reflect - they only emit
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// PDF calculates the probability density function for specific incoming/outgoing directions
+func (dslm *discSpotLightMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	return 0.0
+}
+
 // DiscSpotLight represents a directional spot light implemented as a disc area light
 type DiscSpotLight struct {
 	position        core.Vec3  // Light position in world space

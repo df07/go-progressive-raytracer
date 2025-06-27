@@ -58,6 +58,21 @@ func (d *Dielectric) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Ra
 	}, true
 }
 
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
+func (d *Dielectric) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	// Check for perfect reflection or refraction
+	// Implementation similar to metal but also handles refraction case
+	// Return appropriate Fresnel-weighted contribution or zero
+
+	// Simplified - full implementation needs Fresnel calculations
+	return core.Vec3{X: 0, Y: 0, Z: 0} // Delta function materials
+}
+
+// PDF calculates the probability density function for specific incoming/outgoing directions
+func (d *Dielectric) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	return 0.0 // Delta function
+}
+
 // reflectVector calculates the reflection of a vector v off a surface with normal n
 func reflectVector(v, n core.Vec3) core.Vec3 {
 	// r = v - 2*dot(v,n)*n

@@ -15,6 +15,14 @@ func (d DummyMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.
 	return core.ScatterResult{}, false
 }
 
+func (d DummyMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+func (d DummyMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	return 0.0
+}
+
 func TestSphere_Hit_Miss(t *testing.T) {
 	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
 	ray := core.NewRay(core.NewVec3(2, 0, 0), core.NewVec3(0, 1, 0))

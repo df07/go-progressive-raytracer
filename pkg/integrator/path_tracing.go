@@ -111,13 +111,15 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 	}
 
 	// Get material PDF for this direction (for MIS)
-	materialPDF := cosine / math.Pi // Lambertian PDF: cos(θ)/π
+	// Use the material's PDF method, but for direct lighting we evaluate the light direction
+	// The incoming direction doesn't matter much for Lambertian materials since they're isotropic
+	materialPDF := hit.Material.PDF(core.Vec3{}, lightSample.Direction, hit.Normal)
 
 	// Calculate MIS weight
 	misWeight := core.PowerHeuristic(1, lightSample.PDF, 1, materialPDF)
 
-	// Calculate BRDF value (for Lambertian: albedo/π)
-	brdf := scatter.Attenuation
+	// Calculate BRDF value using the new interface
+	brdf := hit.Material.EvaluateBRDF(core.Vec3{}, lightSample.Direction, hit.Normal)
 
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
 	if lightSample.PDF > 0 {

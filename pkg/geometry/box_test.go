@@ -15,6 +15,14 @@ func (d DummyBoxMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, random *ra
 	return core.ScatterResult{}, false
 }
 
+func (d DummyBoxMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+func (d DummyBoxMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	return 0.0
+}
+
 func TestNewAxisAlignedBox(t *testing.T) {
 	center := core.NewVec3(0, 0, 0)
 	size := core.NewVec3(1, 1, 1)

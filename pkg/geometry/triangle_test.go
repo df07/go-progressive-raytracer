@@ -15,6 +15,14 @@ func (m MockTriangleMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, random
 	return core.ScatterResult{}, false
 }
 
+func (m MockTriangleMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+func (m MockTriangleMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	return 0.0
+}
+
 func TestTriangle_Hit(t *testing.T) {
 	// Create a triangle in the XY plane
 	v0 := core.NewVec3(0, 0, 0)

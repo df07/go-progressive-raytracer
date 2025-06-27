@@ -18,7 +18,14 @@ type Shape interface {
 
 // Material interface for objects that can scatter rays
 type Material interface {
+	// Existing method - generates random scattered direction
 	Scatter(rayIn Ray, hit HitRecord, random *rand.Rand) (ScatterResult, bool)
+
+	// NEW: Evaluate BRDF for specific incoming/outgoing directions
+	EvaluateBRDF(incomingDir, outgoingDir, normal Vec3) Vec3
+
+	// NEW: Calculate PDF for specific incoming/outgoing directions
+	PDF(incomingDir, outgoingDir, normal Vec3) float64
 }
 
 // Emitter interface for materials that emit light

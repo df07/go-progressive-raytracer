@@ -27,3 +27,14 @@ func (e *Emissive) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand
 func (e *Emissive) Emit(rayIn core.Ray, hit core.HitRecord) core.Vec3 {
 	return e.Emission
 }
+
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
+func (e *Emissive) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	// Lights don't reflect - they only emit
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// PDF calculates the probability density function for specific incoming/outgoing directions
+func (e *Emissive) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	return 0.0
+}

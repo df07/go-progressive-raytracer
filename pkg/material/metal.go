@@ -47,6 +47,25 @@ func (m *Metal) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (
 	}, scatters
 }
 
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
+func (m *Metal) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	// Perfect reflection only - delta function
+	reflected := reflect(incomingDir.Negate(), normal)
+
+	// Check if outgoing direction matches perfect reflection (within tolerance)
+	if outgoingDir.Subtract(reflected).Length() < 0.001 {
+		return m.Albedo // Delta function contribution
+	}
+
+	return core.Vec3{X: 0, Y: 0, Z: 0} // No contribution for non-reflection directions
+}
+
+// PDF calculates the probability density function for specific incoming/outgoing directions
+func (m *Metal) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	// Delta function - PDF is 0 for evaluation (handled specially in integrator)
+	return 0.0
+}
+
 // reflect calculates the reflection of a vector v off a surface with normal n
 func reflect(v, n core.Vec3) core.Vec3 {
 	// r = v - 2*dot(v,n)*n

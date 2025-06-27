@@ -73,3 +73,45 @@ func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand)
 		PDF:         innerResult.PDF,
 	}, true
 }
+
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
+func (l *Layered) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	// Our layered material models two-step scattering:
+	// 1. Outer material scatters first
+	// 2. If outer scatters inward, inner material scatters (ignoring outer on exit)
+	//
+	// Assumption: outer material is always dielectric (can reflect or transmit)
+	// We can check if the incoming/outgoing pair represents reflection or transmission
+
+	// Check if this looks like a reflection from the outer dielectric
+	if isReflectionPath(incomingDir, outgoingDir, normal) {
+		return l.Outer.EvaluateBRDF(incomingDir, outgoingDir, normal)
+	}
+
+	// Transmission path - inner material PDF
+	return l.Inner.EvaluateBRDF(incomingDir, outgoingDir, normal)
+}
+
+// PDF calculates the probability density function for specific incoming/outgoing directions
+func (l *Layered) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	// Same logic as BRDF: either reflection from outer or transmission + inner scattering
+	if isReflectionPath(incomingDir, outgoingDir, normal) {
+		return l.Outer.PDF(incomingDir, outgoingDir, normal)
+	}
+
+	// Transmission path - inner material PDF
+	return l.Inner.PDF(incomingDir, outgoingDir, normal)
+}
+
+// isReflectionPath checks if the incoming/outgoing direction pair represents
+// a reflection off the outer surface (assuming outer is dielectric)
+func isReflectionPath(incomingDir, outgoingDir, normal core.Vec3) bool {
+	// Calculate perfect reflection direction
+	// Note: incomingDir points toward surface, so negate it for reflection calculation
+	incidentDir := incomingDir.Negate()
+	reflectedDir := incidentDir.Subtract(normal.Multiply(2 * incidentDir.Dot(normal)))
+
+	// Check if outgoing direction is close to perfect reflection
+	tolerance := 0.1 // Adjust as needed
+	return outgoingDir.Subtract(reflectedDir).Length() < tolerance
+}

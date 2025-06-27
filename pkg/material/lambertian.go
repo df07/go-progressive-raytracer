@@ -39,3 +39,23 @@ func (l *Lambertian) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Ra
 		PDF:         pdf,
 	}, true
 }
+
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
+func (l *Lambertian) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	// Lambertian BRDF is constant: albedo / π
+	cosTheta := outgoingDir.Dot(normal)
+	if cosTheta <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0} // Below surface
+	}
+	return l.Albedo.Multiply(1.0 / math.Pi)
+}
+
+// PDF calculates the probability density function for specific incoming/outgoing directions
+func (l *Lambertian) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+	// Cosine-weighted hemisphere sampling: cos(θ) / π
+	cosTheta := outgoingDir.Dot(normal)
+	if cosTheta <= 0 {
+		return 0.0
+	}
+	return cosTheta / math.Pi
+}
