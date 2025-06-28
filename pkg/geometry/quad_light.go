@@ -106,3 +106,57 @@ func (ql *QuadLight) PDF(point core.Vec3, direction core.Vec3) float64 {
 	areaPDF := 1.0 / ql.Area
 	return areaPDF * distance * distance / cosTheta
 }
+
+// SampleEmission implements the Light interface - samples emission from the quad surface
+func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+	// Sample point uniformly on quad surface
+	alpha := random.Float64()
+	beta := random.Float64()
+	samplePoint := ql.Corner.Add(ql.U.Multiply(alpha)).Add(ql.V.Multiply(beta))
+
+	// Use shared emission sampling function
+	areaPDF := 1.0 / ql.Area
+	return core.SampleEmissionDirection(samplePoint, ql.Normal, areaPDF, ql.Material, random)
+}
+
+// EmissionPDF implements the Light interface - calculates PDF for emission sampling
+func (ql *QuadLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
+	// Check if point is on quad surface by solving point = corner + alpha*u + beta*v
+	toPoint := point.Subtract(ql.Corner)
+
+	// Project onto u and v vectors to get parametric coordinates
+	uDotU := ql.U.Dot(ql.U)
+	vDotV := ql.V.Dot(ql.V)
+	uDotV := ql.U.Dot(ql.V)
+
+	if uDotU == 0 || vDotV == 0 {
+		return 0.0 // Degenerate quad
+	}
+
+	// Solve the 2x2 system for alpha and beta
+	det := uDotU*vDotV - uDotV*uDotV
+	if math.Abs(det) < 1e-8 {
+		return 0.0 // Degenerate or nearly parallel vectors
+	}
+
+	toDotU := toPoint.Dot(ql.U)
+	toDotV := toPoint.Dot(ql.V)
+
+	alpha := (vDotV*toDotU - uDotV*toDotV) / det
+	beta := (uDotU*toDotV - uDotV*toDotU) / det
+
+	// Check if point is within quad bounds
+	if alpha < 0 || alpha > 1 || beta < 0 || beta > 1 {
+		return 0.0 // Point outside quad
+	}
+
+	// Verify the point is actually on the quad plane
+	reconstructed := ql.Corner.Add(ql.U.Multiply(alpha)).Add(ql.V.Multiply(beta))
+	if reconstructed.Subtract(point).Length() > 0.001 {
+		return 0.0 // Point not on quad surface
+	}
+
+	// Use shared PDF calculation
+	areaPDF := 1.0 / ql.Area
+	return core.CombineAreaAndDirectionPDF(areaPDF, direction, ql.Normal)
+}

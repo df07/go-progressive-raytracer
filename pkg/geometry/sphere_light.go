@@ -178,3 +178,36 @@ func (sl *SphereLight) PDF(point core.Vec3, direction core.Vec3) float64 {
 
 	return 1.0 / (2.0 * math.Pi * (1.0 - cosThetaMax))
 }
+
+// SampleEmission implements the Light interface - samples emission from the sphere surface
+func (sl *SphereLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+	// Sample point uniformly on ENTIRE sphere surface
+	z := 1.0 - 2.0*random.Float64() // z ∈ [-1, 1]
+	r := math.Sqrt(math.Max(0, 1.0-z*z))
+	phi := 2.0 * math.Pi * random.Float64()
+	x := r * math.Cos(phi)
+	y := r * math.Sin(phi)
+
+	localDir := core.NewVec3(x, y, z)
+	samplePoint := sl.Center.Add(localDir.Multiply(sl.Radius))
+	normal := localDir // Surface normal points outward
+
+	// Use shared emission sampling function
+	areaPDF := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
+	return core.SampleEmissionDirection(samplePoint, normal, areaPDF, sl.Material, random)
+}
+
+// EmissionPDF implements the Light interface - calculates PDF for emission sampling
+func (sl *SphereLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
+	// Validate point is on sphere surface
+	if !core.ValidatePointOnSphere(point, sl.Center, sl.Radius, 0.001) {
+		return 0.0
+	}
+
+	// Calculate surface normal
+	normal := point.Subtract(sl.Center).Normalize()
+
+	// Use shared PDF calculation
+	areaPDF := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
+	return core.CombineAreaAndDirectionPDF(areaPDF, direction, normal)
+}

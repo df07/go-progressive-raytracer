@@ -202,3 +202,206 @@ func TestDiscLightEdgeCase(t *testing.T) {
 		t.Errorf("Sample point outside disc: distance=%v, radius=%v", distanceFromCenter, radius)
 	}
 }
+
+func TestDiscLight_SampleEmission(t *testing.T) {
+	const tolerance = 1e-9
+
+	// Create a disc light facing upward
+	center := core.NewVec3(0, 0, 0)
+	normal := core.NewVec3(0, 1, 0)
+	radius := 1.0
+	emission := core.NewVec3(5.0, 5.0, 5.0)
+	emissiveMat := material.NewEmissive(emission)
+	light := NewDiscLight(center, normal, radius, emissiveMat)
+
+	random := rand.New(rand.NewSource(42))
+	sample := light.SampleEmission(random)
+
+	// Verify sample point is on disc surface
+	distanceFromCenter := sample.Point.Subtract(center).Length()
+	if distanceFromCenter > radius+tolerance {
+		t.Errorf("Sample point not on disc surface: distance = %f, radius = %f", distanceFromCenter, radius)
+	}
+
+	// Verify point is on the disc plane
+	heightAbovePlane := math.Abs((sample.Point.Subtract(center)).Dot(normal))
+	if heightAbovePlane > tolerance {
+		t.Errorf("Sample point not on disc plane: height = %f", heightAbovePlane)
+	}
+
+	// Verify normal is correct
+	expectedNormal := normal
+	normalError := sample.Normal.Subtract(expectedNormal).Length()
+	if normalError > tolerance {
+		t.Errorf("Normal incorrect: error = %f", normalError)
+	}
+
+	// Verify direction is in correct hemisphere (cosine with normal > 0)
+	cosTheta := sample.Direction.Dot(sample.Normal)
+	if cosTheta <= 0 {
+		t.Errorf("Emission direction not in correct hemisphere: cos(theta) = %f", cosTheta)
+	}
+
+	// Verify direction is normalized
+	dirLength := sample.Direction.Length()
+	if math.Abs(dirLength-1.0) > tolerance {
+		t.Errorf("Direction not normalized: length = %f", dirLength)
+	}
+
+	// Verify PDF is positive and reasonable
+	if sample.PDF <= 0 {
+		t.Errorf("PDF should be positive, got %f", sample.PDF)
+	}
+
+	// Expected PDF combines area and direction sampling
+	expectedAreaPDF := 1.0 / (math.Pi * radius * radius)
+	expectedDirPDF := cosTheta / math.Pi
+	expectedCombinedPDF := expectedAreaPDF * expectedDirPDF
+	if math.Abs(sample.PDF-expectedCombinedPDF) > tolerance {
+		t.Errorf("PDF incorrect: got %f, expected %f", sample.PDF, expectedCombinedPDF)
+	}
+
+	// Verify emission is correct
+	if sample.Emission.X != emission.X || sample.Emission.Y != emission.Y || sample.Emission.Z != emission.Z {
+		t.Errorf("Emission incorrect: got %v, expected %v", sample.Emission, emission)
+	}
+}
+
+func TestDiscLight_EmissionPDF(t *testing.T) {
+	const tolerance = 1e-9
+
+	center := core.NewVec3(0, 0, 0)
+	normal := core.NewVec3(0, 1, 0)
+	radius := 1.0
+	emission := core.NewVec3(1.0, 1.0, 1.0)
+	emissiveMat := material.NewEmissive(emission)
+	light := NewDiscLight(center, normal, radius, emissiveMat)
+
+	tests := []struct {
+		name      string
+		point     core.Vec3
+		direction core.Vec3
+		expectPDF bool
+	}{
+		{
+			name:      "Point on disc, direction in hemisphere",
+			point:     core.NewVec3(0.5, 0, 0), // On disc surface
+			direction: core.NewVec3(0, 1, 0),   // Same as normal
+			expectPDF: true,
+		},
+		{
+			name:      "Point on disc, direction below surface",
+			point:     core.NewVec3(0.5, 0, 0), // On disc surface
+			direction: core.NewVec3(0, -1, 0),  // Opposite to normal
+			expectPDF: false,
+		},
+		{
+			name:      "Point outside disc radius",
+			point:     core.NewVec3(2, 0, 0), // Outside disc radius
+			direction: core.NewVec3(0, 1, 0),
+			expectPDF: false,
+		},
+		{
+			name:      "Point above disc plane",
+			point:     core.NewVec3(0.5, 1, 0), // Above disc plane
+			direction: core.NewVec3(0, 1, 0),
+			expectPDF: false,
+		},
+		{
+			name:      "Point at disc center",
+			point:     center, // Disc center
+			direction: normal, // Normal direction
+			expectPDF: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pdf := light.EmissionPDF(tt.point, tt.direction)
+
+			if !tt.expectPDF {
+				if pdf != 0 {
+					t.Errorf("Expected PDF = 0, got %f", pdf)
+				}
+				return
+			}
+
+			// Verify PDF is positive for valid cases
+			if pdf <= 0 {
+				t.Errorf("Expected positive PDF, got %f", pdf)
+			}
+
+			// Verify PDF formula for valid point on disc
+			cosTheta := tt.direction.Dot(normal)
+			if cosTheta > 0 {
+				expectedAreaPDF := 1.0 / (math.Pi * radius * radius)
+				expectedDirPDF := cosTheta / math.Pi
+				expectedCombinedPDF := expectedAreaPDF * expectedDirPDF
+				if math.Abs(pdf-expectedCombinedPDF) > tolerance {
+					t.Errorf("PDF incorrect: got %f, expected %f", pdf, expectedCombinedPDF)
+				}
+			}
+		})
+	}
+}
+
+func TestDiscLight_EmissionSampling_Coverage(t *testing.T) {
+	// Test that emission sampling covers the entire disc surface
+	center := core.NewVec3(0, 0, 0)
+	normal := core.NewVec3(0, 1, 0)
+	radius := 1.0
+	emission := core.NewVec3(1.0, 1.0, 1.0)
+	emissiveMat := material.NewEmissive(emission)
+	light := NewDiscLight(center, normal, radius, emissiveMat)
+
+	random := rand.New(rand.NewSource(42))
+	numSamples := 1000
+
+	// Track coverage in different regions (center vs edge)
+	centerCount := 0
+	edgeCount := 0
+
+	for i := 0; i < numSamples; i++ {
+		sample := light.SampleEmission(random)
+
+		// Classify by distance from center
+		distanceFromCenter := sample.Point.Subtract(center).Length()
+		if distanceFromCenter <= 0.5 {
+			centerCount++
+		} else {
+			edgeCount++
+		}
+
+		// Verify sample is valid
+		if distanceFromCenter > radius+1e-6 {
+			t.Errorf("Sample %d not on disc surface", i)
+		}
+
+		// Verify point is on disc plane
+		heightAbovePlane := math.Abs((sample.Point.Subtract(center)).Dot(normal))
+		if heightAbovePlane > 1e-6 {
+			t.Errorf("Sample %d not on disc plane", i)
+		}
+
+		// Verify direction is in correct hemisphere
+		cosTheta := sample.Direction.Dot(sample.Normal)
+		if cosTheta <= 0 {
+			t.Errorf("Sample %d direction not in correct hemisphere", i)
+		}
+
+		// Verify PDF consistency
+		calculatedPDF := light.EmissionPDF(sample.Point, sample.Direction)
+		if math.Abs(sample.PDF-calculatedPDF) > 1e-6 {
+			t.Errorf("Sample %d PDF inconsistent: sample=%f, calculated=%f", i, sample.PDF, calculatedPDF)
+		}
+	}
+
+	// Verify distribution (center has 1/4 area, edge has 3/4 area)
+	expectedCenterRatio := 0.25
+	actualCenterRatio := float64(centerCount) / float64(numSamples)
+	tolerance := 0.1 // Allow 10% variation
+
+	if math.Abs(actualCenterRatio-expectedCenterRatio) > tolerance {
+		t.Errorf("Center region poorly sampled: %f ratio (expected ~%f)", actualCenterRatio, expectedCenterRatio)
+	}
+}

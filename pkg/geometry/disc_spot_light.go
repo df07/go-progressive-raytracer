@@ -177,3 +177,65 @@ func (dsl *DiscSpotLight) BoundingBox() core.AABB {
 func (dsl *DiscSpotLight) GetDisc() *Disc {
 	return dsl.discLight.Disc
 }
+
+// SampleEmission implements the Light interface - samples emission from the disc spot light surface
+func (dsl *DiscSpotLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+	// Sample the underlying disc light for surface point
+	discSample := dsl.discLight.SampleEmission(random)
+
+	// For spot lights, we need to modify the emission direction sampling
+	// Instead of cosine-weighted hemisphere, we sample within the spot cone
+
+	// Check if the cosine-weighted sample is within the spot cone
+	cosAngleToSpot := discSample.Direction.Dot(dsl.direction)
+
+	if cosAngleToSpot >= dsl.cosTotalWidth {
+		// Sample is within spot cone, apply spot light falloff to emission
+		spotAttenuation := dsl.falloff(cosAngleToSpot)
+		discSample.Emission = discSample.Emission.Multiply(spotAttenuation)
+		return discSample
+	} else {
+		// Sample is outside spot cone, sample within the cone using shared function
+		emissionDir := core.SampleUniformCone(dsl.direction, dsl.cosTotalWidth, random)
+
+		// Calculate spot light falloff
+		cosTheta := emissionDir.Dot(dsl.direction)
+		spotAttenuation := dsl.falloff(cosTheta)
+
+		// Calculate PDF for cone sampling
+		conePDF := core.UniformConePDF(dsl.cosTotalWidth)
+		areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
+		combinedPDF := areaPDF * conePDF
+
+		// Apply spot attenuation to emission
+		emission := discSample.Emission.Multiply(spotAttenuation)
+
+		return core.EmissionSample{
+			Point:     discSample.Point,
+			Normal:    discSample.Normal,
+			Direction: emissionDir,
+			Emission:  emission,
+			PDF:       combinedPDF,
+		}
+	}
+}
+
+// EmissionPDF implements the Light interface - calculates PDF for emission sampling
+func (dsl *DiscSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
+	// First check if point is on disc surface
+	basePDF := dsl.discLight.EmissionPDF(point, direction)
+	if basePDF == 0.0 {
+		return 0.0 // Point not on disc or direction below surface
+	}
+
+	// Check if direction is within the spot cone
+	cosAngleToSpot := direction.Dot(dsl.direction)
+	if cosAngleToSpot < dsl.cosTotalWidth {
+		return 0.0 // Direction outside spot cone
+	}
+
+	// For directions within the cone, we use cone sampling PDF instead of cosine-weighted
+	areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
+	conePDF := core.UniformConePDF(dsl.cosTotalWidth)
+	return areaPDF * conePDF
+}

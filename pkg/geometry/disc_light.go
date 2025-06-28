@@ -101,3 +101,25 @@ func (dl *DiscLight) PDF(point core.Vec3, direction core.Vec3) float64 {
 
 	return areaPDF * distance * distance / cosTheta
 }
+
+// SampleEmission implements the Light interface - samples emission from the disc surface
+func (dl *DiscLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+	// Sample point uniformly on disc surface
+	samplePoint, normal := dl.Disc.SampleUniform(random)
+
+	// Use shared emission sampling function
+	areaPDF := 1.0 / (math.Pi * dl.Radius * dl.Radius)
+	return core.SampleEmissionDirection(samplePoint, normal, areaPDF, dl.Material, random)
+}
+
+// EmissionPDF implements the Light interface - calculates PDF for emission sampling
+func (dl *DiscLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
+	// Validate point is on disc surface
+	if !core.ValidatePointOnDisc(point, dl.Center, dl.Normal, dl.Radius, 0.001) {
+		return 0.0
+	}
+
+	// Use shared PDF calculation
+	areaPDF := 1.0 / (math.Pi * dl.Radius * dl.Radius)
+	return core.CombineAreaAndDirectionPDF(areaPDF, direction, dl.Normal)
+}

@@ -203,3 +203,206 @@ func TestSphereLight_EdgeCase_ZeroRadius(t *testing.T) {
 		t.Errorf("Expected positive PDF even for tiny sphere, got %f", sample.PDF)
 	}
 }
+
+func TestSphereLight_SampleEmission(t *testing.T) {
+	const tolerance = 1e-9
+
+	// Create a spherical light with emissive material
+	emission := core.NewVec3(5.0, 5.0, 5.0)
+	emissiveMat := material.NewEmissive(emission)
+	center := core.NewVec3(0, 0, 0)
+	radius := 1.0
+	light := NewSphereLight(center, radius, emissiveMat)
+
+	random := rand.New(rand.NewSource(42))
+	sample := light.SampleEmission(random)
+
+	// Verify sample point is on sphere surface
+	distanceToCenter := sample.Point.Subtract(center).Length()
+	if math.Abs(distanceToCenter-radius) > tolerance {
+		t.Errorf("Sample point not on sphere surface: distance = %f, expected = %f", distanceToCenter, radius)
+	}
+
+	// Verify normal points outward
+	expectedNormal := sample.Point.Subtract(center).Normalize()
+	normalError := sample.Normal.Subtract(expectedNormal).Length()
+	if normalError > tolerance {
+		t.Errorf("Normal incorrect: error = %f", normalError)
+	}
+
+	// Verify direction is in correct hemisphere (cosine with normal > 0)
+	cosTheta := sample.Direction.Dot(sample.Normal)
+	if cosTheta <= 0 {
+		t.Errorf("Emission direction not in correct hemisphere: cos(theta) = %f", cosTheta)
+	}
+
+	// Verify direction is normalized
+	dirLength := sample.Direction.Length()
+	if math.Abs(dirLength-1.0) > tolerance {
+		t.Errorf("Direction not normalized: length = %f", dirLength)
+	}
+
+	// Verify PDF is positive and reasonable
+	if sample.PDF <= 0 {
+		t.Errorf("PDF should be positive, got %f", sample.PDF)
+	}
+
+	// Expected PDF combines area and direction sampling
+	expectedAreaPDF := 1.0 / (4.0 * math.Pi * radius * radius)
+	expectedDirPDF := cosTheta / math.Pi
+	expectedCombinedPDF := expectedAreaPDF * expectedDirPDF
+	if math.Abs(sample.PDF-expectedCombinedPDF) > tolerance {
+		t.Errorf("PDF incorrect: got %f, expected %f", sample.PDF, expectedCombinedPDF)
+	}
+
+	// Verify emission is correct
+	if sample.Emission.X != emission.X || sample.Emission.Y != emission.Y || sample.Emission.Z != emission.Z {
+		t.Errorf("Emission incorrect: got %v, expected %v", sample.Emission, emission)
+	}
+}
+
+func TestSphereLight_EmissionPDF(t *testing.T) {
+	const tolerance = 1e-9
+
+	emission := core.NewVec3(1.0, 1.0, 1.0)
+	emissiveMat := material.NewEmissive(emission)
+	center := core.NewVec3(0, 0, 0)
+	radius := 1.0
+	light := NewSphereLight(center, radius, emissiveMat)
+
+	tests := []struct {
+		name      string
+		point     core.Vec3
+		direction core.Vec3
+		expectPDF bool
+	}{
+		{
+			name:      "Point on sphere, direction in hemisphere",
+			point:     core.NewVec3(1, 0, 0), // On sphere surface
+			direction: core.NewVec3(1, 0, 0), // Same as normal
+			expectPDF: true,
+		},
+		{
+			name:      "Point on sphere, direction below surface",
+			point:     core.NewVec3(1, 0, 0),  // On sphere surface
+			direction: core.NewVec3(-1, 0, 0), // Opposite to normal
+			expectPDF: false,
+		},
+		{
+			name:      "Point not on sphere",
+			point:     core.NewVec3(2, 0, 0), // Outside sphere
+			direction: core.NewVec3(1, 0, 0),
+			expectPDF: false,
+		},
+		{
+			name:      "Point inside sphere",
+			point:     core.NewVec3(0.5, 0, 0), // Inside sphere
+			direction: core.NewVec3(1, 0, 0),
+			expectPDF: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pdf := light.EmissionPDF(tt.point, tt.direction)
+
+			if !tt.expectPDF {
+				if pdf != 0 {
+					t.Errorf("Expected PDF = 0, got %f", pdf)
+				}
+				return
+			}
+
+			// Verify PDF is positive for valid cases
+			if pdf <= 0 {
+				t.Errorf("Expected positive PDF, got %f", pdf)
+			}
+
+			// Verify PDF formula for valid point on sphere
+			normal := tt.point.Subtract(center).Normalize()
+			cosTheta := tt.direction.Dot(normal)
+			if cosTheta > 0 {
+				expectedAreaPDF := 1.0 / (4.0 * math.Pi * radius * radius)
+				expectedDirPDF := cosTheta / math.Pi
+				expectedCombinedPDF := expectedAreaPDF * expectedDirPDF
+				if math.Abs(pdf-expectedCombinedPDF) > tolerance {
+					t.Errorf("PDF incorrect: got %f, expected %f", pdf, expectedCombinedPDF)
+				}
+			}
+		})
+	}
+}
+
+func TestSphereLight_EmissionSampling_Coverage(t *testing.T) {
+	// Test that emission sampling covers the entire sphere surface
+	emission := core.NewVec3(1.0, 1.0, 1.0)
+	emissiveMat := material.NewEmissive(emission)
+	center := core.NewVec3(0, 0, 0)
+	radius := 1.0
+	light := NewSphereLight(center, radius, emissiveMat)
+
+	random := rand.New(rand.NewSource(42))
+	numSamples := 1000
+
+	// Track coverage in different octants
+	octantCounts := make(map[string]int)
+
+	for i := 0; i < numSamples; i++ {
+		sample := light.SampleEmission(random)
+
+		// Classify by octant
+		x := sample.Point.X
+		y := sample.Point.Y
+		z := sample.Point.Z
+		octant := ""
+		if x >= 0 {
+			octant += "+"
+		} else {
+			octant += "-"
+		}
+		if y >= 0 {
+			octant += "+"
+		} else {
+			octant += "-"
+		}
+		if z >= 0 {
+			octant += "+"
+		} else {
+			octant += "-"
+		}
+		octantCounts[octant]++
+
+		// Verify sample is valid
+		distanceToCenter := sample.Point.Subtract(center).Length()
+		if math.Abs(distanceToCenter-radius) > 1e-6 {
+			t.Errorf("Sample %d not on sphere surface", i)
+		}
+
+		// Verify direction is in correct hemisphere
+		cosTheta := sample.Direction.Dot(sample.Normal)
+		if cosTheta <= 0 {
+			t.Errorf("Sample %d direction not in correct hemisphere", i)
+		}
+
+		// Verify PDF consistency
+		calculatedPDF := light.EmissionPDF(sample.Point, sample.Direction)
+		if math.Abs(sample.PDF-calculatedPDF) > 1e-6 {
+			t.Errorf("Sample %d PDF inconsistent: sample=%f, calculated=%f", i, sample.PDF, calculatedPDF)
+		}
+	}
+
+	// Verify all octants are represented (should have roughly uniform distribution)
+	expectedPerOctant := numSamples / 8
+	tolerance := expectedPerOctant / 2 // Allow 50% variation
+
+	for octant, count := range octantCounts {
+		if count < expectedPerOctant-tolerance || count > expectedPerOctant+tolerance {
+			t.Errorf("Octant %s poorly sampled: %d samples (expected ~%d)", octant, count, expectedPerOctant)
+		}
+	}
+
+	// Ensure all 8 octants are represented
+	if len(octantCounts) != 8 {
+		t.Errorf("Not all octants sampled: got %d octants", len(octantCounts))
+	}
+}

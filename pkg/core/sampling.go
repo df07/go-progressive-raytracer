@@ -91,3 +91,128 @@ func SampleLight(lights []Light, point Vec3, random *rand.Rand) (LightSample, bo
 
 	return sample, true
 }
+
+// SampleLightEmission randomly selects and samples emission from a light in the scene
+func SampleLightEmission(lights []Light, random *rand.Rand) (EmissionSample, bool) {
+	if len(lights) == 0 {
+		return EmissionSample{}, false
+	}
+
+	sampledLight := lights[random.Intn(len(lights))]
+	sample := sampledLight.SampleEmission(random)
+	sample.PDF *= 1.0 / float64(len(lights))
+
+	return sample, true
+}
+
+// CalculateLightEmissionPDF calculates the combined PDF for emission sampling across multiple lights
+func CalculateLightEmissionPDF(lights []Light, point Vec3, direction Vec3) float64 {
+	if len(lights) == 0 {
+		return 0.0
+	}
+
+	totalPDF := 0.0
+	for _, light := range lights {
+		lightPDF := light.EmissionPDF(point, direction)
+		// Weight by light selection probability (uniform selection)
+		totalPDF += lightPDF / float64(len(lights))
+	}
+
+	return totalPDF
+}
+
+// CombineAreaAndDirectionPDF calculates the combined PDF for emission sampling
+// that includes both area sampling and cosine-weighted direction sampling
+func CombineAreaAndDirectionPDF(areaPDF float64, direction Vec3, normal Vec3) float64 {
+	cosTheta := direction.Dot(normal)
+	if cosTheta <= 0 {
+		return 0.0 // Direction below surface
+	}
+
+	directionPDF := cosTheta / math.Pi // cosine-weighted
+	return areaPDF * directionPDF
+}
+
+// SampleEmissionDirection samples a cosine-weighted emission direction from a surface
+// and returns both the direction and the emission sample with calculated PDF
+func SampleEmissionDirection(point Vec3, normal Vec3, areaPDF float64, material Material, random *rand.Rand) EmissionSample {
+	// Sample emission direction (cosine-weighted hemisphere)
+	emissionDir := RandomCosineDirection(normal, random)
+
+	// Calculate combined PDF (area sampling × direction sampling)
+	combinedPDF := CombineAreaAndDirectionPDF(areaPDF, emissionDir, normal)
+
+	// Get emission from material
+	var emission Vec3
+	if emitter, ok := material.(Emitter); ok {
+		dummyRay := NewRay(point, emissionDir)
+		dummyHit := HitRecord{Point: point, Normal: normal, Material: material}
+		emission = emitter.Emit(dummyRay, dummyHit)
+	}
+
+	return EmissionSample{
+		Point:     point,
+		Normal:    normal,
+		Direction: emissionDir,
+		Emission:  emission,
+		PDF:       combinedPDF,
+	}
+}
+
+// UniformConePDF calculates the PDF for uniform sampling within a cone
+func UniformConePDF(cosTotalWidth float64) float64 {
+	return 1.0 / (2.0 * math.Pi * (1.0 - cosTotalWidth))
+}
+
+// SampleUniformCone samples a direction uniformly within a cone
+func SampleUniformCone(direction Vec3, cosTotalWidth float64, random *rand.Rand) Vec3 {
+	// Create coordinate system with z-axis pointing in cone direction
+	w := direction
+	var u Vec3
+	if math.Abs(w.X) > 0.1 {
+		u = NewVec3(0, 1, 0)
+	} else {
+		u = NewVec3(1, 0, 0)
+	}
+	u = u.Cross(w).Normalize()
+	v := w.Cross(u)
+
+	// Sample direction within the cone
+	cosTheta := 1.0 - random.Float64()*(1.0-cosTotalWidth)
+	sinTheta := math.Sqrt(math.Max(0, 1.0-cosTheta*cosTheta))
+	phi := 2.0 * math.Pi * random.Float64()
+
+	// Convert to Cartesian coordinates in local space
+	x := sinTheta * math.Cos(phi)
+	y := sinTheta * math.Sin(phi)
+	z := cosTheta
+
+	// Transform to world space
+	return u.Multiply(x).Add(v.Multiply(y)).Add(w.Multiply(z))
+}
+
+// ValidatePointOnSphere checks if a point lies on a sphere surface within tolerance
+func ValidatePointOnSphere(point Vec3, center Vec3, radius float64, tolerance float64) bool {
+	distFromCenter := point.Subtract(center).Length()
+	return math.Abs(distFromCenter-radius) <= tolerance
+}
+
+// ValidatePointOnDisc checks if a point lies on a disc surface within tolerance
+func ValidatePointOnDisc(point Vec3, center Vec3, normal Vec3, radius float64, tolerance float64) bool {
+	toPoint := point.Subtract(center)
+
+	// Check distance to plane
+	distanceToPlane := math.Abs(toPoint.Dot(normal))
+	if distanceToPlane > tolerance {
+		return false
+	}
+
+	// Check if within disc radius
+	projectedPoint := toPoint.Subtract(normal.Multiply(toPoint.Dot(normal)))
+	return projectedPoint.Length() <= radius
+}
+
+// ValidateDirectionInHemisphere checks if a direction is in the correct hemisphere
+func ValidateDirectionInHemisphere(direction Vec3, normal Vec3) bool {
+	return direction.Dot(normal) > 0
+}

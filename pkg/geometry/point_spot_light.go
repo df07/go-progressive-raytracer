@@ -153,3 +153,50 @@ func (sl *PointSpotLight) GetIntensityAt(point core.Vec3) core.Vec3 {
 	// Return intensity with distance and spot falloff
 	return sl.emission.Multiply(spotAttenuation / (distance * distance))
 }
+
+// SampleEmission implements the Light interface - samples emission from the point spot light
+func (sl *PointSpotLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+	// For point lights, there's only one surface point (the light position)
+	samplePoint := sl.position
+
+	// Sample direction within the spot cone using shared function
+	emissionDir := core.SampleUniformCone(sl.direction, sl.cosTotalWidth, random)
+
+	// Calculate spot light falloff
+	cosTheta := emissionDir.Dot(sl.direction)
+	spotAttenuation := sl.falloff(cosTheta)
+
+	// For point lights, the PDF is over solid angle only (no area component)
+	conePDF := core.UniformConePDF(sl.cosTotalWidth)
+
+	// Apply spot attenuation to emission
+	emission := sl.emission.Multiply(spotAttenuation)
+
+	// Normal for a point light is somewhat arbitrary - use emission direction
+	normal := emissionDir
+
+	return core.EmissionSample{
+		Point:     samplePoint,
+		Normal:    normal,
+		Direction: emissionDir,
+		Emission:  emission,
+		PDF:       conePDF,
+	}
+}
+
+// EmissionPDF implements the Light interface - calculates PDF for emission sampling
+func (sl *PointSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
+	// Check if point is at the light position
+	if point.Subtract(sl.position).Length() > 0.001 {
+		return 0.0 // Point not at light position
+	}
+
+	// Check if direction is within the spot cone
+	cosAngleToSpot := direction.Dot(sl.direction)
+	if cosAngleToSpot < sl.cosTotalWidth {
+		return 0.0 // Direction outside spot cone
+	}
+
+	// Use shared cone PDF calculation
+	return core.UniformConePDF(sl.cosTotalWidth)
+}

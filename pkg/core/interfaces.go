@@ -35,8 +35,19 @@ type Emitter interface {
 
 // Light interface for objects that can be sampled for direct lighting
 type Light interface {
+	// Sample samples light toward a specific point for direct lighting
+	// Returns LightSample with direction FROM shading point TO light
 	Sample(point Vec3, random *rand.Rand) LightSample
+
+	// PDF calculates the probability density for sampling a given direction toward the light
 	PDF(point Vec3, direction Vec3) float64
+
+	// SampleEmission samples emission from the light surface for BDPT light path generation
+	// Returns EmissionSample with direction FROM light surface (for light transport)
+	SampleEmission(random *rand.Rand) EmissionSample
+
+	// EmissionPDF calculates the PDF for emission sampling (area × direction)
+	EmissionPDF(point Vec3, direction Vec3) float64
 }
 
 // LightSample contains information about a sampled point on a light
@@ -47,6 +58,15 @@ type LightSample struct {
 	Distance  float64 // Distance to light
 	Emission  Vec3    // Emitted light
 	PDF       float64 // Probability density of this sample
+}
+
+// EmissionSample contains information about a sampled emission for BDPT light path generation
+type EmissionSample struct {
+	Point     Vec3    // Point on the light surface
+	Normal    Vec3    // Surface normal at the emission point (outward facing)
+	Direction Vec3    // Emission direction FROM the surface (cosine-weighted hemisphere)
+	Emission  Vec3    // Emitted radiance at this point and direction
+	PDF       float64 // Combined PDF for this emission sample (area sampling × direction sampling)
 }
 
 // Camera interface for cameras to avoid circular imports
