@@ -1,7 +1,6 @@
 package integrator
 
 import (
-	"math"
 	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -28,10 +27,10 @@ type Vertex struct {
 	IsSpecular bool // Specular interaction
 
 	// Transport quantities
-	Throughput    core.Vec3           // Accumulated throughput to vertex
-	Beta          core.Vec3           // BSDF * cos(theta) / pdf
-	EmittedLight  core.Vec3           // Light emitted from this vertex (captured during path gen)
-	ScatterResult *core.ScatterResult // Material scatter result (captured during path gen)
+	Throughput    core.Vec3           // Accumulated throughput from path start to this vertex
+	Beta          core.Vec3           // Unweighted throughput (BRDF * cos without PDF division)
+	EmittedLight  core.Vec3           // Light emitted from this vertex
+	ScatterResult *core.ScatterResult // Material scatter result for BRDF evaluation
 }
 
 // Path represents a sequence of vertices in a light transport path
@@ -43,6 +42,13 @@ type Path struct {
 // BDPTIntegrator implements bidirectional path tracing
 type BDPTIntegrator struct {
 	*PathTracingIntegrator
+}
+
+// bdptStrategy represents a single BDPT path construction strategy
+type bdptStrategy struct {
+	s, t         int       // Light path length, camera path length
+	contribution core.Vec3 // Radiance contribution
+	pdf          float64   // Path construction PDF
 }
 
 // NewBDPTIntegrator creates a new BDPT integrator
@@ -121,8 +127,8 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 			IncomingDirection: currentRay.Direction.Multiply(-1),
 			OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Will be set if ray continues
 			IncomingRay:       currentRay,
-			ForwardPDF:        1.0, // Will be calculated properly later
-			ReversePDF:        1.0, // Will be calculated properly later
+			ForwardPDF:        1.0, // PDF for reaching this vertex
+			ReversePDF:        1.0, // PDF for reverse direction (approximated)
 			IsLight:           emittedLight.Luminance() > 0,
 			IsCamera:          bounces == 0,
 			IsSpecular:        false, // Will be set below if material scatters
@@ -144,6 +150,25 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		vertex.OutgoingDirection = scatter.Scattered.Direction
 		vertex.ScatterResult = &scatter // Capture scatter result for later use
 
+		// Set PDFs based on the scatter result
+		if scatter.IsSpecular() {
+			vertex.ForwardPDF = 0.0 // Delta function - no PDF
+			vertex.ReversePDF = 0.0 // Cannot evaluate reverse PDF for specular
+			// For specular, Beta = attenuation (no cos/PDF division)
+			vertex.Beta = scatter.Attenuation
+		} else {
+			vertex.ForwardPDF = scatter.PDF // PDF for the direction we scattered
+			// Calculate reverse PDF using the material's PDF method
+			vertex.ReversePDF = hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
+			// Beta = BRDF * cos(theta) for non-specular materials
+			cosTheta := scatter.Scattered.Direction.Dot(hit.Normal)
+			if cosTheta > 0 {
+				vertex.Beta = scatter.Attenuation.Multiply(cosTheta)
+			} else {
+				vertex.Beta = core.Vec3{X: 0, Y: 0, Z: 0}
+			}
+		}
+
 		path.Vertices = append(path.Vertices, vertex)
 		path.Length++
 
@@ -162,50 +187,37 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		Length:   0,
 	}
 
-	// Get lights from the scene
-	lights := scene.GetLights()
-	if len(lights) == 0 {
-		return path // No lights, return empty path
-	}
-
-	// Sample a light source
-	lightIndex := int(random.Float64() * float64(len(lights)))
-	if lightIndex >= len(lights) {
-		lightIndex = len(lights) - 1
-	}
-	light := lights[lightIndex]
-
-	// Sample a point on the light and get initial ray
-	lightSample := light.Sample(core.Vec3{X: 0, Y: 0, Z: 0}, random) // Position doesn't matter for emission
-	if lightSample.PDF <= 0 {
-		return path // Invalid light sample
+	// Sample emission from a light in the scene
+	emissionSample, hasLight := core.SampleLightEmission(scene.GetLights(), random)
+	if !hasLight || emissionSample.PDF <= 0 {
+		return path // No lights or invalid emission sample
 	}
 
 	// Create the initial light vertex
 	lightVertex := Vertex{
-		Point:             lightSample.Point,
-		Normal:            lightSample.Normal,
+		Point:             emissionSample.Point,
+		Normal:            emissionSample.Normal,
 		Material:          nil,                         // Lights don't have materials in our current system
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Light is the starting point
-		OutgoingDirection: lightSample.Direction,
-		IncomingRay:       core.Ray{}, // No incoming ray for light
-		ForwardPDF:        lightSample.PDF,
-		ReversePDF:        0.0, // Cannot generate reverse direction to light
+		OutgoingDirection: emissionSample.Direction,
+		IncomingRay:       core.Ray{},         // No incoming ray for light
+		ForwardPDF:        emissionSample.PDF, // Already includes light selection PDF
+		ReversePDF:        0.0,                // Cannot generate reverse direction to light
 		IsLight:           true,
 		IsCamera:          false,
 		IsSpecular:        false,
 		Throughput:        core.Vec3{X: 1, Y: 1, Z: 1},
 		Beta:              core.Vec3{X: 1, Y: 1, Z: 1},
-		EmittedLight:      lightSample.Emission,
-		ScatterResult:     nil, // Lights don't scatter
+		EmittedLight:      emissionSample.Emission, // Already properly scaled
+		ScatterResult:     nil,                     // Lights don't scatter
 	}
 
 	path.Vertices = append(path.Vertices, lightVertex)
 	path.Length++
 
 	// Continue the light path by bouncing off surfaces
-	currentRay := core.NewRay(lightSample.Point, lightSample.Direction)
-	currentThroughput := lightSample.Emission
+	currentRay := core.NewRay(emissionSample.Point, emissionSample.Direction)
+	currentThroughput := emissionSample.Emission
 
 	for bounces := 1; bounces < maxDepth; bounces++ {
 		// Check for intersections
@@ -245,8 +257,8 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 			IncomingDirection: currentRay.Direction.Multiply(-1),
 			OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
 			IncomingRay:       currentRay,
-			ForwardPDF:        1.0, // Will be calculated properly later
-			ReversePDF:        1.0, // Will be calculated properly later
+			ForwardPDF:        1.0, // PDF for reaching this vertex
+			ReversePDF:        1.0, // PDF for reverse direction (approximated)
 			IsLight:           false,
 			IsCamera:          false,
 			IsSpecular:        false,
@@ -270,6 +282,16 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		vertex.OutgoingDirection = scatter.Scattered.Direction
 		vertex.ScatterResult = &scatter
 
+		// Set PDFs based on the scatter result (same as camera path)
+		if scatter.IsSpecular() {
+			vertex.ForwardPDF = 0.0 // Delta function - no PDF
+			vertex.ReversePDF = 0.0 // Cannot evaluate reverse PDF for specular
+		} else {
+			vertex.ForwardPDF = scatter.PDF // PDF for the direction we scattered
+			// Calculate reverse PDF using the material's PDF method
+			vertex.ReversePDF = hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
+		}
+
 		path.Vertices = append(path.Vertices, vertex)
 		path.Length++
 
@@ -281,40 +303,120 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 	return path
 }
 
-// evaluateBDPTStrategies evaluates all BDPT path construction strategies with MIS
-func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene, random *rand.Rand, sampleIndex int) core.Vec3 {
+// calculatePathPDF calculates the PDF for a complete path construction strategy
+func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath Path, lightPath Path, s, t int) float64 {
+	pdf := 1.0
 
-	// Strategy 1: Pure path tracing
-	pathTracingContribution := bdpt.evaluatePathTracingStrategy(cameraPath, scene, random, sampleIndex)
-
-	// Strategy 2: Find the best connection
-	bestConnectionContribution := core.Vec3{X: 0, Y: 0, Z: 0}
-
-	// Try connections (but limit to avoid too many combinations)
-	maxConnections := 3 // Limit connection attempts
-	connectionCount := 0
-
-	for s := 1; s <= lightPath.Length && connectionCount < maxConnections; s++ {
-		for t := 1; t <= cameraPath.Length && connectionCount < maxConnections; t++ {
-			connectionContribution := bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
-			if connectionContribution.Luminance() > bestConnectionContribution.Luminance() {
-				bestConnectionContribution = connectionContribution
-			}
-			connectionCount++
+	// Camera path contribution (first t vertices)
+	for i := 0; i < t && i < len(cameraPath.Vertices); i++ {
+		vertex := cameraPath.Vertices[i]
+		if vertex.ForwardPDF > 0 {
+			pdf *= vertex.ForwardPDF
 		}
 	}
 
-	// Use MIS to weight path tracing vs best connection
-	if bestConnectionContribution.Luminance() > 0 {
-		// Calculate MIS weights for the two strategies
-		pathWeight := 0.5 // path tracing
-		connWeight := 0.5 // connection
-
-		return pathTracingContribution.Multiply(pathWeight).Add(bestConnectionContribution.Multiply(connWeight))
-	} else {
-		// No valid connections, just use path tracing
-		return pathTracingContribution
+	// Light path contribution (first s vertices)
+	for i := 0; i < s && i < len(lightPath.Vertices); i++ {
+		vertex := lightPath.Vertices[i]
+		if vertex.ForwardPDF > 0 {
+			pdf *= vertex.ForwardPDF
+		}
 	}
+
+	return pdf
+}
+
+// calculateMISWeight calculates the MIS weight for a strategy against all competing strategies
+func (bdpt *BDPTIntegrator) calculateMISWeight(currentStrategy bdptStrategy, allStrategies []bdptStrategy) float64 {
+	if currentStrategy.pdf <= 0 {
+		return 0.0
+	}
+
+	// Power heuristic with β = 2
+	sumWeights := 0.0
+	currentWeight := currentStrategy.pdf * currentStrategy.pdf
+
+	for _, strategy := range allStrategies {
+		if strategy.pdf > 0 {
+			sumWeights += strategy.pdf * strategy.pdf
+		}
+	}
+
+	if sumWeights <= 0 {
+		return 0.0
+	}
+
+	return currentWeight / sumWeights
+}
+
+// evaluateBDPTStrategies evaluates all BDPT path construction strategies with MIS weighting.
+//
+// BDPT works by generating two subpaths:
+// - Camera subpath: starts from camera, bounces through scene
+// - Light subpath: starts from light sources, bounces through scene
+//
+// These can be connected in multiple ways to form complete light transport paths:
+// - (s=0, t=n): Pure path tracing - camera path only
+// - (s=1, t=n-1): Direct lighting - connect camera path to light
+// - (s=2, t=n-2): One-bounce indirect - light bounces once before connecting
+// - etc.
+//
+// Multiple Importance Sampling (MIS) optimally combines all strategies using
+// the power heuristic to minimize variance.
+func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene, random *rand.Rand, sampleIndex int) core.Vec3 {
+
+	totalContribution := core.Vec3{X: 0, Y: 0, Z: 0}
+
+	// Calculate all valid strategies and their PDFs for proper MIS
+	strategies := make([]bdptStrategy, 0)
+
+	// Strategy: Pure path tracing (s=0, t=camera_length)
+	if len(cameraPath.Vertices) > 0 {
+		contribution := bdpt.evaluatePathTracingStrategy(cameraPath, scene, random, sampleIndex)
+		pdf := bdpt.calculatePathPDF(cameraPath, lightPath, 0, len(cameraPath.Vertices))
+		if contribution.Luminance() > 0 && pdf > 0 {
+			strategies = append(strategies, bdptStrategy{
+				s: 0, t: len(cameraPath.Vertices),
+				contribution: contribution,
+				pdf:          pdf,
+			})
+		}
+	}
+
+	// Strategies: Connection strategies (s>0, t>0)
+	maxS := lightPath.Length
+	if maxS > 3 {
+		maxS = 3 // Reasonable limit to avoid too many strategies
+	}
+	maxT := cameraPath.Length
+	if maxT > 4 {
+		maxT = 4 // Reasonable limit
+	}
+
+	for s := 1; s <= maxS; s++ {
+		for t := 1; t <= maxT; t++ {
+			contribution := bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
+			if contribution.Luminance() > 0 {
+				pdf := bdpt.calculatePathPDF(cameraPath, lightPath, s, t)
+				if pdf > 0 {
+					strategies = append(strategies, bdptStrategy{
+						s: s, t: t,
+						contribution: contribution,
+						pdf:          pdf,
+					})
+				}
+			}
+		}
+	}
+
+	// Apply MIS weighting to all strategies
+	for _, strategy := range strategies {
+		// Calculate MIS weight by comparing against all other strategies
+		weight := bdpt.calculateMISWeight(strategy, strategies)
+		totalContribution = totalContribution.Add(strategy.contribution.Multiply(weight))
+	}
+
+	return totalContribution
 }
 
 // evaluatePathTracingStrategy evaluates the standard path tracing strategy (camera path only)
@@ -333,6 +435,16 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, scene c
 	// For now, return zero since we don't implement camera sampling from light paths
 	// Full implementation would trace light path and check if it hits the camera
 	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// evaluateBRDF evaluates the BRDF at a vertex for a given outgoing direction
+func (bdpt *BDPTIntegrator) evaluateBRDF(vertex Vertex, outgoingDirection core.Vec3) core.Vec3 {
+	if vertex.Material == nil {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Use the new EvaluateBRDF method from the material interface
+	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, vertex.Normal)
 }
 
 // evaluateConnectionStrategy evaluates connecting s light vertices with t camera vertices
@@ -354,7 +466,20 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	return bdpt.evaluateConnection(cameraVertex, lightVertex, cameraPath, lightPath, s, t, scene)
 }
 
-// evaluateConnection computes the contribution from connecting two specific vertices
+// evaluateConnection computes the contribution from connecting two specific vertices.
+//
+// This implements the BDPT connection formula:
+// L = f_camera(x) * G(x,y) * f_light(y) * T_camera * T_light
+//
+// Where:
+// - f_camera(x): BRDF at camera vertex for connection direction
+// - f_light(y): BRDF at light vertex for connection direction
+// - G(x,y): geometric term = cos(θx) * cos(θy) / distance²
+// - T_camera: accumulated throughput along camera subpath
+// - T_light: accumulated throughput along light subpath
+//
+// The connection is only valid if both vertices are non-specular and
+// there is an unoccluded line of sight between them.
 func (bdpt *BDPTIntegrator) evaluateConnection(cameraVertex, lightVertex Vertex, cameraPath, lightPath Path, s, t int, scene core.Scene) core.Vec3 {
 	// Calculate direction from camera vertex to light vertex
 	direction := lightVertex.Point.Subtract(cameraVertex.Point)
@@ -379,21 +504,16 @@ func (bdpt *BDPTIntegrator) evaluateConnection(cameraVertex, lightVertex Vertex,
 	}
 	geometricTerm := (cosAtCamera * cosAtLight) / (distance * distance)
 
-	// Evaluate BRDF at camera vertex
-	var brdf core.Vec3
-	if cameraVertex.ScatterResult != nil {
-		// Use the actual material BRDF
-		brdf = cameraVertex.ScatterResult.Attenuation.Multiply(1.0 / math.Pi)
-	} else {
-		return core.Vec3{X: 0, Y: 0, Z: 0} // No scatter result means no BRDF
-	}
+	// Evaluate BRDFs at both connection vertices
+	cameraBRDF := bdpt.evaluateBRDF(cameraVertex, direction)
+	lightBRDF := bdpt.evaluateBRDF(lightVertex, direction.Multiply(-1)) // Opposite direction for light vertex
 
 	// Calculate path throughputs
 	cameraPathThroughput := bdpt.calculateCameraPathThroughput(cameraPath, t)
 	lightPathThroughput := bdpt.calculateLightPathThroughput(lightPath, s)
 
-	// Combine everything: f(x) * G(x,y) * f(y) * T_camera * T_light
-	contribution := brdf.Multiply(geometricTerm).MultiplyVec(cameraPathThroughput).MultiplyVec(lightPathThroughput)
+	// Combine everything: f_camera(x) * G(x,y) * f_light(y) * T_camera * T_light
+	contribution := cameraBRDF.MultiplyVec(lightBRDF).Multiply(geometricTerm).MultiplyVec(cameraPathThroughput).MultiplyVec(lightPathThroughput)
 
 	return contribution
 }
@@ -404,14 +524,12 @@ func (bdpt *BDPTIntegrator) calculateCameraPathThroughput(path Path, length int)
 		return core.Vec3{X: 1, Y: 1, Z: 1}
 	}
 
-	throughput := core.Vec3{X: 1, Y: 1, Z: 1}
-	for i := 0; i < length-1; i++ {
-		vertex := path.Vertices[i]
-		if vertex.ScatterResult != nil {
-			throughput = throughput.MultiplyVec(vertex.ScatterResult.Attenuation)
-		}
+	// Use the stored throughput from the vertex (much more efficient)
+	if length <= path.Length && length > 0 {
+		return path.Vertices[length-1].Throughput
 	}
-	return throughput
+
+	return core.Vec3{X: 1, Y: 1, Z: 1}
 }
 
 // calculateLightPathThroughput calculates the throughput along a light subpath
@@ -420,18 +538,10 @@ func (bdpt *BDPTIntegrator) calculateLightPathThroughput(path Path, length int) 
 		return core.Vec3{X: 1, Y: 1, Z: 1}
 	}
 
-	// Start with the light emission from the first vertex
-	throughput := core.Vec3{X: 1, Y: 1, Z: 1}
-	if path.Length > 0 && path.Vertices[0].EmittedLight.Luminance() > 0 {
-		throughput = path.Vertices[0].EmittedLight
+	// Use the stored throughput from the vertex (much more efficient)
+	if length <= path.Length && length > 0 {
+		return path.Vertices[length-1].Throughput
 	}
 
-	// Accumulate scattering along the path (same as camera path)
-	for i := 1; i < length; i++ {
-		vertex := path.Vertices[i]
-		if vertex.ScatterResult != nil {
-			throughput = throughput.MultiplyVec(vertex.ScatterResult.Attenuation)
-		}
-	}
-	return throughput
+	return core.Vec3{X: 1, Y: 1, Z: 1}
 }
