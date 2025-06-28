@@ -70,7 +70,41 @@ func (d *Dielectric) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) co
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
 func (d *Dielectric) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
-	return 0.0 // Delta function
+	// For BDPT: return 1.0 when directions match perfect reflection or refraction, 0.0 otherwise
+
+	// Normalize the incoming direction
+	unitDirection := incomingDir.Negate().Normalize()
+
+	// Calculate the cosine of the angle between ray and normal
+	cosTheta := math.Min(-unitDirection.Dot(normal), 1.0)
+
+	// Check reflection first
+	reflected := reflectVector(unitDirection, normal)
+	if outgoingDir.Subtract(reflected).Length() < 0.001 {
+		return 1.0 // Perfect reflection match
+	}
+
+	// Check refraction (both entering and exiting cases)
+	// Try entering the material (air to glass)
+	refractionRatio1 := 1.0 / d.RefractiveIndex
+	sinTheta1 := math.Sqrt(1.0 - cosTheta*cosTheta)
+	if refractionRatio1*sinTheta1 <= 1.0 { // No total internal reflection
+		refracted1 := refractVector(unitDirection, normal, refractionRatio1)
+		if outgoingDir.Subtract(refracted1).Length() < 0.001 {
+			return 1.0 // Perfect refraction match (entering)
+		}
+	}
+
+	// Try exiting the material (glass to air)
+	refractionRatio2 := d.RefractiveIndex
+	if refractionRatio2*sinTheta1 <= 1.0 { // No total internal reflection
+		refracted2 := refractVector(unitDirection, normal, refractionRatio2)
+		if outgoingDir.Subtract(refracted2).Length() < 0.001 {
+			return 1.0 // Perfect refraction match (exiting)
+		}
+	}
+
+	return 0.0 // No contribution for non-reflection/refraction directions
 }
 
 // reflectVector calculates the reflection of a vector v off a surface with normal n

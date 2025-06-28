@@ -70,8 +70,8 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *ran
 	return bdpt.evaluateBDPTStrategies(cameraPath, lightPath, scene, random, sampleIndex)
 }
 
-// generateCameraSubpath generates a camera subpath with vertex tracking
-// This focuses purely on path generation for BDPT - lighting is handled separately
+// generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
+// Each vertex stores forward/reverse PDFs needed for MIS weight calculation
 func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene, random *rand.Rand, depth int, throughput core.Vec3, sampleIndex int) Path {
 	path := Path{
 		Vertices: make([]Vertex, 0, depth),
@@ -127,8 +127,8 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 			IncomingDirection: currentRay.Direction.Multiply(-1),
 			OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Will be set if ray continues
 			IncomingRay:       currentRay,
-			ForwardPDF:        1.0, // PDF for reaching this vertex
-			ReversePDF:        1.0, // PDF for reverse direction (approximated)
+			ForwardPDF:        1.0, // Will be updated by setVertexPDFs if material scatters
+			ReversePDF:        1.0, // Will be updated by setVertexPDFs if material scatters
 			IsLight:           emittedLight.Luminance() > 0,
 			IsCamera:          bounces == 0,
 			IsSpecular:        false, // Will be set below if material scatters
@@ -150,24 +150,8 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		vertex.OutgoingDirection = scatter.Scattered.Direction
 		vertex.ScatterResult = &scatter // Capture scatter result for later use
 
-		// Set PDFs based on the scatter result
-		if scatter.IsSpecular() {
-			vertex.ForwardPDF = 0.0 // Delta function - no PDF
-			vertex.ReversePDF = 0.0 // Cannot evaluate reverse PDF for specular
-			// For specular, Beta = attenuation (no cos/PDF division)
-			vertex.Beta = scatter.Attenuation
-		} else {
-			vertex.ForwardPDF = scatter.PDF // PDF for the direction we scattered
-			// Calculate reverse PDF using the material's PDF method
-			vertex.ReversePDF = hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
-			// Beta = BRDF * cos(theta) for non-specular materials
-			cosTheta := scatter.Scattered.Direction.Dot(hit.Normal)
-			if cosTheta > 0 {
-				vertex.Beta = scatter.Attenuation.Multiply(cosTheta)
-			} else {
-				vertex.Beta = core.Vec3{X: 0, Y: 0, Z: 0}
-			}
-		}
+		// Set PDFs and Beta using the helper function
+		bdpt.setVertexPDFs(&vertex, scatter, currentRay, hit)
 
 		path.Vertices = append(path.Vertices, vertex)
 		path.Length++
@@ -180,7 +164,8 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 	return path
 }
 
-// generateLightSubpath generates a light subpath starting from a light source
+// generateLightSubpath generates a light subpath with proper PDF tracking for BDPT
+// Starting from light emission, each vertex stores forward/reverse PDFs for MIS
 func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.Rand, maxDepth int) Path {
 	path := Path{
 		Vertices: make([]Vertex, 0, maxDepth),
@@ -257,8 +242,8 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 			IncomingDirection: currentRay.Direction.Multiply(-1),
 			OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
 			IncomingRay:       currentRay,
-			ForwardPDF:        1.0, // PDF for reaching this vertex
-			ReversePDF:        1.0, // PDF for reverse direction (approximated)
+			ForwardPDF:        1.0, // Will be updated by setVertexPDFs if material scatters
+			ReversePDF:        1.0, // Will be updated by setVertexPDFs if material scatters
 			IsLight:           false,
 			IsCamera:          false,
 			IsSpecular:        false,
@@ -282,15 +267,8 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		vertex.OutgoingDirection = scatter.Scattered.Direction
 		vertex.ScatterResult = &scatter
 
-		// Set PDFs based on the scatter result (same as camera path)
-		if scatter.IsSpecular() {
-			vertex.ForwardPDF = 0.0 // Delta function - no PDF
-			vertex.ReversePDF = 0.0 // Cannot evaluate reverse PDF for specular
-		} else {
-			vertex.ForwardPDF = scatter.PDF // PDF for the direction we scattered
-			// Calculate reverse PDF using the material's PDF method
-			vertex.ReversePDF = hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
-		}
+		// Set PDFs and Beta using the helper function
+		bdpt.setVertexPDFs(&vertex, scatter, currentRay, hit)
 
 		path.Vertices = append(path.Vertices, vertex)
 		path.Length++
@@ -301,6 +279,28 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 	}
 
 	return path
+}
+
+// setVertexPDFs sets the forward and reverse PDFs for a vertex based on scattering
+func (bdpt *BDPTIntegrator) setVertexPDFs(vertex *Vertex, scatter core.ScatterResult, incomingRay core.Ray, hit *core.HitRecord) {
+	if scatter.IsSpecular() {
+		// For specular materials, use the new PDF method that returns 1.0 for perfect reflection/refraction
+		vertex.ForwardPDF = hit.Material.PDF(incomingRay.Direction.Multiply(-1), scatter.Scattered.Direction, hit.Normal)
+		vertex.ReversePDF = hit.Material.PDF(scatter.Scattered.Direction, incomingRay.Direction.Multiply(-1), hit.Normal)
+		// For specular, Beta = attenuation (no cos/PDF division)
+		vertex.Beta = scatter.Attenuation
+	} else {
+		vertex.ForwardPDF = scatter.PDF // PDF for the direction we scattered
+		// Calculate reverse PDF using the material's PDF method
+		vertex.ReversePDF = hit.Material.PDF(scatter.Scattered.Direction, incomingRay.Direction.Multiply(-1), hit.Normal)
+		// Beta = BRDF * cos(theta) for non-specular materials
+		cosTheta := scatter.Scattered.Direction.Dot(hit.Normal)
+		if cosTheta > 0 {
+			vertex.Beta = scatter.Attenuation.Multiply(cosTheta)
+		} else {
+			vertex.Beta = core.Vec3{X: 0, Y: 0, Z: 0}
+		}
+	}
 }
 
 // calculatePathPDF calculates the PDF for a complete path construction strategy
