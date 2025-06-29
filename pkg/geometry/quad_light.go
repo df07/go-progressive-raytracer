@@ -114,9 +114,27 @@ func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
 	beta := random.Float64()
 	samplePoint := ql.Corner.Add(ql.U.Multiply(alpha)).Add(ql.V.Multiply(beta))
 
-	// Use shared emission sampling function
+	// Sample emission direction (cosine-weighted hemisphere)
+	emissionDir := core.RandomCosineDirection(ql.Normal, random)
+
+	// For BDPT, use area measure only (probability per unit area)
 	areaPDF := 1.0 / ql.Area
-	return core.SampleEmissionDirection(samplePoint, ql.Normal, areaPDF, ql.Material, random)
+
+	// Get emission from material
+	var emission core.Vec3
+	if emitter, ok := ql.Material.(core.Emitter); ok {
+		dummyRay := core.NewRay(samplePoint, emissionDir)
+		dummyHit := core.HitRecord{Point: samplePoint, Normal: ql.Normal, Material: ql.Material}
+		emission = emitter.Emit(dummyRay, dummyHit)
+	}
+
+	return core.EmissionSample{
+		Point:     samplePoint,
+		Normal:    ql.Normal,
+		Direction: emissionDir,
+		Emission:  emission,
+		PDF:       areaPDF, // Area measure only for BDPT
+	}
 }
 
 // EmissionPDF implements the Light interface - calculates PDF for emission sampling
@@ -156,7 +174,7 @@ func (ql *QuadLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 		return 0.0 // Point not on quad surface
 	}
 
-	// Use shared PDF calculation
+	// For BDPT, use area measure only (probability per unit area)
 	areaPDF := 1.0 / ql.Area
-	return core.CombineAreaAndDirectionPDF(areaPDF, direction, ql.Normal)
+	return areaPDF
 }

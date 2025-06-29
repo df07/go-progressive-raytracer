@@ -149,3 +149,10 @@ Comprehensive test coverage includes:
 **PLY gotcha**: TriangleMesh needs per-triangle normals, PLY files have per-vertex normals - skip normals and let mesh auto-calculate
 
 **New scenes**: Update `pkg/scene/`, `main.go`, `web/server/server.go`, `web/static/index.html`
+
+## Git Commit Message Format
+
+Use this format for commit messages:
+- **Summary line**: Single line describing what was done (imperative mood)
+- **Description**: A few sentences with more detail about the changes and why
+- Always include the Claude Code attribution footer
