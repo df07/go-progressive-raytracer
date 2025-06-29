@@ -67,7 +67,7 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *ran
 	lightPath := bdpt.generateLightSubpath(scene, random, depth)
 
 	// Evaluate all BDPT strategies with proper MIS weighting
-	return bdpt.evaluateBDPTStrategies(cameraPath, lightPath, scene, random, sampleIndex)
+	return bdpt.evaluateBDPTStrategies(cameraPath, lightPath, scene)
 }
 
 // generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
@@ -78,88 +78,31 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		Length:   0,
 	}
 
-	currentRay := ray
-	currentThroughput := throughput
-
-	for bounces := 0; bounces < depth; bounces++ {
-		// No Russian Roulette during path generation - we'll handle it during lighting evaluation
-
-		// Check for intersections
-		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, 1000.0)
-		if !isHit {
-			// Hit background - create a background vertex with captured light
-			bgColor := bdpt.BackgroundGradient(currentRay, scene)
-
-			vertex := Vertex{
-				Point:             currentRay.Origin.Add(currentRay.Direction.Multiply(1000.0)), // Far background
-				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
-				Material:          nil,
-				IncomingDirection: currentRay.Direction.Multiply(-1),
-				OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
-				IncomingRay:       currentRay,
-				ForwardPDF:        1.0,  // Background PDF
-				ReversePDF:        0.0,  // Cannot generate rays towards background
-				IsLight:           true, // Background acts as light source
-				IsCamera:          bounces == 0,
-				IsSpecular:        false,
-				Throughput:        currentThroughput,
-				Beta:              core.Vec3{X: 1, Y: 1, Z: 1},
-				EmittedLight:      bgColor, // Capture background light
-				ScatterResult:     nil,     // Background doesn't scatter
-			}
-
-			path.Vertices = append(path.Vertices, vertex)
-			path.Length++
-			break
-		}
-
-		// Capture emitted light from this vertex
-		emittedLight := bdpt.GetEmittedLight(currentRay, hit)
-
-		// Try to scatter the ray
-		scatter, didScatter := hit.Material.Scatter(currentRay, *hit, random)
-
-		// Create vertex for the intersection with all captured information
-		vertex := Vertex{
-			Point:             hit.Point,
-			Normal:            hit.Normal,
-			Material:          hit.Material,
-			IncomingDirection: currentRay.Direction.Multiply(-1),
-			OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Will be set if ray continues
-			IncomingRay:       currentRay,
-			ForwardPDF:        1.0, // Will be updated by setVertexPDFs if material scatters
-			ReversePDF:        1.0, // Will be updated by setVertexPDFs if material scatters
-			IsLight:           emittedLight.Luminance() > 0,
-			IsCamera:          bounces == 0,
-			IsSpecular:        false, // Will be set below if material scatters
-			Throughput:        currentThroughput,
-			Beta:              core.Vec3{X: 1, Y: 1, Z: 1}, // Will be calculated properly later
-			EmittedLight:      emittedLight,                // Captured during path generation
-			ScatterResult:     nil,                         // Will be set below if material scatters
-		}
-
-		if !didScatter {
-			// Material absorbed the ray - add vertex and terminate path
-			path.Vertices = append(path.Vertices, vertex)
-			path.Length++
-			break
-		}
-
-		// Material scattered - capture the scatter information
-		vertex.IsSpecular = scatter.IsSpecular()
-		vertex.OutgoingDirection = scatter.Scattered.Direction
-		vertex.ScatterResult = &scatter // Capture scatter result for later use
-
-		// Set PDFs and Beta using the helper function
-		bdpt.setVertexPDFs(&vertex, scatter, currentRay, hit)
-
-		path.Vertices = append(path.Vertices, vertex)
-		path.Length++
-
-		// Prepare for next bounce
-		currentRay = scatter.Scattered
-		currentThroughput = currentThroughput.MultiplyVec(scatter.Attenuation)
+	// Create the initial camera vertex (like light path does for light sources)
+	cameraVertex := Vertex{
+		Point:             ray.Origin,
+		Normal:            ray.Direction.Multiply(-1),  // Camera "normal" points back along ray
+		Material:          nil,                         // Cameras don't have materials
+		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Camera is the starting point
+		OutgoingDirection: ray.Direction,
+		IncomingRay:       core.Ray{}, // No incoming ray for camera
+		ForwardPDF:        1.0,        // Camera sampling PDF (could be area of sensor)
+		ReversePDF:        0.0,        // Cannot generate reverse direction to camera
+		IsLight:           false,
+		IsCamera:          true,
+		IsSpecular:        false,
+		Throughput:        core.Vec3{X: 1, Y: 1, Z: 1}, // Start with unit throughput
+		Beta:              core.Vec3{X: 1, Y: 1, Z: 1},
+		EmittedLight:      core.Vec3{X: 0, Y: 0, Z: 0}, // Cameras don't emit light
+		ScatterResult:     nil,                         // Cameras don't scatter
 	}
+
+	path.Vertices = append(path.Vertices, cameraVertex)
+	path.Length++
+
+	// Continue the camera path by tracing the ray through the scene
+	// Use depth-1 because we already have the initial camera vertex
+	bdpt.extendPath(&path, ray, throughput, scene, random, depth-1)
 
 	return path
 }
@@ -200,33 +143,42 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 	path.Vertices = append(path.Vertices, lightVertex)
 	path.Length++
 
-	// Continue the light path by bouncing off surfaces
+	// Continue the light path by bouncing off surfaces using the common path extension logic
 	currentRay := core.NewRay(emissionSample.Point, emissionSample.Direction)
 	currentThroughput := emissionSample.Emission
 
-	for bounces := 1; bounces < maxDepth; bounces++ {
+	// Use the common path extension logic (maxDepth-1 because we already have the initial light vertex)
+	bdpt.extendPath(&path, currentRay, currentThroughput, scene, random, maxDepth-1)
+
+	return path
+}
+
+// extendPath extends a path by tracing a ray through the scene, handling intersections and scattering
+// This is the common logic shared between camera and light path generation after the initial vertex
+func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, currentThroughput core.Vec3, scene core.Scene, random *rand.Rand, maxBounces int) {
+	for bounces := 0; bounces < maxBounces; bounces++ {
 		// Check for intersections
 		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, 1000.0)
 		if !isHit {
-			// Light ray escaped to environment - create background vertex
+			// Hit background - create a background vertex with captured light
 			bgColor := bdpt.BackgroundGradient(currentRay, scene)
 
 			vertex := Vertex{
-				Point:             currentRay.Origin.Add(currentRay.Direction.Multiply(1000.0)),
-				Normal:            currentRay.Direction.Multiply(-1),
+				Point:             currentRay.Origin.Add(currentRay.Direction.Multiply(1000.0)), // Far background
+				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
 				Material:          nil,
 				IncomingDirection: currentRay.Direction.Multiply(-1),
 				OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
 				IncomingRay:       currentRay,
-				ForwardPDF:        1.0,
-				ReversePDF:        1.0,
-				IsLight:           true, // Background is treated as light
-				IsCamera:          false,
+				ForwardPDF:        1.0,   // Background PDF
+				ReversePDF:        0.0,   // Cannot generate rays towards background
+				IsLight:           true,  // Background acts as light source
+				IsCamera:          false, // No camera vertices in path extension
 				IsSpecular:        false,
 				Throughput:        currentThroughput,
 				Beta:              core.Vec3{X: 1, Y: 1, Z: 1},
-				EmittedLight:      bgColor,
-				ScatterResult:     nil,
+				EmittedLight:      bgColor, // Capture background light
+				ScatterResult:     nil,     // Background doesn't scatter
 			}
 
 			path.Vertices = append(path.Vertices, vertex)
@@ -234,23 +186,26 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 			break
 		}
 
+		// Capture emitted light from this vertex
+		emittedLight := bdpt.GetEmittedLight(currentRay, hit)
+
 		// Create vertex for the intersection
 		vertex := Vertex{
 			Point:             hit.Point,
 			Normal:            hit.Normal,
 			Material:          hit.Material,
 			IncomingDirection: currentRay.Direction.Multiply(-1),
-			OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
+			OutgoingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Will be set if ray continues
 			IncomingRay:       currentRay,
 			ForwardPDF:        1.0, // Will be updated by setVertexPDFs if material scatters
 			ReversePDF:        1.0, // Will be updated by setVertexPDFs if material scatters
-			IsLight:           false,
-			IsCamera:          false,
-			IsSpecular:        false,
+			IsLight:           emittedLight.Luminance() > 0,
+			IsCamera:          false, // No camera vertices in path extension
+			IsSpecular:        false, // Will be set below if material scatters
 			Throughput:        currentThroughput,
-			Beta:              core.Vec3{X: 1, Y: 1, Z: 1},
-			EmittedLight:      core.Vec3{X: 0, Y: 0, Z: 0}, // Surface vertices don't emit (usually)
-			ScatterResult:     nil,
+			Beta:              core.Vec3{X: 1, Y: 1, Z: 1}, // Will be calculated properly later
+			EmittedLight:      emittedLight,                // Captured during path generation
+			ScatterResult:     nil,                         // Will be set below if material scatters
 		}
 
 		// Try to scatter the ray
@@ -265,7 +220,7 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		// Material scattered - capture the scatter information
 		vertex.IsSpecular = scatter.IsSpecular()
 		vertex.OutgoingDirection = scatter.Scattered.Direction
-		vertex.ScatterResult = &scatter
+		vertex.ScatterResult = &scatter // Capture scatter result for later use
 
 		// Set PDFs and Beta using the helper function
 		bdpt.setVertexPDFs(&vertex, scatter, currentRay, hit)
@@ -275,10 +230,26 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 
 		// Prepare for next bounce
 		currentRay = scatter.Scattered
-		currentThroughput = currentThroughput.MultiplyVec(scatter.Attenuation)
-	}
 
-	return path
+		// Calculate proper throughput for BDPT: throughput *= (BRDF * cos_theta / PDF)
+		// For non-specular materials, we need to account for the PDF
+		if scatter.IsSpecular() {
+			// For specular materials, attenuation already includes the correct contribution
+			currentThroughput = currentThroughput.MultiplyVec(scatter.Attenuation)
+		} else {
+			// For non-specular materials, calculate throughput properly
+			cosTheta := scatter.Scattered.Direction.Dot(hit.Normal)
+			if cosTheta > 0 && scatter.PDF > 0 {
+				// throughput *= (attenuation * cos_theta / PDF)
+				// Note: scatter.Attenuation represents the BRDF value
+				contribution := scatter.Attenuation.Multiply(cosTheta / scatter.PDF)
+				currentThroughput = currentThroughput.MultiplyVec(contribution)
+			} else {
+				// Invalid scattering - terminate path
+				break
+			}
+		}
+	}
 }
 
 // setVertexPDFs sets the forward and reverse PDFs for a vertex based on scattering
@@ -363,7 +334,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(currentStrategy bdptStrategy, all
 //
 // Multiple Importance Sampling (MIS) optimally combines all strategies using
 // the power heuristic to minimize variance.
-func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene, random *rand.Rand, sampleIndex int) core.Vec3 {
+func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene) core.Vec3 {
 
 	totalContribution := core.Vec3{X: 0, Y: 0, Z: 0}
 
@@ -372,7 +343,7 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, s
 
 	// Strategy: Pure path tracing (s=0, t=camera_length)
 	if len(cameraPath.Vertices) > 0 {
-		contribution := bdpt.evaluatePathTracingStrategy(cameraPath, scene, random, sampleIndex)
+		contribution := bdpt.evaluatePathTracingStrategy(cameraPath)
 		pdf := bdpt.calculatePathPDF(cameraPath, lightPath, 0, len(cameraPath.Vertices))
 		if contribution.Luminance() > 0 && pdf > 0 {
 			strategies = append(strategies, bdptStrategy{
@@ -419,19 +390,28 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, s
 	return totalContribution
 }
 
-// evaluatePathTracingStrategy evaluates the standard path tracing strategy (camera path only)
-func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path, scene core.Scene, random *rand.Rand, sampleIndex int) core.Vec3 {
-	// Just use the original path tracing integrator for this - it's proven to work
-	if len(cameraPath.Vertices) > 0 {
-		firstVertex := cameraPath.Vertices[0]
-		originalRay := firstVertex.IncomingRay
-		return bdpt.PathTracingIntegrator.RayColor(originalRay, scene, random, bdpt.config.MaxDepth, core.Vec3{X: 1, Y: 1, Z: 1}, sampleIndex)
+// evaluatePathTracingStrategy evaluates the BDPT path tracing strategy (s=0, t=camera_length)
+// This is the camera-only path that accumulates radiance from surface emission and background
+func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path) core.Vec3 {
+	if len(cameraPath.Vertices) == 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
-	return core.Vec3{X: 0, Y: 0, Z: 0}
+
+	// For s=0,t=n strategy, we evaluate the camera path's accumulated radiance
+	// The last vertex in the camera path determines the final contribution
+	lastVertex := cameraPath.Vertices[len(cameraPath.Vertices)-1]
+
+	// Calculate path throughput up to the last vertex
+	pathThroughput := bdpt.calculateCameraPathThroughput(cameraPath, len(cameraPath.Vertices))
+
+	// The contribution is the emitted light at the last vertex weighted by path throughput
+	contribution := lastVertex.EmittedLight.MultiplyVec(pathThroughput)
+
+	return contribution
 }
 
 // evaluateLightTracingStrategy evaluates light tracing (light path hits camera)
-func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, scene core.Scene) core.Vec3 {
+func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path) core.Vec3 {
 	// For now, return zero since we don't implement camera sampling from light paths
 	// Full implementation would trace light path and check if it hits the camera
 	return core.Vec3{X: 0, Y: 0, Z: 0}
