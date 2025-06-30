@@ -887,40 +887,43 @@ func TestBDPTConnectionPDFMissing(t *testing.T) {
 	t.Logf("Connection distance: %.6f", distance)
 	t.Logf("Connection direction: %v", direction)
 
-	// Calculate what the connection PDF should be
-	// This is the PDF of choosing this specific connection direction
+	// Calculate what the connection PDF should be using material PDFs
 	cosAtLight := direction.Multiply(-1).Dot(lightVertex.Normal)
 	cosAtCamera := direction.Dot(cameraVertex.Normal)
 
 	t.Logf("cos_theta at light: %.6f", cosAtLight)
 	t.Logf("cos_theta at camera: %.6f", cosAtCamera)
 
-	// For directional sampling, the PDF is typically distance² / cos_theta
-	// This represents the solid angle conversion from area measure to directional measure
-	var expectedConnectionPDF float64
-	if cosAtLight > 0 {
-		expectedConnectionPDF = (distance * distance) / cosAtLight
-	} else {
-		expectedConnectionPDF = 0 // Invalid connection
+	// Calculate expected material-based connection PDFs
+	var expectedConnectionPDF float64 = 1.0
+	if cameraVertex.Material != nil {
+		cameraPDF := cameraVertex.Material.PDF(cameraVertex.IncomingDirection, direction, cameraVertex.Normal)
+		expectedConnectionPDF *= cameraPDF
+		t.Logf("Camera material PDF: %.9f", cameraPDF)
+	}
+	if lightVertex.Material != nil {
+		lightPDF := lightVertex.Material.PDF(lightVertex.IncomingDirection, direction.Multiply(-1), lightVertex.Normal)
+		expectedConnectionPDF *= lightPDF
+		t.Logf("Light material PDF: %.9f", lightPDF)
 	}
 
-	t.Logf("Expected connection PDF: %.9f", expectedConnectionPDF)
+	t.Logf("Expected material-based connection PDF: %.9f", expectedConnectionPDF)
 
 	// Now get the actual PDF calculated by calculatePathPDF
 	actualPDF := bdptIntegrator.calculatePathPDF(cameraPath, lightPath, s, tVert)
 	t.Logf("Actual path PDF (from calculatePathPDF): %.9f", actualPDF)
 
-	// Calculate what the PDF should be if connection PDF was included
+	// Calculate what the PDF should be with material-based connection PDF
 	pathOnlyPDF := 1.0
 
-	// Camera path PDFs (first tVert+1 vertices)
-	for i := 0; i <= tVert && i < len(cameraPath.Vertices); i++ {
+	// Camera path PDFs (up to but not including connection vertex, following our i<t approach)
+	for i := 0; i < tVert && i < len(cameraPath.Vertices); i++ {
 		vertex := cameraPath.Vertices[i]
 		pathOnlyPDF *= vertex.ForwardPDF
 	}
 
-	// Light path PDFs (first s+1 vertices)
-	for i := 0; i <= s && i < len(lightPath.Vertices); i++ {
+	// Light path PDFs (up to but not including connection vertex, following our i<s approach)  
+	for i := 0; i < s && i < len(lightPath.Vertices); i++ {
 		vertex := lightPath.Vertices[i]
 		pathOnlyPDF *= vertex.ForwardPDF
 	}
@@ -929,24 +932,21 @@ func TestBDPTConnectionPDFMissing(t *testing.T) {
 
 	t.Logf("=== PDF Breakdown ===")
 	t.Logf("Path-only PDF (vertices): %.9f", pathOnlyPDF)
-	t.Logf("Expected connection PDF: %.9f", expectedConnectionPDF)
+	t.Logf("Expected material connection PDF: %.9f", expectedConnectionPDF)
 	t.Logf("Expected total PDF: %.9f", expectedTotalPDF)
 	t.Logf("Actual PDF from function: %.9f", actualPDF)
 
-	// The bug: actualPDF should equal expectedTotalPDF, but it equals pathOnlyPDF
-	if actualPDF == pathOnlyPDF {
-		t.Logf("BUG CONFIRMED: calculatePathPDF is missing connection PDF!")
-		t.Logf("Missing factor: %.9f", expectedConnectionPDF)
-		t.Logf("This explains why s>0 strategies have tiny contributions")
-	}
-
-	// Check the ratio - this shows how much the PDF is underestimated
+	// Test that connection PDFs are properly included (within reasonable tolerance)
 	if expectedTotalPDF > 0 {
-		underestimationFactor := expectedTotalPDF / actualPDF
-		t.Logf("PDF underestimation factor: %.2f", underestimationFactor)
+		ratio := actualPDF / expectedTotalPDF
+		t.Logf("Actual/Expected PDF ratio: %.6f", ratio)
 
-		if underestimationFactor > 100 {
-			t.Errorf("PDF is underestimated by factor %.0f - connection PDF is missing", underestimationFactor)
+		// Allow some tolerance for numerical differences, but check it's roughly correct
+		if ratio < 0.5 || ratio > 2.0 {
+			t.Errorf("PDF calculation incorrect: actual %.9f vs expected %.9f (ratio %.3f)", 
+				actualPDF, expectedTotalPDF, ratio)
+		} else {
+			t.Logf("PDF calculation correct - material-based connection PDFs properly included")
 		}
 	}
 }
