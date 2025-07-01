@@ -100,47 +100,23 @@ func SampleLightEmission(lights []Light, random *rand.Rand) (EmissionSample, boo
 
 	sampledLight := lights[random.Intn(len(lights))]
 	sample := sampledLight.SampleEmission(random)
-	sample.PDF *= 1.0 / float64(len(lights))
+	// Apply light selection probability to area PDF only (combined effect when multiplied)
+	lightSelectionProb := 1.0 / float64(len(lights))
+	sample.AreaPDF *= lightSelectionProb
+	// Don't modify DirectionPDF - it's independent of light selection
 
 	return sample, true
 }
 
-// CalculateLightEmissionPDF calculates the combined PDF for emission sampling across multiple lights
-func CalculateLightEmissionPDF(lights []Light, point Vec3, direction Vec3) float64 {
-	if len(lights) == 0 {
-		return 0.0
-	}
-
-	totalPDF := 0.0
-	for _, light := range lights {
-		lightPDF := light.EmissionPDF(point, direction)
-		// Weight by light selection probability (uniform selection)
-		totalPDF += lightPDF / float64(len(lights))
-	}
-
-	return totalPDF
-}
-
-// CombineAreaAndDirectionPDF calculates the combined PDF for emission sampling
-// that includes both area sampling and cosine-weighted direction sampling
-func CombineAreaAndDirectionPDF(areaPDF float64, direction Vec3, normal Vec3) float64 {
-	cosTheta := direction.Dot(normal)
-	if cosTheta <= 0 {
-		return 0.0 // Direction below surface
-	}
-
-	directionPDF := cosTheta / math.Pi // cosine-weighted
-	return areaPDF * directionPDF
-}
-
 // SampleEmissionDirection samples a cosine-weighted emission direction from a surface
-// and returns both the direction and the emission sample with calculated PDF
+// and returns both the direction and the emission sample with separate area and direction PDFs
 func SampleEmissionDirection(point Vec3, normal Vec3, areaPDF float64, material Material, random *rand.Rand) EmissionSample {
 	// Sample emission direction (cosine-weighted hemisphere)
 	emissionDir := RandomCosineDirection(normal, random)
 
-	// Calculate combined PDF (area sampling × direction sampling)
-	combinedPDF := CombineAreaAndDirectionPDF(areaPDF, emissionDir, normal)
+	// Calculate direction PDF separately (cosine-weighted)
+	cosTheta := emissionDir.Dot(normal)
+	directionPDF := cosTheta / math.Pi
 
 	// Get emission from material
 	var emission Vec3
@@ -151,11 +127,12 @@ func SampleEmissionDirection(point Vec3, normal Vec3, areaPDF float64, material 
 	}
 
 	return EmissionSample{
-		Point:     point,
-		Normal:    normal,
-		Direction: emissionDir,
-		Emission:  emission,
-		PDF:       combinedPDF,
+		Point:        point,
+		Normal:       normal,
+		Direction:    emissionDir,
+		Emission:     emission,
+		AreaPDF:      areaPDF,
+		DirectionPDF: directionPDF,
 	}
 }
 

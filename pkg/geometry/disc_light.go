@@ -119,7 +119,12 @@ func (dl *DiscLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 		return 0.0
 	}
 
-	// Use shared PDF calculation
+	// Check if direction is in correct hemisphere
+	if direction.Dot(dl.Normal) <= 0 {
+		return 0.0
+	}
+
+	// Return area PDF only (direction PDF handled separately in new interface)
 	areaPDF := 1.0 / (math.Pi * dl.Radius * dl.Radius)
-	return core.CombineAreaAndDirectionPDF(areaPDF, direction, dl.Normal)
+	return areaPDF
 }

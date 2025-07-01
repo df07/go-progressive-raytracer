@@ -117,8 +117,11 @@ func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
 	// Sample emission direction (cosine-weighted hemisphere)
 	emissionDir := core.RandomCosineDirection(ql.Normal, random)
 
-	// For BDPT, use area measure only (probability per unit area)
+	// Calculate PDFs separately for BDPT
 	areaPDF := 1.0 / ql.Area
+	// For cosine-weighted direction sampling: PDF = cos(θ)/π
+	cosTheta := emissionDir.Dot(ql.Normal)
+	directionPDF := cosTheta / math.Pi
 
 	// Get emission from material
 	var emission core.Vec3
@@ -129,11 +132,12 @@ func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
 	}
 
 	return core.EmissionSample{
-		Point:     samplePoint,
-		Normal:    ql.Normal,
-		Direction: emissionDir,
-		Emission:  emission,
-		PDF:       areaPDF, // Area measure only for BDPT
+		Point:        samplePoint,
+		Normal:       ql.Normal,
+		Direction:    emissionDir,
+		Emission:     emission,
+		AreaPDF:      areaPDF,
+		DirectionPDF: directionPDF,
 	}
 }
 

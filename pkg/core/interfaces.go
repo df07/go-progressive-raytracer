@@ -45,9 +45,6 @@ type Light interface {
 	// SampleEmission samples emission from the light surface for BDPT light path generation
 	// Returns EmissionSample with direction FROM light surface (for light transport)
 	SampleEmission(random *rand.Rand) EmissionSample
-
-	// EmissionPDF calculates the PDF for emission sampling (area × direction)
-	EmissionPDF(point Vec3, direction Vec3) float64
 }
 
 // LightSample contains information about a sampled point on a light
@@ -62,11 +59,12 @@ type LightSample struct {
 
 // EmissionSample contains information about a sampled emission for BDPT light path generation
 type EmissionSample struct {
-	Point     Vec3    // Point on the light surface
-	Normal    Vec3    // Surface normal at the emission point (outward facing)
-	Direction Vec3    // Emission direction FROM the surface (cosine-weighted hemisphere)
-	Emission  Vec3    // Emitted radiance at this point and direction
-	PDF       float64 // Combined PDF for this emission sample (area sampling × direction sampling)
+	Point        Vec3    // Point on the light surface
+	Normal       Vec3    // Surface normal at the emission point (outward facing)
+	Direction    Vec3    // Emission direction FROM the surface (cosine-weighted hemisphere)
+	Emission     Vec3    // Emitted radiance at this point and direction
+	AreaPDF      float64 // PDF for position sampling (per unit area)
+	DirectionPDF float64 // PDF for direction sampling (per unit solid angle)
 }
 
 // Camera interface for cameras to avoid circular imports

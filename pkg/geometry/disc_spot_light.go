@@ -205,17 +205,17 @@ func (dsl *DiscSpotLight) SampleEmission(random *rand.Rand) core.EmissionSample 
 		// Calculate PDF for cone sampling
 		conePDF := core.UniformConePDF(dsl.cosTotalWidth)
 		areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
-		combinedPDF := areaPDF * conePDF
 
 		// Apply spot attenuation to emission
 		emission := discSample.Emission.Multiply(spotAttenuation)
 
 		return core.EmissionSample{
-			Point:     discSample.Point,
-			Normal:    discSample.Normal,
-			Direction: emissionDir,
-			Emission:  emission,
-			PDF:       combinedPDF,
+			Point:        discSample.Point,
+			Normal:       discSample.Normal,
+			Direction:    emissionDir,
+			Emission:     emission,
+			AreaPDF:      areaPDF,
+			DirectionPDF: conePDF, // Extract direction component
 		}
 	}
 }
@@ -234,8 +234,7 @@ func (dsl *DiscSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 		return 0.0 // Direction outside spot cone
 	}
 
-	// For directions within the cone, we use cone sampling PDF instead of cosine-weighted
+	// Return area PDF only (direction PDF handled separately in new interface)
 	areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
-	conePDF := core.UniformConePDF(dsl.cosTotalWidth)
-	return areaPDF * conePDF
+	return areaPDF
 }

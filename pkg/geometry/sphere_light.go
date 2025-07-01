@@ -207,7 +207,12 @@ func (sl *SphereLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64
 	// Calculate surface normal
 	normal := point.Subtract(sl.Center).Normalize()
 
-	// Use shared PDF calculation
+	// Check if direction is in correct hemisphere
+	if direction.Dot(normal) <= 0 {
+		return 0.0
+	}
+
+	// Return area PDF only (direction PDF handled separately in new interface)
 	areaPDF := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
-	return core.CombineAreaAndDirectionPDF(areaPDF, direction, normal)
+	return areaPDF
 }

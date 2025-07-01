@@ -176,11 +176,12 @@ func (sl *PointSpotLight) SampleEmission(random *rand.Rand) core.EmissionSample 
 	normal := emissionDir
 
 	return core.EmissionSample{
-		Point:     samplePoint,
-		Normal:    normal,
-		Direction: emissionDir,
-		Emission:  emission,
-		PDF:       conePDF,
+		Point:        samplePoint,
+		Normal:       normal,
+		Direction:    emissionDir,
+		Emission:     emission,
+		AreaPDF:      1.0, // Point light has no area
+		DirectionPDF: conePDF,
 	}
 }
 

@@ -29,11 +29,12 @@ func (ml *MockLight) PDF(point Vec3, direction Vec3) float64 {
 
 func (ml *MockLight) SampleEmission(random *rand.Rand) EmissionSample {
 	return EmissionSample{
-		Point:     Vec3{X: 0, Y: 1, Z: 0},
-		Normal:    Vec3{X: 0, Y: -1, Z: 0},
-		Direction: Vec3{X: 0, Y: -1, Z: 0},
-		Emission:  ml.emission,
-		PDF:       ml.pdf,
+		Point:        Vec3{X: 0, Y: 1, Z: 0},
+		Normal:       Vec3{X: 0, Y: -1, Z: 0},
+		Direction:    Vec3{X: 0, Y: -1, Z: 0},
+		Emission:     ml.emission,
+		AreaPDF:      ml.pdf,
+		DirectionPDF: 1.0 / math.Pi, // cosine-weighted
 	}
 }
 
@@ -61,10 +62,10 @@ func TestSampleLightEmission(t *testing.T) {
 		t.Error("Expected to find sample from single light")
 	}
 
-	// PDF should be divided by number of lights
-	expectedPDF := mockLight.pdf / float64(len(lights))
-	if math.Abs(sample.PDF-expectedPDF) > 1e-9 {
-		t.Errorf("PDF incorrect: got %f, expected %f", sample.PDF, expectedPDF)
+	// Area PDF should be divided by number of lights
+	expectedAreaPDF := mockLight.pdf / float64(len(lights))
+	if math.Abs(sample.AreaPDF-expectedAreaPDF) > 1e-9 {
+		t.Errorf("AreaPDF incorrect: got %f, expected %f", sample.AreaPDF, expectedAreaPDF)
 	}
 
 	if sample.Emission != emission {
@@ -80,41 +81,9 @@ func TestSampleLightEmission(t *testing.T) {
 		t.Error("Expected to find sample from multiple lights")
 	}
 
-	// PDF should be divided by number of lights
-	if sample2.PDF > 1.0 {
-		t.Errorf("PDF too high for multiple lights: %f", sample2.PDF)
-	}
-}
-
-func TestCalculateLightEmissionPDF(t *testing.T) {
-	// Test with no lights
-	var emptyLights []Light
-	pdf := CalculateLightEmissionPDF(emptyLights, Vec3{}, Vec3{})
-	if pdf != 0.0 {
-		t.Errorf("Expected 0 PDF for no lights, got %f", pdf)
-	}
-
-	// Test with single light
-	mockLight := &MockLight{emission: NewVec3(1.0, 1.0, 1.0), pdf: 0.5}
-	lights := []Light{mockLight}
-
-	point := NewVec3(0, 0, 0)
-	direction := NewVec3(0, 1, 0)
-	pdf = CalculateLightEmissionPDF(lights, point, direction)
-
-	expectedPDF := mockLight.pdf / float64(len(lights))
-	if math.Abs(pdf-expectedPDF) > 1e-9 {
-		t.Errorf("PDF incorrect: got %f, expected %f", pdf, expectedPDF)
-	}
-
-	// Test with multiple lights
-	mockLight2 := &MockLight{emission: NewVec3(2.0, 2.0, 2.0), pdf: 0.3}
-	multiLights := []Light{mockLight, mockLight2}
-
-	pdf = CalculateLightEmissionPDF(multiLights, point, direction)
-	expectedTotal := (mockLight.pdf + mockLight2.pdf) / float64(len(multiLights))
-	if math.Abs(pdf-expectedTotal) > 1e-9 {
-		t.Errorf("Total PDF incorrect: got %f, expected %f", pdf, expectedTotal)
+	// Area PDF should be reasonable for multiple lights
+	if sample2.AreaPDF > 1.0 {
+		t.Errorf("AreaPDF too high for multiple lights: %f", sample2.AreaPDF)
 	}
 }
 

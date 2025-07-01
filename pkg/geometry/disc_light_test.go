@@ -248,17 +248,22 @@ func TestDiscLight_SampleEmission(t *testing.T) {
 		t.Errorf("Direction not normalized: length = %f", dirLength)
 	}
 
-	// Verify PDF is positive and reasonable
-	if sample.PDF <= 0 {
-		t.Errorf("PDF should be positive, got %f", sample.PDF)
+	// Verify PDFs are positive and reasonable
+	if sample.AreaPDF <= 0 {
+		t.Errorf("AreaPDF should be positive, got %f", sample.AreaPDF)
+	}
+	if sample.DirectionPDF <= 0 {
+		t.Errorf("DirectionPDF should be positive, got %f", sample.DirectionPDF)
 	}
 
-	// Expected PDF combines area and direction sampling
+	// Expected PDFs
 	expectedAreaPDF := 1.0 / (math.Pi * radius * radius)
 	expectedDirPDF := cosTheta / math.Pi
-	expectedCombinedPDF := expectedAreaPDF * expectedDirPDF
-	if math.Abs(sample.PDF-expectedCombinedPDF) > tolerance {
-		t.Errorf("PDF incorrect: got %f, expected %f", sample.PDF, expectedCombinedPDF)
+	if math.Abs(sample.AreaPDF-expectedAreaPDF) > tolerance {
+		t.Errorf("AreaPDF incorrect: got %f, expected %f", sample.AreaPDF, expectedAreaPDF)
+	}
+	if math.Abs(sample.DirectionPDF-expectedDirPDF) > tolerance {
+		t.Errorf("DirectionPDF incorrect: got %f, expected %f", sample.DirectionPDF, expectedDirPDF)
 	}
 
 	// Verify emission is correct
@@ -331,14 +336,12 @@ func TestDiscLight_EmissionPDF(t *testing.T) {
 				t.Errorf("Expected positive PDF, got %f", pdf)
 			}
 
-			// Verify PDF formula for valid point on disc
+			// Verify PDF formula for valid point on disc (area-only PDF)
 			cosTheta := tt.direction.Dot(normal)
 			if cosTheta > 0 {
 				expectedAreaPDF := 1.0 / (math.Pi * radius * radius)
-				expectedDirPDF := cosTheta / math.Pi
-				expectedCombinedPDF := expectedAreaPDF * expectedDirPDF
-				if math.Abs(pdf-expectedCombinedPDF) > tolerance {
-					t.Errorf("PDF incorrect: got %f, expected %f", pdf, expectedCombinedPDF)
+				if math.Abs(pdf-expectedAreaPDF) > tolerance {
+					t.Errorf("PDF incorrect: got %f, expected %f", pdf, expectedAreaPDF)
 				}
 			}
 		})
@@ -389,10 +392,10 @@ func TestDiscLight_EmissionSampling_Coverage(t *testing.T) {
 			t.Errorf("Sample %d direction not in correct hemisphere", i)
 		}
 
-		// Verify PDF consistency
-		calculatedPDF := light.EmissionPDF(sample.Point, sample.Direction)
-		if math.Abs(sample.PDF-calculatedPDF) > 1e-6 {
-			t.Errorf("Sample %d PDF inconsistent: sample=%f, calculated=%f", i, sample.PDF, calculatedPDF)
+		// Verify area PDF consistency (EmissionPDF returns area-only PDF)
+		calculatedAreaPDF := light.EmissionPDF(sample.Point, sample.Direction)
+		if math.Abs(sample.AreaPDF-calculatedAreaPDF) > 1e-6 {
+			t.Errorf("Sample %d AreaPDF inconsistent: sample=%f, calculated=%f", i, sample.AreaPDF, calculatedAreaPDF)
 		}
 	}
 
