@@ -117,14 +117,9 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 
 	// Sample emission from a light in the scene
 	emissionSample, hasLight := core.SampleLightEmission(scene.GetLights(), random)
-	if !hasLight || emissionSample.PDF <= 0 {
+	if !hasLight || emissionSample.AreaPDF <= 0 || emissionSample.DirectionPDF <= 0 {
 		return path // No lights or invalid emission sample
 	}
-
-	// Create the initial light vertex
-	// For BDPT, light path starts with unit throughput
-	// The emission is handled separately in the connection evaluation
-	lightThroughput := core.Vec3{X: 1, Y: 1, Z: 1}
 
 	lightVertex := Vertex{
 		Point:             emissionSample.Point,
@@ -132,16 +127,16 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		Material:          nil,                         // Lights don't have materials in our current system
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Light is the starting point
 		OutgoingDirection: emissionSample.Direction,
-		IncomingRay:       core.Ray{},         // No incoming ray for light
-		ForwardPDF:        emissionSample.PDF, // Already includes light selection PDF
-		ReversePDF:        0.0,                // Cannot generate reverse direction to light
+		IncomingRay:       core.Ray{},                                           // No incoming ray for light
+		ForwardPDF:        emissionSample.AreaPDF * emissionSample.DirectionPDF, // Combined area * direction PDF for MIS calculations
+		ReversePDF:        0.0,                                                  // Cannot generate reverse direction to light
 		IsLight:           true,
 		IsCamera:          false,
 		IsSpecular:        false,
-		Throughput:        lightThroughput,
-		Beta:              emissionSample.Emission.Multiply(1.0 / emissionSample.PDF), // Beta = emission/PDF for light vertex
-		EmittedLight:      emissionSample.Emission,                                    // Already properly scaled
-		ScatterResult:     nil,                                                        // Lights don't scatter
+		Throughput:        emissionSample.Emission.Multiply(1.0 / emissionSample.AreaPDF), // Include emission in throughput,
+		Beta:              emissionSample.Emission,                                        // Raw emission for light vertex
+		EmittedLight:      emissionSample.Emission,                                        // Already properly scaled
+		ScatterResult:     nil,                                                            // Lights don't scatter
 	}
 
 	path.Vertices = append(path.Vertices, lightVertex)
@@ -149,10 +144,9 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 
 	// Continue the light path by bouncing off surfaces using the common path extension logic
 	currentRay := core.NewRay(emissionSample.Point, emissionSample.Direction)
-	currentThroughput := lightThroughput // Use consistent unit throughput
 
 	// Use the common path extension logic (maxDepth-1 because we already have the initial light vertex)
-	bdpt.extendPath(&path, currentRay, currentThroughput, scene, random, maxDepth-1)
+	bdpt.extendPath(&path, currentRay, lightVertex.Throughput, scene, random, maxDepth-1)
 
 	return path
 }
@@ -293,7 +287,7 @@ func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath Path, lightPath Path, s,
 	}
 
 	// Light path contribution: PDFs up to but not including connection vertex
-	// For connection strategies, we exclude the final scatter PDF since it's replaced by connection PDF  
+	// For connection strategies, we exclude the final scatter PDF since it's replaced by connection PDF
 	for i := 0; i < s && i < len(lightPath.Vertices); i++ {
 		vertex := lightPath.Vertices[i]
 		if vertex.ForwardPDF > 0 {
@@ -399,9 +393,13 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, s
 				// s=0, t=last: Pure camera path hitting light at the end
 				contribution = bdpt.evaluatePathTracingStrategy(cameraPath)
 				t = cameraPath.Length
+			} else if t == 1 {
+				// t=1 is light path direct to camera, which might hit a different pixel
+				// skip it for now
+				continue
 			} else {
 				// All other cases: Connection strategies (including s=0, t<last)
-				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
+				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s-1, t-1, scene)
 			}
 
 			if contribution.Luminance() > 0 {
@@ -540,7 +538,7 @@ func (bdpt *BDPTIntegrator) evaluateConnection(cameraVertex, lightVertex Vertex,
 	var lightContribution core.Vec3
 	if lightVertex.IsLight {
 		// When connecting to a light source, use Beta (emission/PDF)
-		lightContribution = lightVertex.Beta
+		lightContribution = core.Vec3{X: 1, Y: 1, Z: 1}
 	} else {
 		// When connecting to a surface hit by light, the surface acts as a secondary light source
 		// We need BRDF * cos_theta, but cos_theta is already in the geometric term

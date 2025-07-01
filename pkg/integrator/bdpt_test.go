@@ -804,17 +804,17 @@ func TestBDPTIndirectLighting(t *testing.T) {
 			}
 		}
 	}
-	
+
 	t.Logf("s=0 strategies total contribution: %.9f", s0Contribution)
 	t.Logf("s>=1 strategies total contribution: %.9f", sGeq1Contribution)
-	
+
 	// For indirect lighting, s>=1 strategies should contribute significantly
 	// If s>=1 contributes less than 1% of s=0, there's likely a bug
 	if s0Contribution > 0.001 && sGeq1Contribution > 0 {
 		sRatio := sGeq1Contribution / s0Contribution
 		t.Logf("s>=1 to s=0 contribution ratio: %.6f", sRatio)
 		if sRatio < 0.01 {
-			t.Errorf("s>=1 strategies severely undercontributing: %.9f vs s=0: %.9f (ratio %.6f)", 
+			t.Errorf("s>=1 strategies severely undercontributing: %.9f vs s=0: %.9f (ratio %.6f)",
 				sGeq1Contribution, s0Contribution, sRatio)
 		}
 	}
@@ -922,7 +922,7 @@ func TestBDPTConnectionPDFMissing(t *testing.T) {
 		pathOnlyPDF *= vertex.ForwardPDF
 	}
 
-	// Light path PDFs (up to but not including connection vertex, following our i<s approach)  
+	// Light path PDFs (up to but not including connection vertex, following our i<s approach)
 	for i := 0; i < s && i < len(lightPath.Vertices); i++ {
 		vertex := lightPath.Vertices[i]
 		pathOnlyPDF *= vertex.ForwardPDF
@@ -943,7 +943,7 @@ func TestBDPTConnectionPDFMissing(t *testing.T) {
 
 		// Allow some tolerance for numerical differences, but check it's roughly correct
 		if ratio < 0.5 || ratio > 2.0 {
-			t.Errorf("PDF calculation incorrect: actual %.9f vs expected %.9f (ratio %.3f)", 
+			t.Errorf("PDF calculation incorrect: actual %.9f vs expected %.9f (ratio %.3f)",
 				actualPDF, expectedTotalPDF, ratio)
 		} else {
 			t.Logf("PDF calculation correct - material-based connection PDFs properly included")
