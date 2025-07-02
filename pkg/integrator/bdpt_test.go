@@ -53,37 +53,50 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 			i, vertex.Point, vertex.IsLight, vertex.Material != nil, vertex.EmittedLight.Luminance(), vertex.Throughput)
 	}
 
-	// Debug individual strategies
+	// Generate and debug strategies using the new separated function
+	t.Logf("=== DEBUG: Strategy Generation ===")
+	strategies := bdptIntegrator.generateBDPTStrategies(cameraPath, lightPath, scene)
+	t.Logf("Generated %d valid strategies", len(strategies))
+
+	// Debug each generated strategy
 	t.Logf("=== DEBUG: Individual Strategy Contributions ===")
 	workingStrategies := 0
 
+	for i, strategy := range strategies {
+		workingStrategies++
+		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.6f) - WORKING",
+			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance())
+		t.Logf("  -> Path PDF: %.9f", strategy.pdf)
+
+		// Debug throughputs for key strategies
+		if (strategy.s == 0 && strategy.t == 1) || (strategy.s == 1 && strategy.t == 0) || (strategy.s == 1 && strategy.t == 1) {
+			cameraThru := bdptIntegrator.calculateCameraPathThroughput(cameraPath, strategy.t)
+			lightThru := bdptIntegrator.calculateLightPathThroughput(lightPath, strategy.s)
+			t.Logf("  -> Camera throughput (len %d): %v (lum: %.6f)", strategy.t, cameraThru, cameraThru.Luminance())
+			t.Logf("  -> Light throughput (len %d): %v (lum: %.6f)", strategy.s, lightThru, lightThru.Luminance())
+		}
+	}
+
+	// Also show what strategies were skipped
+	totalPossible := 0
 	for s := 0; s < lightPath.Length; s++ {
-		for tVert := 0; tVert < cameraPath.Length; tVert++ {
-			contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, s, tVert, scene)
-
-			if contribution.Luminance() > 0 {
-				workingStrategies++
-				t.Logf("Strategy s=%d,t=%d: contribution=%v (lum: %.6f) - WORKING",
-					s, tVert, contribution, contribution.Luminance())
-
-				// Calculate MIS weight for this strategy
-				pathPDF := bdptIntegrator.calculatePathPDF(cameraPath, lightPath, s, tVert)
-				t.Logf("  -> Path PDF: %.9f", pathPDF)
-
-				// Debug throughputs for key strategies
-				if (s == 0 && tVert == 1) || (s == 1 && tVert == 0) || (s == 1 && tVert == 1) {
-					cameraThru := bdptIntegrator.calculateCameraPathThroughput(cameraPath, tVert+1)
-					lightThru := bdptIntegrator.calculateLightPathThroughput(lightPath, s+1)
-					t.Logf("  -> Camera throughput (len %d): %v (lum: %.6f)", tVert+1, cameraThru, cameraThru.Luminance())
-					t.Logf("  -> Light throughput (len %d): %v (lum: %.6f)", s+1, lightThru, lightThru.Luminance())
+		for tVert := 1; tVert < cameraPath.Length; tVert++ { // t starts at 1 like in generateBDPTStrategies
+			totalPossible++
+			// Check if this strategy was generated
+			found := false
+			for _, strategy := range strategies {
+				if strategy.s == s && strategy.t == tVert {
+					found = true
+					break
 				}
-			} else {
-				t.Logf("Strategy s=%d,t=%d: ZERO contribution", s, tVert)
+			}
+			if !found {
+				t.Logf("Strategy s=%d,t=%d: SKIPPED or ZERO contribution", s, tVert)
 			}
 		}
 	}
 
-	t.Logf("Found %d working strategies out of %d total", workingStrategies, lightPath.Length*cameraPath.Length)
+	t.Logf("Found %d working strategies out of %d possible", workingStrategies, totalPossible)
 
 	// Now get the actual BDPT result through evaluateBDPTStrategies (with MIS)
 	bdptStrategyResult := bdptIntegrator.evaluateBDPTStrategies(cameraPath, lightPath, scene)
@@ -659,38 +672,51 @@ func TestBDPTMISWeighting(t *testing.T) {
 			i, vertex.Point, vertex.IsLight, vertex.IsSpecular, vertex.Material != nil, vertex.EmittedLight.Luminance())
 	}
 
-	// Debug all strategies in detail
-	t.Logf("=== Debugging all strategies ===")
-	workingStrategies := 0
-	for s := 0; s < lightPath.Length; s++ {
-		for tVert := 0; tVert < cameraPath.Length; tVert++ {
-			contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, s, tVert, scene)
-			if contribution.Luminance() > 0 {
-				workingStrategies++
-				t.Logf("Strategy s=%d,t=%d: contribution=%v (lum: %.6f)",
-					s, tVert, contribution, contribution.Luminance())
-			} else {
-				t.Logf("Strategy s=%d,t=%d: ZERO contribution", s, tVert)
+	// Generate strategies and debug them in detail
+	t.Logf("=== Strategy generation and debugging ===")
+	strategies := bdptIntegrator.generateBDPTStrategies(cameraPath, lightPath, scene)
+	t.Logf("Generated %d valid strategies", len(strategies))
+
+	for i, strategy := range strategies {
+		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.6f)",
+			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance())
+
+		// Debug throughputs for key strategies
+		if (strategy.s == 0 && strategy.t == 1) || (strategy.s == 1 && strategy.t == 1) {
+			cameraThru := bdptIntegrator.calculateCameraPathThroughput(cameraPath, strategy.t)
+			lightThru := bdptIntegrator.calculateLightPathThroughput(lightPath, strategy.s)
+			t.Logf("  -> Camera throughput (len %d): %v (lum: %.6f)", strategy.t, cameraThru, cameraThru.Luminance())
+			t.Logf("  -> Light throughput (len %d): %v (lum: %.6f)", strategy.s, lightThru, lightThru.Luminance())
+
+			// Debug individual vertex throughputs
+			if strategy.t-1 < len(cameraPath.Vertices) {
+				t.Logf("  -> Camera vertex[%d] throughput: %v", strategy.t-1, cameraPath.Vertices[strategy.t-1].Throughput)
 			}
-
-			// Debug throughputs for key strategies
-			if (s == 0 && tVert == 1) || (s == 1 && tVert == 1) {
-				cameraThru := bdptIntegrator.calculateCameraPathThroughput(cameraPath, tVert+1)
-				lightThru := bdptIntegrator.calculateLightPathThroughput(lightPath, s+1)
-				t.Logf("  -> Camera throughput (len %d): %v (lum: %.6f)", tVert+1, cameraThru, cameraThru.Luminance())
-				t.Logf("  -> Light throughput (len %d): %v (lum: %.6f)", s+1, lightThru, lightThru.Luminance())
-
-				// Debug individual vertex throughputs
-				if tVert < len(cameraPath.Vertices) {
-					t.Logf("  -> Camera vertex[%d] throughput: %v", tVert, cameraPath.Vertices[tVert].Throughput)
-				}
-				if s < len(lightPath.Vertices) {
-					t.Logf("  -> Light vertex[%d] throughput: %v", s, lightPath.Vertices[s].Throughput)
-				}
+			if strategy.s < len(lightPath.Vertices) {
+				t.Logf("  -> Light vertex[%d] throughput: %v", strategy.s, lightPath.Vertices[strategy.s].Throughput)
 			}
 		}
 	}
-	t.Logf("Found %d working strategies out of %d total", workingStrategies, lightPath.Length*cameraPath.Length)
+
+	// Also show what strategies were skipped
+	totalPossible := 0
+	for s := 0; s < lightPath.Length; s++ {
+		for tVert := 1; tVert < cameraPath.Length; tVert++ { // t starts at 1 like in generateBDPTStrategies
+			totalPossible++
+			// Check if this strategy was generated
+			found := false
+			for _, strategy := range strategies {
+				if strategy.s == s && strategy.t == tVert {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Logf("Strategy s=%d,t=%d: SKIPPED or ZERO contribution", s, tVert)
+			}
+		}
+	}
+	t.Logf("Found %d working strategies out of %d possible", len(strategies), totalPossible)
 }
 
 // TestBDPTIndirectLighting tests BDPT with a ray that hits a corner (indirect lighting only)

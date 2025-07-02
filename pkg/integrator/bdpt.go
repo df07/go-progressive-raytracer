@@ -368,10 +368,22 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(currentStrategy bdptStrategy, all
 // Multiple Importance Sampling (MIS) optimally combines all strategies using
 // the power heuristic to minimize variance.
 func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene) core.Vec3 {
+	// Generate all valid strategies
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene)
 
+	// Apply MIS weighting to all strategies
 	totalContribution := core.Vec3{X: 0, Y: 0, Z: 0}
+	for _, strategy := range strategies {
+		// Calculate MIS weight by comparing against all other strategies
+		weight := bdpt.calculateMISWeight(strategy, strategies)
+		totalContribution = totalContribution.Add(strategy.contribution.Multiply(weight))
+	}
 
-	// Calculate all valid strategies and their PDFs for proper MIS
+	return totalContribution
+}
+
+// generateBDPTStrategies generates all valid BDPT strategies for the given camera and light paths
+func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene) []bdptStrategy {
 	strategies := make([]bdptStrategy, 0)
 
 	// Only evaluate connection strategies (s≥0, t≥1) to avoid double-counting
@@ -406,7 +418,8 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, s
 				pdf := bdpt.calculatePathPDF(cameraPath, lightPath, s, t)
 				if pdf > 0 {
 					strategies = append(strategies, bdptStrategy{
-						s: s, t: t,
+						s:            s,
+						t:            t,
 						contribution: contribution,
 						pdf:          pdf,
 					})
@@ -415,14 +428,7 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, s
 		}
 	}
 
-	// Apply MIS weighting to all strategies
-	for _, strategy := range strategies {
-		// Calculate MIS weight by comparing against all other strategies
-		weight := bdpt.calculateMISWeight(strategy, strategies)
-		totalContribution = totalContribution.Add(strategy.contribution.Multiply(weight))
-	}
-
-	return totalContribution
+	return strategies
 }
 
 // evaluatePathTracingStrategy evaluates the BDPT path tracing strategy (s=0, t=camera_length)
