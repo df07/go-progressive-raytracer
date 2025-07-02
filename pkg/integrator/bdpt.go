@@ -274,7 +274,7 @@ func (bdpt *BDPTIntegrator) setVertexPDFs(vertex *Vertex, scatter core.ScatterRe
 }
 
 // calculatePathPDF calculates the PDF for a complete path construction strategy
-func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath Path, lightPath Path, s, t int) float64 {
+func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath, lightPath Path, s, t int) float64 {
 	pdf := 1.0
 
 	// Camera path contribution: PDFs up to but not including connection vertex
@@ -297,8 +297,8 @@ func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath Path, lightPath Path, s,
 
 	// Connection PDF: Only for actual connection strategies, not pure camera/light paths
 	if s > 0 && t > 0 {
-		cameraVertex := cameraPath.Vertices[t]
-		lightVertex := lightPath.Vertices[s]
+		cameraVertex := cameraPath.Vertices[t-1]
+		lightVertex := lightPath.Vertices[s-1]
 
 		// Calculate connection direction
 		direction := lightVertex.Point.Subtract(cameraVertex.Point)
@@ -411,7 +411,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 				continue
 			} else {
 				// All other cases: Connection strategies (including s=0, t<last)
-				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s-1, t-1, scene)
+				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
 			}
 
 			if contribution.Luminance() > 0 {
@@ -476,15 +476,28 @@ func (bdpt *BDPTIntegrator) evaluateBRDF(vertex Vertex, outgoingDirection core.V
 }
 
 // evaluateConnectionStrategy evaluates connecting s light vertices with t camera vertices
-// Uses standard BDPT indexing: s=0 is light source, t=0 is camera
+// Uses standard BDPT strategy indexing: s=1 means use 1 light vertex, t=1 means use 1 camera vertex
 func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Path, s, t int, scene core.Scene) core.Vec3 {
-	if s < 0 || t < 0 || s >= lightPath.Length || t >= cameraPath.Length {
+	if s < 0 || t < 0 || s > lightPath.Length || t > cameraPath.Length {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
-	// Get the vertices to connect (now using 0-based indexing directly)
-	lightVertex := lightPath.Vertices[s]   // s-th vertex in light path
-	cameraVertex := cameraPath.Vertices[t] // t-th vertex in camera path
+	// Handle pure path cases - these should not be evaluated as connections
+	if s == 0 || t == 0 {
+		// s=0: pure camera path (no light vertices to connect)
+		// t=0: pure light path (no camera vertices to connect)
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Convert strategy indices to array indices
+	// s=1 means "use 1 light vertex" = lightPath.Vertices[0]
+	// t=1 means "use 1 camera vertex" = cameraPath.Vertices[0]
+	lightIndex := s - 1
+	cameraIndex := t - 1
+
+	// Get the vertices to connect
+	lightVertex := lightPath.Vertices[lightIndex]
+	cameraVertex := cameraPath.Vertices[cameraIndex]
 
 	// Skip connections involving specular vertices (can't connect through delta functions)
 	if lightVertex.IsSpecular || cameraVertex.IsSpecular {
