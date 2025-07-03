@@ -32,6 +32,9 @@ type Camera struct {
 	pixelDeltaV  core.Vec3 // Offset to pixel below
 	defocusDiskU core.Vec3 // Defocus disk horizontal radius
 	defocusDiskV core.Vec3 // Defocus disk vertical radius
+
+	// Store configuration for PDF calculations
+	config CameraConfig
 }
 
 // NewCamera creates a camera with the given configuration
@@ -84,6 +87,7 @@ func NewCamera(config CameraConfig) *Camera {
 		pixelDeltaV:  pixelDeltaV,
 		defocusDiskU: defocusDiskU,
 		defocusDiskV: defocusDiskV,
+		config:       config,
 	}
 }
 
@@ -105,6 +109,65 @@ func (c *Camera) GetRay(i, j int, random *rand.Rand) core.Ray {
 
 	rayDirection := pixelSample.Subtract(rayOrigin)
 	return core.NewRay(rayOrigin, rayDirection)
+}
+
+// CalculateRayPDFs calculates the area and direction PDFs for a camera ray
+// This is needed for BDPT to properly balance camera and light path PDFs
+func (c *Camera) CalculateRayPDFs(ray core.Ray) (areaPDF, directionPDF float64) {
+	// Calculate image dimensions
+	imageHeight := int(float64(c.config.Width) / c.config.AspectRatio)
+
+	// Camera sensor area (in world units)
+	// The sensor area is the area of one pixel times the number of pixels
+	pixelAreaU := c.pixelDeltaU.Length()
+	pixelAreaV := c.pixelDeltaV.Length()
+	totalSensorArea := pixelAreaU * pixelAreaV * float64(c.config.Width) * float64(imageHeight)
+
+	// Area PDF: uniform sampling over the sensor area
+	areaPDF = 1.0 / totalSensorArea
+
+	// Direction PDF: based on solid angle subtended by the pixel
+	// For a pinhole camera, this is proportional to cos^3(theta) / distance^2
+	// where theta is angle from optical axis
+
+	// Calculate focus distance
+	focusDistance := c.config.FocusDistance
+	if focusDistance <= 0 {
+		focusDistance = c.config.Center.Subtract(c.config.LookAt).Length()
+	}
+
+	// Ray direction from camera center (normalized)
+	rayDir := ray.Direction.Normalize()
+
+	// Camera forward direction (toward LookAt)
+	cameraForward := c.config.LookAt.Subtract(c.config.Center).Normalize()
+
+	// Cosine of angle between ray and camera forward direction
+	cosTheta := rayDir.Dot(cameraForward)
+	if cosTheta <= 0 {
+		// Ray pointing away from camera forward direction - invalid
+		return 0, 0
+	}
+
+	// Direction PDF includes cos^3 term for perspective projection
+	// and normalization by solid angle of the entire image plane
+	theta := c.config.VFov * math.Pi / 180.0
+	h := math.Tan(theta / 2.0)
+	viewportHeight := 2.0 * h * focusDistance
+	viewportWidth := viewportHeight * c.config.AspectRatio
+
+	// Total solid angle subtended by the viewport
+	totalSolidAngle := viewportWidth * viewportHeight / (focusDistance * focusDistance)
+
+	// Direction PDF: cos^3(theta) normalized by total solid angle
+	directionPDF = (cosTheta * cosTheta * cosTheta) / totalSolidAngle
+
+	return areaPDF, directionPDF
+}
+
+// GetCameraForward returns the camera's forward direction (toward LookAt)
+func (c *Camera) GetCameraForward() core.Vec3 {
+	return c.config.LookAt.Subtract(c.config.Center).Normalize()
 }
 
 // MergeCameraConfig merges camera configuration overrides with defaults

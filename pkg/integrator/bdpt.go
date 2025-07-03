@@ -78,6 +78,18 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		Length:   0,
 	}
 
+	// Calculate camera PDFs for proper BDPT balancing
+	camera := scene.GetCamera()
+	areaPDF, directionPDF := camera.CalculateRayPDFs(ray)
+	
+	// Calculate cosine term for perspective projection (like light emission cosine)
+	rayDir := ray.Direction.Normalize()
+	cameraForward := camera.GetCameraForward()
+	cosTheta := rayDir.Dot(cameraForward)
+	if cosTheta <= 0 {
+		cosTheta = 0.001 // Avoid division by zero
+	}
+	
 	// Create the initial camera vertex (like light path does for light sources)
 	cameraVertex := Vertex{
 		Point:             ray.Origin,
@@ -86,13 +98,14 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Camera is the starting point
 		OutgoingDirection: ray.Direction,
 		IncomingRay:       core.Ray{}, // No incoming ray for camera
-		ForwardPDF:        1.0,        // Camera sampling PDF (could be area of sensor)
+		ForwardPDF:        areaPDF,    // Use area PDF for camera vertex (like light vertices)
 		ReversePDF:        0.0,        // Cannot generate reverse direction to camera
 		IsLight:           false,
 		IsCamera:          true,
 		IsSpecular:        false,
-		Throughput:        core.Vec3{X: 1, Y: 1, Z: 1}, // Start with unit throughput
-		Beta:              core.Vec3{X: 1, Y: 1, Z: 1},
+		// Camera throughput: importance * cosTheta / (areaPDF * directionPDF) - same pattern as light
+		Throughput: core.Vec3{X: 1, Y: 1, Z: 1}.Multiply(cosTheta / (areaPDF * directionPDF)),
+		Beta:       core.Vec3{X: 1, Y: 1, Z: 1}, // Camera "emission" is unit importance
 		EmittedLight:      core.Vec3{X: 0, Y: 0, Z: 0}, // Cameras don't emit light
 		ScatterResult:     nil,                         // Cameras don't scatter
 	}

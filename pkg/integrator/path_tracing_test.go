@@ -43,6 +43,14 @@ func (m *MockCamera) GetRay(i, j int, random *rand.Rand) core.Ray {
 	return core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
 }
 
+func (m *MockCamera) CalculateRayPDFs(ray core.Ray) (float64, float64) {
+	return 1.0, 1.0
+}
+
+func (m *MockCamera) GetCameraForward() core.Vec3 {
+	return core.NewVec3(0, 0, -1)
+}
+
 // createTestScene creates a simple scene with a sphere for testing
 func createTestScene() *MockScene {
 	// Create a simple lambertian sphere

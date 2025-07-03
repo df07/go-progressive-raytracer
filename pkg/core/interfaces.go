@@ -64,12 +64,18 @@ type EmissionSample struct {
 	Direction    Vec3    // Emission direction FROM the surface (cosine-weighted hemisphere)
 	Emission     Vec3    // Emitted radiance at this point and direction
 	AreaPDF      float64 // PDF for position sampling (per unit area)
-	DirectionPDF float64 // PDF for direction sampling (per unit solid angle)
+	DirectionPDF float64
 }
 
 // Camera interface for cameras to avoid circular imports
 type Camera interface {
 	GetRay(i, j int, random *rand.Rand) Ray
+	
+	// BDPT support: calculate area and direction PDFs for a camera ray
+	CalculateRayPDFs(ray Ray) (areaPDF, directionPDF float64)
+	
+	// Get camera forward direction for BDPT calculations
+	GetCameraForward() Vec3
 }
 
 // Scene interface for scene management
