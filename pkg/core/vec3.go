@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 )
@@ -23,6 +24,10 @@ func NewVec3(x, y, z float64) Vec3 {
 // NewVec2 creates a new Vec2
 func NewVec2(x, y float64) Vec2 {
 	return Vec2{X: x, Y: y}
+}
+
+func (v Vec3) String() string {
+	return fmt.Sprintf("{%.3g, %.3g, %.3g}", v.X, v.Y, v.Z)
 }
 
 // Add returns the sum of two vectors
