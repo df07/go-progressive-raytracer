@@ -70,10 +70,10 @@ type EmissionSample struct {
 // Camera interface for cameras to avoid circular imports
 type Camera interface {
 	GetRay(i, j int, random *rand.Rand) Ray
-	
+
 	// BDPT support: calculate area and direction PDFs for a camera ray
 	CalculateRayPDFs(ray Ray) (areaPDF, directionPDF float64)
-	
+
 	// Get camera forward direction for BDPT calculations
 	GetCameraForward() Vec3
 }

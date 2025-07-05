@@ -81,7 +81,7 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 	// Calculate camera PDFs for proper BDPT balancing
 	camera := scene.GetCamera()
 	areaPDF, directionPDF := camera.CalculateRayPDFs(ray)
-	
+
 	// Calculate cosine term for perspective projection (like light emission cosine)
 	rayDir := ray.Direction.Normalize()
 	cameraForward := camera.GetCameraForward()
@@ -89,7 +89,7 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 	if cosTheta <= 0 {
 		cosTheta = 0.001 // Avoid division by zero
 	}
-	
+
 	// Create the initial camera vertex (like light path does for light sources)
 	cameraVertex := Vertex{
 		Point:             ray.Origin,

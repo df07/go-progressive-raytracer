@@ -84,7 +84,7 @@ func TestCameraCalculateRayPDFs_DirectionPDF(t *testing.T) {
 
 	// Direction PDF should be higher for rays closer to the optical axis (cos^3 term)
 	if straightDirectionPDF <= angleDirectionPDF {
-		t.Errorf("Straight ray should have higher direction PDF than angled ray. Straight: %f, Angled: %f", 
+		t.Errorf("Straight ray should have higher direction PDF than angled ray. Straight: %f, Angled: %f",
 			straightDirectionPDF, angleDirectionPDF)
 	}
 
@@ -174,14 +174,14 @@ func TestCameraCalculateRayPDFs_ConsistencyWithGeneration(t *testing.T) {
 		// Generate a ray from a random pixel
 		pixelI := random.Intn(config.Width)
 		pixelJ := random.Intn(config.Width) // Square image
-		
+
 		ray := camera.GetRay(pixelI, pixelJ, random)
 		areaPDF, directionPDF := camera.CalculateRayPDFs(ray)
 
 		// Check that PDFs are positive for forward-facing rays
 		forward := camera.GetCameraForward()
 		cosTheta := ray.Direction.Normalize().Dot(forward)
-		
+
 		if cosTheta > 0 {
 			if areaPDF <= 0 {
 				t.Errorf("Generated ray should have positive area PDF, got %f", areaPDF)
@@ -191,7 +191,7 @@ func TestCameraCalculateRayPDFs_ConsistencyWithGeneration(t *testing.T) {
 			}
 		}
 
-		t.Logf("Pixel (%d,%d): cosTheta=%f, areaPDF=%e, directionPDF=%e", 
+		t.Logf("Pixel (%d,%d): cosTheta=%f, areaPDF=%e, directionPDF=%e",
 			pixelI, pixelJ, cosTheta, areaPDF, directionPDF)
 	}
 }
@@ -224,7 +224,7 @@ func TestCameraCalculateRayPDFs_ScaleConsistency(t *testing.T) {
 
 	// Camera area PDF should be in a similar range (maybe 1-2 orders of magnitude different)
 	ratio := areaPDF / lightAreaPDF
-	
+
 	t.Logf("Camera area PDF: %e", areaPDF)
 	t.Logf("Light area PDF: %e", lightAreaPDF)
 	t.Logf("Ratio (camera/light): %f", ratio)
