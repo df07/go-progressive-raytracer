@@ -117,18 +117,18 @@ func addCornellWalls(s *Scene) {
 		white,
 	)
 
-	// Right wall (red) - YZ plane at x=0
+	// Left wall (red) - YZ plane at x=0
 	// From Cornell data: 0.0 0.0 559.2, 0.0 0.0 0.0, 0.0 548.8 0.0, 0.0 548.8 559.2
-	rightWall := geometry.NewQuad(
+	leftWall := geometry.NewQuad(
 		core.NewVec3(0.0, 0.0, 0.0), // corner
 		core.NewVec3(0.0, 0.0, 556), // u vector (Z direction)
 		core.NewVec3(0.0, 556, 0.0), // v vector (Y direction)
 		red,
 	)
 
-	// Left wall (green) - YZ plane at x=556.0
+	// Right wall (green) - YZ plane at x=556.0
 	// Simplified to use consistent X coordinate
-	leftWall := geometry.NewQuad(
+	rightWall := geometry.NewQuad(
 		core.NewVec3(556, 0.0, 0.0), // corner
 		core.NewVec3(0.0, 0.0, 556), // u vector (Z direction)
 		core.NewVec3(0.0, 556, 0.0), // v vector (Y direction)
