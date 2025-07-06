@@ -1,6 +1,7 @@
 package integrator
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 
@@ -9,13 +10,15 @@ import (
 
 // PathTracingIntegrator implements unidirectional path tracing
 type PathTracingIntegrator struct {
-	config core.SamplingConfig
+	config  core.SamplingConfig
+	Verbose bool
 }
 
 // NewPathTracingIntegrator creates a new path tracing integrator
 func NewPathTracingIntegrator(config core.SamplingConfig) *PathTracingIntegrator {
 	return &PathTracingIntegrator{
-		config: config,
+		config:  config,
+		Verbose: false,
 	}
 }
 
@@ -123,6 +126,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
 	if lightSample.PDF > 0 {
+		pt.logf("pt: brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
 		contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
 		return contribution
 	}
@@ -204,4 +208,10 @@ func (pt *PathTracingIntegrator) BackgroundGradient(r core.Ray, scene core.Scene
 
 	// Linear interpolation: (1-t)*bottom + t*top
 	return bottomColor.Multiply(1.0 - t).Add(topColor.Multiply(t))
+}
+
+func (pt *PathTracingIntegrator) logf(format string, a ...interface{}) {
+	if pt.Verbose {
+		fmt.Printf(format, a...)
+	}
 }

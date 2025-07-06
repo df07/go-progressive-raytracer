@@ -1,6 +1,7 @@
 package integrator
 
 import (
+	"fmt"
 	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -42,6 +43,7 @@ type Path struct {
 // BDPTIntegrator implements bidirectional path tracing
 type BDPTIntegrator struct {
 	*PathTracingIntegrator
+	Verbose bool
 }
 
 // bdptStrategy represents a single BDPT path construction strategy
@@ -55,6 +57,7 @@ type bdptStrategy struct {
 func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 	return &BDPTIntegrator{
 		PathTracingIntegrator: NewPathTracingIntegrator(config),
+		Verbose:               false,
 	}
 }
 
@@ -389,6 +392,7 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(cameraPath, lightPath Path, s
 	for _, strategy := range strategies {
 		// Calculate MIS weight by comparing against all other strategies
 		weight := bdpt.calculateMISWeight(strategy, strategies)
+		bdpt.logf("weightBDPTStrategies: strategy.contribution=%v * weight=%f\n", strategy.contribution, weight)
 		totalContribution = totalContribution.Add(strategy.contribution.Multiply(weight))
 	}
 
@@ -595,26 +599,8 @@ func (bdpt *BDPTIntegrator) calculateCameraPathThroughput(path Path, length int)
 	// Use the stored throughput from the vertex (much more efficient)
 	if length <= path.Length && length > 0 {
 		return path.Vertices[length-1].Throughput
+func (bdpt *BDPTIntegrator) logf(format string, a ...interface{}) {
+	if bdpt.Verbose {
+		fmt.Printf(format, a...)
 	}
-
-	return core.Vec3{X: 1, Y: 1, Z: 1}
-}
-
-// calculateLightPathThroughput calculates the throughput along a light subpath
-func (bdpt *BDPTIntegrator) calculateLightPathThroughput(path Path, length int) core.Vec3 {
-	if length < 0 || length > path.Length {
-		return core.Vec3{X: 1, Y: 1, Z: 1}
-	}
-
-	// Special case: length=0 means we want the light source throughput (first vertex)
-	if length == 0 && path.Length > 0 {
-		return path.Vertices[0].Throughput
-	}
-
-	// Use the stored throughput from the vertex (much more efficient)
-	if length <= path.Length && length > 0 {
-		return path.Vertices[length-1].Throughput
-	}
-
-	return core.Vec3{X: 1, Y: 1, Z: 1}
 }
