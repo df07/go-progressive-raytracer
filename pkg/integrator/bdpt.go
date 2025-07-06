@@ -16,7 +16,6 @@ type Vertex struct {
 
 	// Path tracing information
 	IncomingDirection core.Vec3 // Direction ray arrived from
-	IncomingRay       core.Ray  // The actual ray that hit this vertex
 
 	// MIS probability densities
 	AreaPdfForward float64 // PDF for generating this vertex forward
@@ -98,7 +97,6 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		Normal:            ray.Direction.Multiply(-1),  // Camera "normal" points back along ray
 		Material:          nil,                         // Cameras don't have materials
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Camera is the starting point
-		IncomingRay:       core.Ray{},                  // No incoming ray for camera
 		AreaPdfForward:    0.0,                         // Initial camera PDF is always 0.0
 		AreaPdfReverse:    0.0,                         // Cannot generate reverse direction to camera
 		IsLight:           false,
@@ -142,7 +140,6 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		Normal:            emissionSample.Normal,
 		Material:          nil,                         // Lights don't have materials in our current system
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Light is the starting point
-		IncomingRay:       core.Ray{},                  // No incoming ray for light
 		AreaPdfForward:    emissionSample.AreaPDF * lightSelectionPdf,
 		AreaPdfReverse:    0.0, // Cannot generate reverse direction to light
 		IsLight:           true,
@@ -182,7 +179,6 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
 				Material:          nil,
 				IncomingDirection: currentRay.Direction.Multiply(-1),
-				IncomingRay:       currentRay,
 				AreaPdfForward:    1.0,                     // Background PDF
 				AreaPdfReverse:    0.0,                     // Cannot generate rays towards background
 				IsLight:           bgColor.Luminance() > 0, // Only mark as light if background actually emits
@@ -206,7 +202,6 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			Normal:            hit.Normal,
 			Material:          hit.Material,
 			IncomingDirection: currentRay.Direction.Multiply(-1),
-			IncomingRay:       currentRay,
 			AreaPdfForward:    1.0, // Will be updated by setVertexPDFs if material scatters
 			AreaPdfReverse:    0.0, // Will be updated by setVertexPDFs if material scatters
 			IsLight:           emittedLight.Luminance() > 0,
