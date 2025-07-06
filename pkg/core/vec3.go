@@ -60,6 +60,11 @@ func (v Vec3) Dot(other Vec3) float64 {
 	return v.X*other.X + v.Y*other.Y + v.Z*other.Z
 }
 
+// AbsDot returns the absolute value of the dot product of two vectors
+func (v Vec3) AbsDot(other Vec3) float64 {
+	return math.Abs(v.Dot(other))
+}
+
 // Clamp returns a vector with components clamped to [min, max]
 func (v Vec3) Clamp(minVal, maxVal float64) Vec3 {
 	return Vec3{
