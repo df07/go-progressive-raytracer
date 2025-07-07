@@ -19,8 +19,8 @@ func (d DummyMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) 
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
 
-func (d DummyMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
-	return 0.0
+func (d DummyMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+	return 0.0, false
 }
 
 func TestSphere_Hit_Miss(t *testing.T) {

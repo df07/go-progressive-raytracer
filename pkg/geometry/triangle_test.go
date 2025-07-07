@@ -19,8 +19,8 @@ func (m MockTriangleMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
 
-func (m MockTriangleMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
-	return 0.0
+func (m MockTriangleMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+	return 0.0, false
 }
 
 func TestTriangle_Hit(t *testing.T) {

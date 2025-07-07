@@ -45,9 +45,11 @@ func (m *Mix) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
-func (m *Mix) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+func (m *Mix) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
 	// Combine PDFs from both materials with appropriate weights
-	pdf1 := m.Material1.PDF(incomingDir, outgoingDir, normal)
-	pdf2 := m.Material2.PDF(incomingDir, outgoingDir, normal)
-	return pdf1*(1.0-m.Ratio) + pdf2*m.Ratio
+	// Treat mix as finite PDF material even if it contains delta components
+	pdf1, _ := m.Material1.PDF(incomingDir, outgoingDir, normal)
+	pdf2, _ := m.Material2.PDF(incomingDir, outgoingDir, normal)
+	combinedPDF := pdf1*(1.0-m.Ratio) + pdf2*m.Ratio
+	return combinedPDF, false // Always treat mix as non-delta
 }

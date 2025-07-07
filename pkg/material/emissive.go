@@ -35,6 +35,7 @@ func (e *Emissive) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
-func (e *Emissive) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
-	return 0.0
+func (e *Emissive) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+	// Emissive materials don't scatter, so PDF is always 0
+	return 0.0, false // Not a delta function, just no scattering
 }

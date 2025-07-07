@@ -61,16 +61,10 @@ func (m *Metal) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Ve
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
-func (m *Metal) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
-	// For BDPT: return 1.0 when directions match perfect reflection, 0.0 otherwise
-	reflected := reflect(incomingDir.Negate(), normal)
-
-	// Check if outgoing direction matches perfect reflection (within tolerance)
-	if outgoingDir.Subtract(reflected).Length() < 0.001 {
-		return 1.0 // Perfect reflection match
-	}
-
-	return 0.0 // No contribution for non-reflection directions
+func (m *Metal) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+	// For specular materials: always return (0.0, true) indicating delta function
+	// This is consistent with scatter.PDF = 0 and matches PBRT approach
+	return 0.0, true
 }
 
 // reflect calculates the reflection of a vector v off a surface with normal n

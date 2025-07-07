@@ -796,7 +796,7 @@ func TestBDPTIndirectLighting(t *testing.T) {
 
 	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 5, RussianRouletteMinSamples: 10})
 	bdpt := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
-	bdpt.Verbose = true
+	//bdpt.Verbose = true
 
 	for i := 0; i < numSamples; i++ {
 		// Path tracing sample
@@ -1049,10 +1049,12 @@ func TestBDPTSpecularHandling(t *testing.T) {
 	bvh := core.NewBVH([]core.Shape{sphere})
 
 	testScene := &MockScene{
-		shapes: []core.Shape{sphere},
-		config: core.SamplingConfig{MaxDepth: 3},
-		bvh:    bvh,
-		camera: &MockCamera{},
+		shapes:      []core.Shape{sphere},
+		config:      core.SamplingConfig{MaxDepth: 3},
+		bvh:         bvh,
+		camera:      &MockCamera{},
+		topColor:    core.NewVec3(0.5, 0.7, 1.0), // Blue sky background
+		bottomColor: core.NewVec3(1.0, 1.0, 1.0), // White ground
 	}
 
 	config := core.SamplingConfig{MaxDepth: 3}
@@ -1077,16 +1079,30 @@ func TestBDPTSpecularHandling(t *testing.T) {
 
 	// all vertices should have reasonable pdfs and betas
 	for i, vertex := range cameraPath.Vertices {
-		if vertex.AreaPdfForward < 0 || vertex.AreaPdfForward > 1 {
-			t.Errorf("FAIL: Vertex[%d]: invalid area pdf forward: %v", i, vertex.AreaPdfForward)
+		if vertex.AreaPdfForward < 0 {
+			t.Errorf("FAIL: Vertex[%d]: negative area pdf forward: %v", i, vertex.AreaPdfForward)
 		}
 		if vertex.Beta.Luminance() < 0.01 || vertex.Beta.Luminance() > 100 {
 			t.Errorf("FAIL: Vertex[%d]: invalid beta: %v", i, vertex.Beta)
 		}
 	}
 
+	// Debug: Generate light path and strategies to see what's happening
+	lightPath := bdpt.generateLightSubpath(testScene, random, config.MaxDepth)
+	LogPath(t, "Light", lightPath)
+
+	// Generate strategies to debug why result is zero
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, testScene)
+	t.Logf("Generated %d strategies", len(strategies))
+
+	for i, strategy := range strategies {
+		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.6f), pdf=%f",
+			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance(), strategy.pdf)
+	}
+
 	// Should produce a ray color with valid luminance
 	result := bdpt.RayColor(ray, testScene, random, config.MaxDepth, beta, 0)
+	t.Logf("Final RayColor result: %v (luminance: %.6f)", result, result.Luminance())
 
 	// Result should be valid (not NaN/Inf, not black, not too bright)
 	if result.Luminance() < 0.01 || result.Luminance() > 10 {

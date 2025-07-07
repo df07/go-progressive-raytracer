@@ -51,11 +51,11 @@ func (l *Lambertian) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) co
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
-func (l *Lambertian) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+func (l *Lambertian) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
 	// Cosine-weighted hemisphere sampling: cos(θ) / π
 	cosTheta := outgoingDir.Dot(normal)
 	if cosTheta <= 0 {
-		return 0.0
+		return 0.0, false
 	}
-	return cosTheta / math.Pi
+	return cosTheta / math.Pi, false // Not a delta function
 }

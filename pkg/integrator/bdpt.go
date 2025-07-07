@@ -227,11 +227,21 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		vertex.IsSpecular = scatter.IsSpecular()
 		pdfDir = scatter.PDF // PDF for the direction we scattered, also used in next bounce
 
-		// beta *= f * AbsDot(wi [scatter dir], isect.shading.n) / pdfFwd
+		// Handle specular vs diffuse materials differently (like path tracer does)
 		cosTheta := scatter.Scattered.Direction.AbsDot(hit.Normal)
-		beta = beta.MultiplyVec(scatter.Attenuation).Multiply(cosTheta / pdfDir)
+		if scatter.IsSpecular() {
+			// For specular materials: no PDF division (deterministic reflection/refraction)
+			beta = beta.MultiplyVec(scatter.Attenuation)
+		} else {
+			// For diffuse materials: standard Monte Carlo integration with PDF
+			beta = beta.MultiplyVec(scatter.Attenuation).Multiply(cosTheta / pdfDir)
+		}
 
-		pdfRev := hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
+		pdfRev, isReverseDelta := hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
+		// For delta functions in BDPT, set reverse PDF to 0 (like PBRT)
+		if isReverseDelta {
+			pdfRev = 0.0
+		}
 		vertexPrev.AreaPdfReverse = vertex.convertPDFDensity(vertexPrev, pdfRev)
 
 		path.Vertices = append(path.Vertices, vertex)
@@ -290,7 +300,11 @@ func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath, lightPath Path, s, t in
 
 			// Connection PDF from camera vertex: probability of scattering toward light vertex
 			if cameraVertex.Material != nil {
-				cameraPDF := cameraVertex.Material.PDF(cameraVertex.IncomingDirection, direction, cameraVertex.Normal)
+				cameraPDF, isCameraDelta := cameraVertex.Material.PDF(cameraVertex.IncomingDirection, direction, cameraVertex.Normal)
+				// Skip connections through delta (specular) vertices
+				if isCameraDelta {
+					return 0.0 // Cannot connect through delta functions
+				}
 				if cameraPDF <= 0 {
 					return 0.0 // Invalid connection direction
 				}
@@ -299,7 +313,11 @@ func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath, lightPath Path, s, t in
 
 			// Connection PDF from light vertex: probability of scattering toward camera vertex
 			if lightVertex.Material != nil {
-				lightPDF := lightVertex.Material.PDF(lightVertex.IncomingDirection, direction.Multiply(-1), lightVertex.Normal)
+				lightPDF, isLightDelta := lightVertex.Material.PDF(lightVertex.IncomingDirection, direction.Multiply(-1), lightVertex.Normal)
+				// Skip connections through delta (specular) vertices
+				if isLightDelta {
+					return 0.0 // Cannot connect through delta functions
+				}
 				if lightPDF <= 0 {
 					return 0.0 // Invalid connection direction
 				}

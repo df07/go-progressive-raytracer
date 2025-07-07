@@ -49,8 +49,9 @@ func (dslm *discSpotLightMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
-func (dslm *discSpotLightMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
-	return 0.0
+func (dslm *discSpotLightMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+	// Emissive materials don't scatter, so PDF is always 0
+	return 0.0, false // Not a delta function, just no scattering
 }
 
 // DiscSpotLight represents a directional spot light implemented as a disc area light

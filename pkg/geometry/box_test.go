@@ -19,8 +19,8 @@ func (d DummyBoxMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
 
-func (d DummyBoxMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
-	return 0.0
+func (d DummyBoxMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+	return 0.0, false
 }
 
 func TestNewAxisAlignedBox(t *testing.T) {

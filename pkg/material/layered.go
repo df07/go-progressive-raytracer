@@ -93,14 +93,17 @@ func (l *Layered) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
-func (l *Layered) PDF(incomingDir, outgoingDir, normal core.Vec3) float64 {
+func (l *Layered) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
 	// Same logic as BRDF: either reflection from outer or transmission + inner scattering
+	// Treat layered as finite PDF material even if components are delta
 	if isReflectionPath(incomingDir, outgoingDir, normal) {
-		return l.Outer.PDF(incomingDir, outgoingDir, normal)
+		pdf, _ := l.Outer.PDF(incomingDir, outgoingDir, normal)
+		return pdf, false // Always treat layered as non-delta
 	}
 
 	// Transmission path - inner material PDF
-	return l.Inner.PDF(incomingDir, outgoingDir, normal)
+	pdf, _ := l.Inner.PDF(incomingDir, outgoingDir, normal)
+	return pdf, false // Always treat layered as non-delta
 }
 
 // isReflectionPath checks if the incoming/outgoing direction pair represents

@@ -25,7 +25,8 @@ type Material interface {
 	EvaluateBRDF(incomingDir, outgoingDir, normal Vec3) Vec3
 
 	// NEW: Calculate PDF for specific incoming/outgoing directions
-	PDF(incomingDir, outgoingDir, normal Vec3) float64
+	// Returns (pdf, isDelta) where isDelta indicates if this is a delta function (specular)
+	PDF(incomingDir, outgoingDir, normal Vec3) (pdf float64, isDelta bool)
 }
 
 // Emitter interface for materials that emit light
