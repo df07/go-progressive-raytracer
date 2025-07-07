@@ -1056,19 +1056,43 @@ func TestBDPTSpecularHandling(t *testing.T) {
 	}
 
 	config := core.SamplingConfig{MaxDepth: 3}
-	integrator := NewBDPTIntegrator(config)
+	bdpt := NewBDPTIntegrator(config)
 
 	random := rand.New(rand.NewSource(42))
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
 	beta := core.NewVec3(1, 1, 1)
+	// camera path should contain camera, specular hit, and background light
+	cameraPath := bdpt.generateCameraSubpath(ray, testScene, random, config.MaxDepth, beta, 0)
+	LogPath(t, "Camera", cameraPath)
 
-	// Should not crash on specular materials
-	result := integrator.RayColor(ray, testScene, random, config.MaxDepth, beta, 0)
-
-	// Result should be valid (not NaN/Inf)
-	if result.X != result.X || result.Y != result.Y || result.Z != result.Z {
-		t.Error("BDPT produced NaN result with specular material")
+	if cameraPath.Length != 3 {
+		t.Errorf("BDPT produced camera path with length %d, expected 3", cameraPath.Length)
 	}
+
+	specularVertex := cameraPath.Vertices[1]
+	if !specularVertex.IsSpecular || specularVertex.Material != metal {
+		t.Error("BDPT did not produce correct specular vertex in camera path")
+		LogPath(t, "Camera", cameraPath)
+	}
+
+	// all vertices should have reasonable pdfs and betas
+	for i, vertex := range cameraPath.Vertices {
+		if vertex.AreaPdfForward < 0 || vertex.AreaPdfForward > 1 {
+			t.Errorf("FAIL: Vertex[%d]: invalid area pdf forward: %v", i, vertex.AreaPdfForward)
+		}
+		if vertex.Beta.Luminance() < 0.01 || vertex.Beta.Luminance() > 100 {
+			t.Errorf("FAIL: Vertex[%d]: invalid beta: %v", i, vertex.Beta)
+		}
+	}
+
+	// Should produce a ray color with valid luminance
+	result := bdpt.RayColor(ray, testScene, random, config.MaxDepth, beta, 0)
+
+	// Result should be valid (not NaN/Inf, not black, not too bright)
+	if result.Luminance() < 0.01 || result.Luminance() > 10 {
+		t.Error("FAIL: RayColor produced invalid result with specular material: ", result)
+	}
+
 }
 
 func abs(x float64) float64 {
