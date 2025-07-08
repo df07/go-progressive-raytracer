@@ -349,7 +349,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(currentStrategy bdptStrategy, all
 		return 0.0
 	}
 
-	bdpt.logf("calculated MIS Weight for s=%d, t=%d: currentWeight=%f, sumWeights=%f\n", currentStrategy.s, currentStrategy.t, currentWeight, sumWeights)
+	bdpt.logf(" (s=%d,t=%d) calculateMISWeight: weight=%f (%f / %f)\n", currentStrategy.s, currentStrategy.t, currentWeight/sumWeights, currentWeight, sumWeights)
 	return currentWeight / sumWeights
 }
 
@@ -373,7 +373,7 @@ func (bdpt *BDPTIntegrator) weightBDPTStrategies(strategies []bdptStrategy) core
 	for _, strategy := range strategies {
 		// Calculate MIS weight by comparing against all other strategies
 		weight := bdpt.calculateMISWeight(strategy, strategies)
-		bdpt.logf("weightBDPTStrategies: strategy.contribution=%v * weight=%f\n", strategy.contribution, weight)
+		bdpt.logf(" (s=%d,t=%d) weightBDPTStrategies: contribution=%v * weight=%f\n", strategy.s, strategy.t, strategy.contribution, weight)
 		totalContribution = totalContribution.Add(strategy.contribution.Multiply(weight))
 	}
 
@@ -430,7 +430,9 @@ func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path, t int) 
 	lastVertex := cameraPath.Vertices[t-1]
 
 	// The contribution is the emitted light at the last vertex weighted by path throughput
-	return lastVertex.EmittedLight.MultiplyVec(lastVertex.Beta)
+	contribution := lastVertex.EmittedLight.MultiplyVec(lastVertex.Beta)
+	bdpt.logf(" (s=0,t=%d) evaluatePathTracingStrategy: contribution:%v = lastVertex.EmittedLight:%v * lastVertex.Beta:%v\n", t, contribution, lastVertex.EmittedLight, lastVertex.Beta)
+	return contribution
 }
 
 // evaluateLightTracingStrategy evaluates light tracing (light path hits camera)

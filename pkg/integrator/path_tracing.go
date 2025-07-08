@@ -131,7 +131,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
 	if lightSample.PDF > 0 {
-		pt.logf("pt: brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
+		pt.logf("pt direct: brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
 		contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
 		return contribution
 	}
@@ -166,6 +166,9 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 
 	// Indirect lighting contribution with MIS
 	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)
+
+	pt.logf("pt indirect: contribution=%v = attenuation=%v * incomingLight=%v * (cosine=%f * misWeight=%f / scatterPDF=%f)\n", contribution, scatter.Attenuation, incomingLight, cosine, misWeight, scatter.PDF)
+
 	return contribution
 }
 
