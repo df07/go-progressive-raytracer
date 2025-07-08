@@ -1110,18 +1110,27 @@ func TestBDPTSpecularHandling(t *testing.T) {
 	}
 }
 
-func SceneWithGroundPlane() (core.Scene, core.SamplingConfig) {
+func SceneWithGroundPlane(includeLight bool) (core.Scene, core.SamplingConfig) {
 	// simple scene with a green ground plane mirroring default scene (without spheres)
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
 	groundPlane := geometry.NewPlane(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0), lambertianGreen)
-	bvh := core.NewBVH([]core.Shape{groundPlane})
+
+	shapes := []core.Shape{groundPlane}
+	lights := []core.Light{}
+	if includeLight {
+		emissiveMaterial := material.NewEmissive(core.NewVec3(15.0, 14.0, 13.0))
+		light := geometry.NewSphereLight(core.NewVec3(30, 30.5, 15), 10, emissiveMaterial)
+		shapes = append(shapes, light.Sphere)
+		lights = append(lights, light)
+	}
 
 	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinSamples: 100, RussianRouletteMinBounces: 100}
 
 	testScene := &MockScene{
-		shapes:      []core.Shape{groundPlane},
+		lights:      lights,
+		shapes:      shapes,
+		bvh:         core.NewBVH(shapes),
 		config:      config,
-		bvh:         bvh,
 		camera:      &MockCamera{},
 		topColor:    core.NewVec3(0.5, 0.7, 1.0), // Blue sky background
 		bottomColor: core.NewVec3(1.0, 1.0, 1.0), // White ground
@@ -1130,31 +1139,55 @@ func SceneWithGroundPlane() (core.Scene, core.SamplingConfig) {
 	return testScene, config
 }
 
-func TestBackgroundHandling(t *testing.T) {
-	testScene, config := SceneWithGroundPlane()
-
-	bdpt := NewBDPTIntegrator(config)
-	pt := NewPathTracingIntegrator(config)
-
-	bdpt.Verbose = true
-	pt.Verbose = true
-
-	// test rays
+func GroundPlaneTestRays() []struct {
+	name string
+	ray  core.Ray
+} {
 	cameraCenter := core.NewVec3(0, 0.75, 2) // From default scene
-
-	testRays := []struct {
+	return []struct {
 		name string
 		ray  core.Ray
 	}{
 		{"Sky", core.NewRay(cameraCenter, core.NewVec3(0, 1, 0))},
 		{"Ground", core.NewRay(cameraCenter, core.NewVec3(0, 0.5, -1).Subtract(cameraCenter).Normalize())},
-		{"Far", core.NewRay(cameraCenter, core.NewVec3(0, 100, 0).Subtract(cameraCenter).Normalize())},
+		{"Far", core.NewRay(cameraCenter, core.NewVec3(0, 0.5, -100).Subtract(cameraCenter).Normalize())},
 	}
+}
+func TestBackgroundHandling(t *testing.T) {
+	testScene, config := SceneWithGroundPlane(false)
+	testRays := GroundPlaneTestRays()
+
+	bdpt := NewBDPTIntegrator(config)
+	pt := NewPathTracingIntegrator(config)
 
 	for _, testRay := range testRays {
 		// compare bdpt and pt results
 		bdptResult := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
 		ptResult := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+
+		t.Logf("%s: BDPT=%v, PT=%v", testRay.name, bdptResult, ptResult)
+
+		// check if the results are similar
+		ratio := bdptResult.Luminance() / ptResult.Luminance()
+		if ratio < 0.9 || ratio > 1.1 {
+			t.Errorf("FAIL: %s ray luminance ratio of %.3f: BDPT=%v, PT=%v", testRay.name, ratio, bdptResult, ptResult)
+		}
+	}
+}
+
+func TestBackgroundWithLight(t *testing.T) {
+	testScene, config := SceneWithGroundPlane(true)
+	testRays := GroundPlaneTestRays()
+
+	bdpt := NewBDPTIntegrator(config)
+	pt := NewPathTracingIntegrator(config)
+
+	for _, testRay := range testRays {
+		// compare bdpt and pt results
+		bdptResult := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+		ptResult := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+
+		t.Logf("%s: BDPT=%v, PT=%v", testRay.name, bdptResult, ptResult)
 
 		// check if the results are similar
 		ratio := bdptResult.Luminance() / ptResult.Luminance()
