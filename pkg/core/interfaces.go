@@ -46,6 +46,9 @@ type Light interface {
 	// SampleEmission samples emission from the light surface for BDPT light path generation
 	// Returns EmissionSample with direction FROM light surface (for light transport)
 	SampleEmission(random *rand.Rand) EmissionSample
+
+	// EmissionPDF calculates PDF for emission sampling - needed for BDPT MIS calculations
+	EmissionPDF(point Vec3, direction Vec3) float64
 }
 
 // LightSample contains information about a sampled point on a light
