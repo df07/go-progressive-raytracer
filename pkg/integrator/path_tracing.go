@@ -94,8 +94,8 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 	lights := scene.GetLights()
 
 	// Sample a light
-	lightSample, hasLight := core.SampleLight(lights, hit.Point, random)
-	if !hasLight {
+	lightSample, _, hasLight := core.SampleLight(lights, hit.Point, random)
+	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
@@ -131,8 +131,9 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
 	if lightSample.PDF > 0 {
-		pt.logf("pt direct: brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
 		contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
+		pt.logf("pt direct: contribution=%v = brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", contribution, brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
+
 		return contribution
 	}
 

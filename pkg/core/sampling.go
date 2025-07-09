@@ -80,16 +80,16 @@ func CalculateLightPDF(lights []Light, point Vec3, direction Vec3) float64 {
 }
 
 // SampleLight randomly selects and samples a light from the scene
-func SampleLight(lights []Light, point Vec3, random *rand.Rand) (LightSample, bool) {
+func SampleLight(lights []Light, point Vec3, random *rand.Rand) (LightSample, Light, bool) {
 	if len(lights) == 0 {
-		return LightSample{}, false
+		return LightSample{}, nil, false
 	}
 
 	sampledLight := lights[random.Intn(len(lights))]
 	sample := sampledLight.Sample(point, random)
 	sample.PDF *= 1.0 / float64(len(lights))
 
-	return sample, true
+	return sample, sampledLight, true
 }
 
 // SampleLightEmission randomly selects and samples emission from a light in the scene

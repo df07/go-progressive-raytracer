@@ -12,7 +12,9 @@ import (
 type Vertex struct {
 	Point    core.Vec3     // 3D position
 	Normal   core.Vec3     // Surface normal
+	Light    core.Light    // Light at this vertex
 	Material core.Material // Material at this vertex
+	Camera   core.Camera   // Camera at this vertex
 
 	// Path tracing information
 	IncomingDirection core.Vec3 // Direction ray arrived from
@@ -22,9 +24,10 @@ type Vertex struct {
 	AreaPdfReverse float64 // PDF for generating this vertex reverse
 
 	// Vertex classification
-	IsLight    bool // On light source
-	IsCamera   bool // On camera
-	IsSpecular bool // Specular interaction
+	IsLight         bool // On light source
+	IsCamera        bool // On camera
+	IsSpecular      bool // Specular interaction
+	IsInfiniteLight bool // On infinite area light (background)
 
 	// Transport quantities
 	Beta         core.Vec3 // Accumulated throughput from path start to this vertex
@@ -96,6 +99,8 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		Point:             ray.Origin,
 		Normal:            ray.Direction.Multiply(-1),  // Camera "normal" points back along ray
 		Material:          nil,                         // Cameras don't have materials
+		Light:             nil,                         // Cameras are not lights
+		Camera:            camera,                      // Store camera reference for PDF calculations
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Camera is the starting point
 		AreaPdfForward:    0.0,                         // Initial camera PDF is always 0.0
 		AreaPdfReverse:    0.0,                         // Cannot generate reverse direction to camera
@@ -138,7 +143,8 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 	lightVertex := Vertex{
 		Point:             emissionSample.Point,
 		Normal:            emissionSample.Normal,
-		Material:          nil,                         // Lights don't have materials in our current system
+		Material:          nil, // Lights don't have materials in our current system
+		Light:             sampledLight,
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Light is the starting point
 		AreaPdfForward:    emissionSample.AreaPDF * lightSelectionPdf,
 		AreaPdfReverse:    0.0, // Cannot generate reverse direction to light
@@ -184,6 +190,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 				IsLight:           bgColor.Luminance() > 0, // Only mark as light if background actually emits
 				IsCamera:          false,                   // No camera vertices in path extension
 				IsSpecular:        false,
+				IsInfiniteLight:   true, // Mark as infinite area light
 				Beta:              beta,
 				EmittedLight:      bgColor, // Capture background light
 			}
