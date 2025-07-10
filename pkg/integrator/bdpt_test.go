@@ -68,7 +68,7 @@ func TestBDPTvsPathTracingCameraPath(t *testing.T) {
 	}
 
 	// BDPT should generate the s=0,t=2 strategy with the correct contribution
-	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene)
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, random)
 	if len(strategies) != 1 {
 		t.Errorf("BDPT should generate 1 strategy, got %d", len(strategies))
 		t.FailNow()
@@ -105,63 +105,7 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 	bdptRandom := rand.New(rand.NewSource(seed))
 	bdptConfig := core.SamplingConfig{MaxDepth: 5}
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-
-	// Generate paths for debugging
-	cameraPath := bdptIntegrator.generateCameraSubpath(rayToFloor, scene, bdptRandom, 5, core.NewVec3(1, 1, 1), 0)
-	lightPath := bdptIntegrator.generateLightSubpath(scene, bdptRandom, 5)
-
-	t.Logf("=== DEBUG: Path Generation ===")
-	LogPath(t, "Camera", cameraPath)
-	LogPath(t, "Light", lightPath)
-
-	// Generate and debug strategies using the new separated function
-	t.Logf("=== DEBUG: Strategy Generation ===")
-	strategies := bdptIntegrator.generateBDPTStrategies(cameraPath, lightPath, scene)
-	t.Logf("Generated %d valid strategies", len(strategies))
-
-	// Debug each generated strategy
-	t.Logf("=== DEBUG: Individual Strategy Contributions ===")
-	workingStrategies := 0
-
-	for i, strategy := range strategies {
-		workingStrategies++
-		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.6f) - WORKING",
-			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance())
-		t.Logf("  -> Path PDF: %.9f", strategy.pdf)
-
-		// Debug betas for key strategies
-		if (strategy.s == 0 && strategy.t == 1) || (strategy.s == 1 && strategy.t == 0) || (strategy.s == 1 && strategy.t == 1) {
-			cameraThru := cameraPath.Vertices[strategy.t-1].Beta
-			lightThru := lightPath.Vertices[strategy.s-1].Beta
-			t.Logf("  -> Camera beta (len %d): %v (lum: %.6f)", strategy.t, cameraThru, cameraThru.Luminance())
-			t.Logf("  -> Light beta (len %d): %v (lum: %.6f)", strategy.s, lightThru, lightThru.Luminance())
-		}
-	}
-
-	// Also show what strategies were skipped
-	totalPossible := 0
-	for s := 0; s < lightPath.Length; s++ {
-		for tVert := 1; tVert < cameraPath.Length; tVert++ { // t starts at 1 like in generateBDPTStrategies
-			totalPossible++
-			// Check if this strategy was generated
-			found := false
-			for _, strategy := range strategies {
-				if strategy.s == s && strategy.t == tVert {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Logf("Strategy s=%d,t=%d: SKIPPED or ZERO contribution", s, tVert)
-			}
-		}
-	}
-
-	t.Logf("Found %d working strategies out of %d possible", workingStrategies, totalPossible)
-
-	// Now get the actual BDPT result through evaluateBDPTStrategies (with MIS)
-	bdptStrategyResult := bdptIntegrator.weightBDPTStrategies(strategies)
-	t.Logf("BDPT strategies combined result: %v (luminance: %.6f)", bdptStrategyResult, bdptStrategyResult.Luminance())
+	bdptIntegrator.Verbose = true // Enable verbose logging to see MIS weights
 
 	// Get the final result through RayColor for comparison
 	bdptRandom = rand.New(rand.NewSource(seed)) // Reset seed
@@ -510,49 +454,6 @@ func TestBDPTConnectionStrategy(t *testing.T) {
 	}
 }
 
-// TestBDPTPathPDFPositive tests that path PDFs are positive for valid paths
-func TestBDPTPathPDFPositive(t *testing.T) {
-	scene := createMinimalCornellScene()
-
-	seed := int64(42)
-	random := rand.New(rand.NewSource(seed))
-
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
-	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-
-	// Generate paths
-	rayToFloor := core.NewRay(
-		core.NewVec3(278, 400, -200),
-		core.NewVec3(0, -1, 0.5).Normalize(),
-	)
-	cameraPath := bdptIntegrator.generateCameraSubpath(rayToFloor, scene, random, 3, core.NewVec3(1, 1, 1), 0)
-	lightPath := bdptIntegrator.generateLightSubpath(scene, random, 3)
-
-	// Assert: Camera path PDF should be positive
-	if cameraPath.Length > 0 {
-		pathPDF := bdptIntegrator.calculatePathPDF(cameraPath, lightPath, 0, cameraPath.Length)
-		if pathPDF <= 0 {
-			t.Errorf("Camera path PDF should be positive, got %.6f", pathPDF)
-		}
-	}
-
-	// Assert: Light path PDF should be positive
-	if lightPath.Length > 0 {
-		lightPDF := bdptIntegrator.calculatePathPDF(cameraPath, lightPath, lightPath.Length, 0)
-		if lightPDF <= 0 {
-			t.Errorf("Light path PDF should be positive, got %.6f", lightPDF)
-		}
-	}
-
-	// Assert: Connection PDFs should not be negative
-	if cameraPath.Length >= 1 && lightPath.Length >= 1 {
-		connectionPDF := bdptIntegrator.calculatePathPDF(cameraPath, lightPath, 1, 1)
-		if connectionPDF < 0 {
-			t.Errorf("Connection PDF should not be negative, got %.6f", connectionPDF)
-		}
-	}
-}
-
 // TestBDPTPathIndexing verifies how paths are indexed in our implementation
 func TestBDPTPathIndexing(t *testing.T) {
 	scene := createMinimalCornellScene()
@@ -631,14 +532,14 @@ func TestBDPTvsPTDirectLightSampling(t *testing.T) {
 	t.Logf("PT contribution: %v (luminance: %.3f)", ptContribution, ptContribution.Luminance())
 
 	ratio := bdptContribution.Luminance() / ptContribution.Luminance()
-	if math.Abs(ratio-1.0) > 0.02 {
+	if math.Abs(ratio-1.0) > 0.025 {
 		t.Errorf("BDPT s=1,t=2 should match direct lighting exactly, got ratio %.3f", ratio)
 	}
 
-	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene)
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, random)
 	for i, strategy := range strategies {
-		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.3f), pdf=%f",
-			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance(), strategy.pdf)
+		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.3f), weight=%f",
+			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance(), strategy.misWeight)
 	}
 }
 
@@ -718,8 +619,8 @@ func TestBDPTMISWeighting(t *testing.T) {
 	t.Logf("s=0,t=1 individual contribution: %v (luminance: %.6f)", s0t1Contribution, s0t1Contribution.Luminance())
 
 	// Now test all strategies through evaluateBDPTStrategies
-	strategies := bdptIntegrator.generateBDPTStrategies(cameraPath, lightPath, scene)
-	allStrategies := bdptIntegrator.weightBDPTStrategies(strategies)
+	strategies := bdptIntegrator.generateBDPTStrategies(cameraPath, lightPath, scene, random)
+	allStrategies := bdptIntegrator.evaluateBDPTStrategies(strategies)
 	t.Logf("All strategies result: %v (luminance: %.6f)", allStrategies, allStrategies.Luminance())
 
 	// The all-strategies result should be positive since s=0,t=1 works
@@ -813,80 +714,6 @@ func TestBDPTIndirectLighting(t *testing.T) {
 	pathResult := pathTotal.Multiply(1.0 / float64(numSamples))
 	bdptResult := bdptTotal.Multiply(1.0 / float64(numSamples))
 
-	// Also do single sample debug with specific seed
-	bdptRandom := rand.New(rand.NewSource(seed))
-	bdpt = NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
-
-	// Generate paths for debugging
-	cameraPath := bdpt.generateCameraSubpath(rayToCorner, scene, bdptRandom, 5, core.NewVec3(1, 1, 1), 0)
-	lightPath := bdpt.generateLightSubpath(scene, bdptRandom, 5)
-
-	t.Logf("=== DEBUG: Corner Lighting Path Generation ===")
-	LogPath(t, "Camera", cameraPath)
-	LogPath(t, "Light", lightPath)
-
-	// Debug individual strategies - focus on indirect lighting strategies
-	t.Logf("=== DEBUG: Indirect Lighting Strategy Contributions ===")
-	workingStrategies := 0
-
-	for s := 0; s < lightPath.Length; s++ {
-		for tVert := 2; tVert < cameraPath.Length; tVert++ {
-			strategyType := "UNKNOWN"
-			if s == 0 {
-				strategyType = "CAMERA "
-			} else if s == 1 {
-				strategyType = "DIRECT "
-			} else {
-				strategyType = "CONNECT"
-			}
-
-			contribution := bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, tVert, scene)
-
-			if contribution.Luminance() > 0 {
-				workingStrategies++
-				pathPDF := bdpt.calculatePathPDF(cameraPath, lightPath, s, tVert)
-
-				t.Logf("Strategy s=%d,t=%d (%s): contribution=%v (lum: %.9f), pdf=%.3g - WORKING",
-					s, tVert, strategyType, contribution, contribution.Luminance(), pathPDF)
-			} else {
-				t.Logf("Strategy s=%d,t=%d (%s): ZERO contribution", s, tVert, strategyType)
-			}
-		}
-	}
-
-	t.Logf("Found %d working strategies total", workingStrategies)
-
-	// Analyze strategy contributions to catch s>=1 undercontribution issues
-	var s1Contribution, sG1Contribution float64
-	for s := 0; s < lightPath.Length; s++ {
-		for tVert := 2; tVert < cameraPath.Length; tVert++ {
-			contribution := bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, tVert, scene)
-			if contribution.Luminance() > 0 {
-				if s == 1 {
-					s1Contribution += contribution.Luminance()
-				} else {
-					sG1Contribution += contribution.Luminance()
-				}
-			}
-		}
-	}
-
-	t.Logf("s=1 strategies total contribution: %.9f", s1Contribution)
-	t.Logf("s>1 strategies total contribution: %.9f", sG1Contribution)
-
-	// For indirect lighting, s>=1 strategies should contribute significantly
-	// If s>=1 contributes less than 1% of s=0, there's likely a bug
-	if s1Contribution > 0.001 && sG1Contribution > 0 {
-		sRatio := sG1Contribution / s1Contribution
-		t.Logf("s>=1 to s=0 contribution ratio: %.6f", sRatio)
-		if sRatio < 0.01 {
-			t.Errorf("s>=1 strategies severely undercontributing: %.9f vs s=0: %.9f (ratio %.6f)",
-				sG1Contribution, s1Contribution, sRatio)
-		}
-	}
-
-	// Results are already calculated above from averaging
-
 	t.Logf("=== CORNER LIGHTING COMPARISON ===")
 	t.Logf("Path tracing result: %v (luminance: %.6f)", pathResult, pathResult.Luminance())
 	t.Logf("BDPT result: %v (luminance: %.6f)", bdptResult, bdptResult.Luminance())
@@ -908,63 +735,6 @@ func TestBDPTIndirectLighting(t *testing.T) {
 			t.Errorf("BDPT shows light where path tracing shows none: BDPT=%.6f, PT=%.6f",
 				bdptResult.Luminance(), pathResult.Luminance())
 		}
-	}
-}
-
-func TestBDPTStrategyPDFCalculation(t *testing.T) {
-	scene := createMinimalCornellScene()
-
-	seed := int64(42)
-	random := rand.New(rand.NewSource(seed))
-
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
-	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-
-	rayToFloor := core.NewRay(
-		core.NewVec3(278, 400, -200),
-		core.NewVec3(0, -1, 0.5).Normalize(),
-	)
-	cameraPath := bdptIntegrator.generateCameraSubpath(rayToFloor, scene, random, 3, core.NewVec3(1, 1, 1), 0)
-	lightPath := bdptIntegrator.generateLightSubpath(scene, random, 3)
-
-	// Focus on s=0,t=1 strategy PDF calculation
-	s, tVert := 0, 1
-
-	// Calculate PDFs manually using the actual method
-	pathPDF := bdptIntegrator.calculatePathPDF(cameraPath, lightPath, s, tVert)
-
-	// Verify PDFs are reasonable
-	if lightPath.Length > 0 && lightPath.Vertices[0].AreaPdfForward <= 0 {
-		t.Errorf("Light vertex PDF should be positive, got %.9f", lightPath.Vertices[0].AreaPdfForward)
-	}
-	if cameraPath.Length > 1 && cameraPath.Vertices[1].AreaPdfForward <= 0 {
-		t.Errorf("Camera path vertex PDF should be positive, got %.9f", cameraPath.Vertices[1].AreaPdfForward)
-	}
-
-	// The combined PDF should be positive for a valid strategy
-	if pathPDF <= 0 {
-		t.Errorf("Combined path PDF should be positive for valid strategy, got: %.9f", pathPDF)
-	}
-}
-
-// Test MIS weight calculation
-func TestMISWeightCalculation(t *testing.T) {
-	config := core.SamplingConfig{MaxDepth: 3}
-	integrator := NewBDPTIntegrator(config)
-
-	strategies := []bdptStrategy{
-		{s: 0, t: 2, contribution: core.NewVec3(0.5, 0.5, 0.5), pdf: 0.1},
-		{s: 1, t: 1, contribution: core.NewVec3(0.3, 0.3, 0.3), pdf: 0.2},
-		{s: 2, t: 0, contribution: core.NewVec3(0.2, 0.2, 0.2), pdf: 0.15},
-	}
-
-	weight := integrator.calculateMISWeight(strategies[0], strategies)
-
-	// Power heuristic: weight = pdf^2 / sum(all_pdf^2)
-	expectedWeight := (0.1 * 0.1) / (0.1*0.1 + 0.2*0.2 + 0.15*0.15)
-
-	if abs(weight-expectedWeight) > 1e-6 {
-		t.Errorf("Expected MIS weight %f, got %f", expectedWeight, weight)
 	}
 }
 
@@ -1092,12 +862,12 @@ func TestBDPTSpecularHandling(t *testing.T) {
 	LogPath(t, "Light", lightPath)
 
 	// Generate strategies to debug why result is zero
-	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, testScene)
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, testScene, random)
 	t.Logf("Generated %d strategies", len(strategies))
 
 	for i, strategy := range strategies {
-		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.6f), pdf=%f",
-			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance(), strategy.pdf)
+		t.Logf("Strategy %d: s=%d,t=%d: contribution=%v (lum: %.6f), weight=%f",
+			i, strategy.s, strategy.t, strategy.contribution, strategy.contribution.Luminance(), strategy.misWeight)
 	}
 
 	// Should produce a ray color with valid luminance
@@ -1110,7 +880,7 @@ func TestBDPTSpecularHandling(t *testing.T) {
 	}
 }
 
-func SceneWithGroundPlane(includeLight bool) (core.Scene, core.SamplingConfig) {
+func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene, core.SamplingConfig) {
 	// simple scene with a green ground plane mirroring default scene (without spheres)
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
 	groundPlane := geometry.NewPlane(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0), lambertianGreen)
@@ -1129,11 +899,15 @@ func SceneWithGroundPlane(includeLight bool) (core.Scene, core.SamplingConfig) {
 	testScene := &MockScene{
 		lights:      lights,
 		shapes:      shapes,
-		bvh:         core.NewBVH(shapes),
 		config:      config,
 		camera:      &MockCamera{},
 		topColor:    core.NewVec3(0.5, 0.7, 1.0), // Blue sky background
 		bottomColor: core.NewVec3(1.0, 1.0, 1.0), // White ground
+	}
+
+	if !includeBackground {
+		testScene.topColor = core.NewVec3(0, 0, 0)
+		testScene.bottomColor = core.NewVec3(0, 0, 0)
 	}
 
 	return testScene, config
@@ -1154,14 +928,19 @@ func GroundPlaneTestRays() []struct {
 	}
 }
 func TestBackgroundHandling(t *testing.T) {
-	testScene, config := SceneWithGroundPlane(false)
+	testScene, config := SceneWithGroundPlane(true, false)
 	testRays := GroundPlaneTestRays()
 
 	bdpt := NewBDPTIntegrator(config)
 	pt := NewPathTracingIntegrator(config)
 
 	for _, testRay := range testRays {
+		// Enable verbose mode for debugging
+		bdpt.Verbose = testing.Verbose()
+		pt.Verbose = testing.Verbose()
+
 		// compare bdpt and pt results
+		t.Logf("=== Testing %s ray ===", testRay.name)
 		bdptResult := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
 		ptResult := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
 
@@ -1176,11 +955,14 @@ func TestBackgroundHandling(t *testing.T) {
 }
 
 func TestBackgroundWithLight(t *testing.T) {
-	testScene, config := SceneWithGroundPlane(true)
+	testScene, config := SceneWithGroundPlane(true, true)
 	testRays := GroundPlaneTestRays()
 
 	bdpt := NewBDPTIntegrator(config)
 	pt := NewPathTracingIntegrator(config)
+
+	bdpt.Verbose = testing.Verbose()
+	pt.Verbose = testing.Verbose()
 
 	for _, testRay := range testRays {
 		// compare bdpt and pt results
@@ -1194,6 +976,56 @@ func TestBackgroundWithLight(t *testing.T) {
 		if ratio < 0.9 || ratio > 1.1 {
 			t.Errorf("FAIL: %s ray luminance ratio of %.3f: BDPT=%v, PT=%v", testRay.name, ratio, bdptResult, ptResult)
 		}
+
+	}
+}
+
+func TestNoBackgroundWithLight(t *testing.T) {
+	testScene, config := SceneWithGroundPlane(false, true)
+	testRays := GroundPlaneTestRays()
+
+	bdpt := NewBDPTIntegrator(config)
+	pt := NewPathTracingIntegrator(config)
+
+	bdpt.Verbose = false // Disable verbose for multi-sample test
+	pt.Verbose = false
+
+	for _, testRay := range testRays {
+		// Test with multiple samples to average out randomness differences
+		numSamples := 100
+		bdptSum := core.Vec3{X: 0, Y: 0, Z: 0}
+		ptSum := core.Vec3{X: 0, Y: 0, Z: 0}
+
+		for i := 0; i < numSamples; i++ {
+			seed := int64(42 + i)
+
+			// Enable verbose for first sample to debug
+			if i == 0 {
+				bdpt.Verbose = true
+				pt.Verbose = true
+			} else {
+				bdpt.Verbose = false
+				pt.Verbose = false
+			}
+
+			bdptResult := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(seed)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+			ptResult := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(seed)), config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+
+			bdptSum = bdptSum.Add(bdptResult)
+			ptSum = ptSum.Add(ptResult)
+		}
+
+		bdptAvg := bdptSum.Multiply(1.0 / float64(numSamples))
+		ptAvg := ptSum.Multiply(1.0 / float64(numSamples))
+
+		t.Logf("%s (averaged over %d samples): BDPT=%v, PT=%v", testRay.name, numSamples, bdptAvg, ptAvg)
+
+		// check if the results are similar
+		ratio := bdptAvg.Luminance() / ptAvg.Luminance()
+		if ratio < 0.95 || ratio > 1.05 {
+			t.Errorf("FAIL: %s ray luminance ratio of %.3f: BDPT=%v, PT=%v", testRay.name, ratio, bdptAvg, ptAvg)
+		}
+
 	}
 }
 

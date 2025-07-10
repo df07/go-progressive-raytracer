@@ -50,7 +50,7 @@ type BDPTIntegrator struct {
 type bdptStrategy struct {
 	s, t         int       // Light path length, camera path length
 	contribution core.Vec3 // Radiance contribution
-	pdf          float64   // Path construction PDF
+	misWeight    float64   // MIS weight
 }
 
 // NewBDPTIntegrator creates a new BDPT integrator
@@ -70,8 +70,8 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *ran
 	lightPath := bdpt.generateLightSubpath(scene, random, maxDepth)
 
 	// Evaluate all BDPT strategies with proper MIS weighting
-	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene)
-	return bdpt.weightBDPTStrategies(strategies)
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, random)
+	return bdpt.evaluateBDPTStrategies(strategies)
 }
 
 // generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
@@ -116,7 +116,7 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 
 	// Continue the camera path by tracing the ray through the scene
 	beta := core.Vec3{X: 1, Y: 1, Z: 1}
-	bdpt.extendPath(&path, ray, beta, directionPDF, scene, random, maxDepth) // Pass maxDepth through because camera doesn't count as a vertex
+	bdpt.extendPath(&path, ray, beta, directionPDF, scene, random, maxDepth, true) // Pass maxDepth through because camera doesn't count as a vertex
 
 	return path
 }
@@ -162,30 +162,37 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 	currentRay := core.NewRay(emissionSample.Point, emissionSample.Direction)
 
 	// Use the common path extension logic (maxDepth-1 because light counts as a vertex in pt)
-	forwardThroughput := emissionSample.Emission.Multiply(cosTheta / emissionSample.AreaPDF * emissionSample.DirectionPDF * lightSelectionPdf)
-	bdpt.extendPath(&path, currentRay, forwardThroughput, emissionSample.DirectionPDF, scene, random, maxDepth-1)
+	// PBRT formula: beta = Le * |cos(theta)| / (lightPdf * pdfPos * pdfDir)
+	forwardThroughput := emissionSample.Emission.Multiply(math.Abs(cosTheta) / (lightSelectionPdf * emissionSample.AreaPDF * emissionSample.DirectionPDF))
+	bdpt.logf("generateLightSubpath: forwardThroughput=%v, cosTheta=%f, lightSelectionPdf=%f, AreaPDF=%f, DirectionPDF=%f\n", forwardThroughput, math.Abs(cosTheta), lightSelectionPdf, emissionSample.AreaPDF, emissionSample.DirectionPDF)
+	bdpt.extendPath(&path, currentRay, forwardThroughput, emissionSample.DirectionPDF, scene, random, maxDepth-1, false)
 
 	return path
 }
 
 // extendPath extends a path by tracing a ray through the scene, handling intersections and scattering
 // This is the common logic shared between camera and light path generation after the initial vertex
-func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta core.Vec3, pdfDir float64, scene core.Scene, random *rand.Rand, maxBounces int) {
+func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta core.Vec3, pdfDir float64, scene core.Scene, random *rand.Rand, maxBounces int, isCameraPath bool) {
 	for bounces := 0; bounces < maxBounces; bounces++ {
 		vertexPrev := path.Vertices[path.Length-1]
 
 		// Check for intersections
 		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, 1e100)
 		if !isHit {
+			if !isCameraPath {
+				break
+			}
 			// Hit background - create a background vertex with captured light
 			bgColor := bdpt.BackgroundGradient(currentRay, scene)
 
+			// For background (infinite area light), we should use solid angle PDF directly
+			// Don't convert to area PDF since background is at infinite distance
 			vertex := Vertex{
 				Point:             currentRay.Origin.Add(currentRay.Direction.Multiply(1000.0)), // Far background
 				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
 				Material:          nil,
 				IncomingDirection: currentRay.Direction.Multiply(-1),
-				AreaPdfForward:    1.0,                     // Background PDF
+				AreaPdfForward:    pdfDir,                  // Keep as solid angle PDF for infinite area light
 				AreaPdfReverse:    0.0,                     // Cannot generate rays towards background
 				IsLight:           bgColor.Luminance() > 0, // Only mark as light if background actually emits
 				IsCamera:          false,                   // No camera vertices in path extension
@@ -218,8 +225,8 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			EmittedLight:      emittedLight, // Captured during path generation
 		}
 
-		// Set forward direction PDF into this vertex
-		vertex.AreaPdfForward = vertex.convertPDFDensity(vertexPrev, pdfDir)
+		// Set forward direction PDF into this vertex (PBRT: prev.ConvertDensity(pdf, v))
+		vertex.AreaPdfForward = vertexPrev.convertPDFDensity(vertex, pdfDir)
 
 		// Try to scatter the ray
 		scatter, didScatter := hit.Material.Scatter(currentRay, *hit, random)
@@ -261,106 +268,325 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 
 // Return probability per unit area at vertex to
 func (v *Vertex) convertPDFDensity(next Vertex, pdfDir float64) float64 {
+	// For infinite area lights (background), keep solid angle PDF as-is
+	if next.IsInfiniteLight {
+		return pdfDir
+	}
+
 	direction := next.Point.Subtract(v.Point)
 	distanceSquared := direction.LengthSquared()
 	if distanceSquared == 0 { // prevent division by zero
 		return 0.0
 	}
 	invDist2 := 1.0 / distanceSquared
-	cosTheta := direction.Multiply(math.Sqrt(invDist2)).Dot(next.Normal)
-	return pdfDir * cosTheta * invDist2
+
+	// Follow PBRT's ConvertDensity exactly
+	pdf := pdfDir
+	// Only multiply by cosine if next vertex is on a surface
+	if next.Material != nil { // IsOnSurface equivalent
+		cosTheta := direction.Multiply(math.Sqrt(invDist2)).Dot(next.Normal)
+		pdf *= math.Abs(cosTheta) // Use absolute value like PBRT
+	}
+
+	return pdf * invDist2
 }
 
-// calculatePathPDF calculates the PDF for a complete path construction strategy
-func (bdpt *BDPTIntegrator) calculatePathPDF(cameraPath, lightPath Path, s, t int) float64 {
-	pdf := 1.0
+// calculateMISWeight implements PBRT's MIS weighting for BDPT strategies
+// This compares forward vs reverse PDFs to properly weight different path construction strategies
+func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+	if s+t == 2 {
+		return 1.0
+	}
 
-	// Camera path contribution: PDFs up to but not including connection vertex
-	// For connection strategies, we exclude the final scatter PDF since it's replaced by connection PDF
-	for i := 0; i < t-1 && i < cameraPath.Length; i++ {
-		vertex := cameraPath.Vertices[i]
-		if vertex.AreaPdfForward > 0 {
-			pdf *= vertex.AreaPdfForward
+	// For path tracing strategies that hit infinite lights (background),
+	// return MIS weight 1.0 since we can't actually sample infinite lights directly
+	if s == 0 && t > 1 {
+		lastVertex := cameraPath.Vertices[t-1]
+		if lastVertex.IsInfiniteLight {
+			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight: infinite light hit, weight=1.0\n", s, t)
+			return 1.0
 		}
 	}
 
-	// Light path contribution: PDFs up to but not including connection vertex
-	// For connection strategies, we exclude the final scatter PDF since it's replaced by connection PDF
-	for i := 0; i < s-1 && i < lightPath.Length; i++ {
-		vertex := lightPath.Vertices[i]
-		if vertex.AreaPdfForward > 0 {
-			pdf *= vertex.AreaPdfForward
+	// Helper function equivalent to PBRT's remap0 - deals with delta functions
+	remap0 := func(f float64) float64 {
+		if f != 0 {
+			return f
+		}
+		return 1.0
+	}
+
+	sumRi := 0.0
+
+	// Look up connection vertices and their predecessors
+	var qs, pt, qsMinus, ptMinus *Vertex
+	if s > 0 {
+		qs = &lightPath.Vertices[s-1]
+	}
+	if t > 0 {
+		pt = &cameraPath.Vertices[t-1]
+	}
+	if s > 1 {
+		qsMinus = &lightPath.Vertices[s-2]
+	}
+	if t > 1 {
+		ptMinus = &cameraPath.Vertices[t-2]
+	}
+
+	// Store original values to restore later (Go's defer equivalent of PBRT's ScopedAssignment)
+	var originalPtPdfRev, originalPtMinusPdfRev, originalQsPdfRev, originalQsMinusPdfRev float64
+	var originalPtDelta, originalQsDelta bool
+
+	defer func() {
+		// Restore original values
+		if pt != nil {
+			pt.AreaPdfReverse = originalPtPdfRev
+			pt.IsSpecular = originalPtDelta
+		}
+		if ptMinus != nil {
+			ptMinus.AreaPdfReverse = originalPtMinusPdfRev
+		}
+		if qs != nil {
+			qs.AreaPdfReverse = originalQsPdfRev
+			qs.IsSpecular = originalQsDelta
+		}
+		if qsMinus != nil {
+			qsMinus.AreaPdfReverse = originalQsMinusPdfRev
+		}
+	}()
+
+	// Update sampled vertex for s=1 or t=1 strategy
+	if s == 1 && qs != nil && sampledVertex != nil {
+		*qs = *sampledVertex
+	} else if t == 1 && pt != nil && sampledVertex != nil {
+		*pt = *sampledVertex
+	}
+
+	// Mark connection vertices as non-degenerate and store originals
+	if pt != nil {
+		originalPtDelta = pt.IsSpecular
+		pt.IsSpecular = false
+	}
+	if qs != nil {
+		originalQsDelta = qs.IsSpecular
+		qs.IsSpecular = false
+	}
+
+	// Update reverse density of vertex pt_{t-1}
+	if pt != nil {
+		originalPtPdfRev = pt.AreaPdfReverse
+		if s > 0 {
+			// pt.AreaPdfReverse = qs.Pdf(scene, qsMinus, *pt)
+			pt.AreaPdfReverse = bdpt.calculateVertexPdf(*qs, qsMinus, *pt, scene)
+			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 1 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
+		} else {
+			// pt.AreaPdfReverse = pt.PdfLightOrigin(scene, *ptMinus, lightPdf, lightToIndex)
+			pt.AreaPdfReverse = bdpt.calculateLightOriginPdf(*pt, *ptMinus, scene)
+			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 2 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
 		}
 	}
 
-	// Connection PDF: Only for actual connection strategies, not pure camera/light paths
-	if s > 0 && t > 0 {
-		cameraVertex := cameraPath.Vertices[t-1]
-		lightVertex := lightPath.Vertices[s-1]
-
-		// Calculate connection direction
-		direction := lightVertex.Point.Subtract(cameraVertex.Point)
-		distance := direction.Length()
-
-		if distance > 0.001 { // Avoid division by zero for very close vertices
-			direction = direction.Multiply(1.0 / distance)
-
-			// Connection PDF from camera vertex: probability of scattering toward light vertex
-			if cameraVertex.Material != nil {
-				cameraPDF, isCameraDelta := cameraVertex.Material.PDF(cameraVertex.IncomingDirection, direction, cameraVertex.Normal)
-				// Skip connections through delta (specular) vertices
-				if isCameraDelta {
-					return 0.0 // Cannot connect through delta functions
-				}
-				if cameraPDF <= 0 {
-					return 0.0 // Invalid connection direction
-				}
-				pdf *= cameraPDF
-			}
-
-			// Connection PDF from light vertex: probability of scattering toward camera vertex
-			if lightVertex.Material != nil {
-				lightPDF, isLightDelta := lightVertex.Material.PDF(lightVertex.IncomingDirection, direction.Multiply(-1), lightVertex.Normal)
-				// Skip connections through delta (specular) vertices
-				if isLightDelta {
-					return 0.0 // Cannot connect through delta functions
-				}
-				if lightPDF <= 0 {
-					return 0.0 // Invalid connection direction
-				}
-				pdf *= lightPDF
-			}
+	// Update reverse density of vertex pt_{t-2}
+	if ptMinus != nil {
+		originalPtMinusPdfRev = ptMinus.AreaPdfReverse
+		if s > 0 {
+			// ptMinus.AreaPdfReverse = pt.Pdf(scene, qs, *ptMinus)
+			ptMinus.AreaPdfReverse = bdpt.calculateVertexPdf(*pt, qs, *ptMinus, scene)
+			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 1 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
+		} else {
+			// ptMinus.AreaPdfReverse = pt.PdfLight(scene, *ptMinus)
+			ptMinus.AreaPdfReverse = bdpt.calculateLightPdf(*pt, *ptMinus, scene)
+			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 2 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
 		}
+	}
+
+	// Update reverse density of vertices qs_{s-1} and qs_{s-2}
+	if qs != nil {
+		originalQsPdfRev = qs.AreaPdfReverse
+		if pt != nil {
+			// qs.AreaPdfReverse = pt.Pdf(scene, ptMinus, *qs)
+			qs.AreaPdfReverse = bdpt.calculateVertexPdf(*pt, ptMinus, *qs, scene)
+		}
+	}
+	if qsMinus != nil {
+		originalQsMinusPdfRev = qsMinus.AreaPdfReverse
+		if qs != nil && pt != nil {
+			// qsMinus.AreaPdfReverse = qs.Pdf(scene, pt, *qsMinus)
+			qsMinus.AreaPdfReverse = bdpt.calculateVertexPdf(*qs, pt, *qsMinus, scene)
+		}
+	}
+
+	// Consider hypothetical connection strategies along the camera subpath
+	ri := 1.0
+	for i := t - 1; i > 0; i-- {
+		vertex := &cameraPath.Vertices[i]
+		ri *= remap0(vertex.AreaPdfReverse) / remap0(vertex.AreaPdfForward)
+		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular {
+			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g -> %.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, sumRi+ri)
+			sumRi += ri
+		}
+	}
+
+	// Consider hypothetical connection strategies along the light subpath
+	ri = 1.0
+	for i := s - 1; i >= 0; i-- {
+		vertex := &lightPath.Vertices[i]
+		ri *= remap0(vertex.AreaPdfReverse) / remap0(vertex.AreaPdfForward)
+
+		var deltaLightVertex bool
+		if i > 0 {
+			deltaLightVertex = lightPath.Vertices[i-1].IsSpecular
+		} else {
+			deltaLightVertex = vertex.IsLight && vertex.IsSpecular // Assuming delta lights are specular
+		}
+
+		if !vertex.IsSpecular && !deltaLightVertex {
+			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight lightPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g -> %.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, sumRi+ri)
+			sumRi += ri
+		}
+	}
+
+	return 1.0 / (1.0 + sumRi)
+}
+
+// Helper functions for PBRT MIS calculations
+
+// calculateVertexPdf implements PBRT's Vertex::Pdf
+func (bdpt *BDPTIntegrator) calculateVertexPdf(from Vertex, prev *Vertex, next Vertex, scene core.Scene) float64 {
+	if from.IsLight {
+		return bdpt.calculateLightPdf(from, next, scene)
+	}
+
+	// Compute directions to preceding and next vertex
+	wn := next.Point.Subtract(from.Point)
+	if wn.LengthSquared() == 0 {
+		return 0
+	}
+	wn = wn.Normalize()
+
+	var wp core.Vec3
+	if prev != nil {
+		wp = prev.Point.Subtract(from.Point)
+		if wp.LengthSquared() == 0 {
+			return 0
+		}
+		wp = wp.Normalize()
+	} else {
+		// CHECK(type == VertexType::Camera) equivalent
+		if !from.IsCamera {
+			return 0
+		}
+	}
+
+	var pdf float64
+	if from.IsCamera {
+		// ei.camera->Pdf_We(ei.SpawnRay(wn), &unused, &pdf);
+		// Use our camera PDF implementation
+		ray := core.NewRay(from.Point, wn)
+		if from.Camera != nil {
+			_, pdf = from.Camera.CalculateRayPDFs(ray)
+		}
+		if pdf == 0 {
+			return 0
+		}
+	} else if from.Material != nil {
+		// pdf = si.bsdf->Pdf(wp, wn);
+		materialPdf, isDelta := from.Material.PDF(wp, wn, from.Normal)
+		if isDelta {
+			return 0
+		}
+		pdf = materialPdf
+	} else {
+		// Medium case - TODO: implement if needed
+		return 0
+	}
+
+	// Return probability per unit area at vertex _next_
+	// return ConvertDensity(pdf, next);
+	return from.convertPDFDensity(next, pdf)
+}
+
+// calculateLightPdf implements PBRT's Vertex::PdfLight
+func (bdpt *BDPTIntegrator) calculateLightPdf(from Vertex, to Vertex, scene core.Scene) float64 {
+	w := to.Point.Subtract(from.Point)
+	invDist2 := 1.0 / w.LengthSquared()
+	w = w.Multiply(math.Sqrt(invDist2))
+
+	var pdf float64
+	if from.IsLight {
+		// Handle infinite area lights (background)
+		if from.IsInfiniteLight {
+			// PBRT: Compute planar sampling density for infinite light sources
+			worldRadius := bdpt.getWorldRadius(scene)
+			pdf = 1.0 / (math.Pi * worldRadius * worldRadius)
+		} else if from.Light != nil {
+			// Use the light's EmissionPDF which gives area PDF
+			areaPdf := from.Light.EmissionPDF(from.Point, w)
+
+			// Convert to directional PDF: pdfDir = areaPdf / cos(theta)
+			// where cos(theta) is angle between light normal and emission direction
+			cosTheta := w.Dot(from.Normal)
+			if cosTheta <= 0 {
+				return 0
+			}
+
+			pdfDir := areaPdf / cosTheta
+			pdf = pdfDir * invDist2
+		}
+	}
+
+	// if (v.IsOnSurface()) pdf *= AbsDot(v.ng(), w);
+	if !to.IsLight && !to.IsCamera {
+		cosine := math.Abs(to.Normal.Dot(w))
+		pdf *= cosine
 	}
 
 	return pdf
 }
 
-// calculateMISWeight calculates the MIS weight for a strategy against all competing strategies
-func (bdpt *BDPTIntegrator) calculateMISWeight(currentStrategy bdptStrategy, allStrategies []bdptStrategy) float64 {
-	if currentStrategy.pdf <= 0 {
-		return 0.0
+// calculateLightOriginPdf implements PBRT's Vertex::PdfLightOrigin
+func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex Vertex, to Vertex, scene core.Scene) float64 {
+	w := to.Point.Subtract(lightVertex.Point)
+	if w.LengthSquared() == 0 {
+		return 0
+	}
+	w = w.Normalize()
+
+	// Handle infinite area lights (background)
+	if lightVertex.IsInfiniteLight {
+		// PBRT: Return solid angle density for infinite light sources
+		// For our simple background, use uniform solid angle distribution
+		// In PBRT this would be InfiniteLightDensity(scene, lightDistr, lightToDistrIndex, w)
+
+		// Light selection probability (uniform among all lights)
+		lightSelectionPdf := 1.0 // no light selection for infinite light
+
+		// For uniform background, PDF is uniform over sphere
+		infiniteLightPdf := 1.0 / (4.0 * math.Pi)
+
+		bdpt.logf(" (s=?,t=?) calculateLightOriginPdf: infinite light, infiniteLightPdf=%0.3g, lightSelectionPdf=%0.3g\n", infiniteLightPdf, lightSelectionPdf)
+		return infiniteLightPdf / lightSelectionPdf
 	}
 
-	// Power heuristic with β = 2
-	sumWeights := 0.0
-	currentWeight := currentStrategy.pdf * currentStrategy.pdf
-
-	for _, strategy := range allStrategies {
-		if strategy.pdf > 0 {
-			sumWeights += strategy.pdf * strategy.pdf
-		}
+	if !lightVertex.IsLight || lightVertex.Light == nil {
+		return 0
 	}
 
-	if sumWeights <= 0 {
-		return 0.0
+	// Compute the discrete probability of sampling this light
+	lights := scene.GetLights()
+	if len(lights) == 0 {
+		return 0
 	}
+	pdfChoice := 1.0 / float64(len(lights)) // Uniform light selection
 
-	bdpt.logf(" (s=%d,t=%d) calculateMISWeight: weight=%f (%f / %f)\n", currentStrategy.s, currentStrategy.t, currentWeight/sumWeights, currentWeight, sumWeights)
-	return currentWeight / sumWeights
+	// Get position PDF from the light's EmissionPDF
+	// This is equivalent to PBRT's light->Pdf_Le(..., &pdfPos, &pdfDir)
+	pdfPos := lightVertex.Light.EmissionPDF(lightVertex.Point, w)
+
+	return pdfPos * pdfChoice
 }
 
-// weightBDPTStrategies evaluates all BDPT path construction strategies with MIS weighting.
+// evaluateBDPTStrategies evaluates all BDPT path construction strategies with MIS weighting.
 //
 // BDPT works by generating two subpaths:
 // - Camera subpath: starts from camera, bounces through scene
@@ -374,49 +600,58 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(currentStrategy bdptStrategy, all
 //
 // Multiple Importance Sampling (MIS) optimally combines all strategies using
 // the power heuristic to minimize variance.
-func (bdpt *BDPTIntegrator) weightBDPTStrategies(strategies []bdptStrategy) core.Vec3 {
+func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(strategies []bdptStrategy) core.Vec3 {
 	// Apply MIS weighting to all strategies
 	totalContribution := core.Vec3{X: 0, Y: 0, Z: 0}
 	for _, strategy := range strategies {
-		// Calculate MIS weight by comparing against all other strategies
-		weight := bdpt.calculateMISWeight(strategy, strategies)
-		bdpt.logf(" (s=%d,t=%d) weightBDPTStrategies: contribution=%v * weight=%f\n", strategy.s, strategy.t, strategy.contribution, weight)
-		totalContribution = totalContribution.Add(strategy.contribution.Multiply(weight))
+		if strategy.t > 1 { // t=1 strategies hit the camera directly, not necessarily at the point we're calculating
+			// Use PBRT MIS weight calculation
+			bdpt.logf(" (s=%d,t=%d) evaluateBDPTStrategies: contribution=%v, PBRT weight=%0.3g\n", strategy.s, strategy.t, strategy.contribution, strategy.misWeight)
+			totalContribution = totalContribution.Add(strategy.contribution.Multiply(strategy.misWeight))
+		}
 	}
 
 	return totalContribution
 }
 
 // generateBDPTStrategies generates all valid BDPT strategies for the given camera and light paths
-func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene) []bdptStrategy {
+func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene, random *rand.Rand) []bdptStrategy {
 	strategies := make([]bdptStrategy, 0)
 
 	for s := 0; s <= lightPath.Length; s++ {
 		for t := 1; t <= cameraPath.Length; t++ {
 			var contribution core.Vec3
+			var sampledVertex *Vertex
 
 			if s == 0 {
 				// s=0: Pure camera path
 				contribution = bdpt.evaluatePathTracingStrategy(cameraPath, t)
+				if contribution.Luminance() > 0 {
+					bdpt.logf(" (s=%d,t=%d) Path tracing PDF: %g\n", s, t, contribution)
+				}
 			} else if t == 1 {
 				// t=1 is light path direct to camera, which might hit a different pixel
 				// skip it for now
 				continue
+			} else if s == 1 {
+				// s=1: Direct lighting
+				// Use direct light sampling to avoid challenges with choosing a light point on the wrong side of the light
+				contribution, sampledVertex = bdpt.evaluateDirectLightingStrategy(cameraPath, s, t, scene, random)
+				bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy returned contribution=%v\n", s, t, contribution)
 			} else {
 				// All other cases: Connection strategies (including s=0, t<last)
 				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
 			}
 
 			if contribution.Luminance() > 0 {
-				pdf := bdpt.calculatePathPDF(cameraPath, lightPath, s, t)
-				if pdf > 0 {
-					strategies = append(strategies, bdptStrategy{
-						s:            s,
-						t:            t,
-						contribution: contribution,
-						pdf:          pdf,
-					})
-				}
+				misWeight := bdpt.calculateMISWeight(cameraPath, lightPath, sampledVertex, s, t, scene)
+
+				strategies = append(strategies, bdptStrategy{
+					s:            s,
+					t:            t,
+					contribution: contribution,
+					misWeight:    misWeight,
+				})
 			}
 		}
 	}
@@ -437,9 +672,72 @@ func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path, t int) 
 	lastVertex := cameraPath.Vertices[t-1]
 
 	// The contribution is the emitted light at the last vertex weighted by path throughput
+	// pbrt: L = pt.Le(scene, cameraVertices[t - 2]) * pt.beta
 	contribution := lastVertex.EmittedLight.MultiplyVec(lastVertex.Beta)
 	bdpt.logf(" (s=0,t=%d) evaluatePathTracingStrategy: contribution:%v = lastVertex.EmittedLight:%v * lastVertex.Beta:%v\n", t, contribution, lastVertex.EmittedLight, lastVertex.Beta)
 	return contribution
+}
+
+func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, s, t int, scene core.Scene, random *rand.Rand) (core.Vec3, *Vertex) {
+	if s != 1 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}, nil // Only s=1 is valid for direct lighting
+	}
+
+	cameraVertex := cameraPath.Vertices[t-1]
+
+	if cameraVertex.IsSpecular || cameraVertex.Material == nil {
+		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
+	}
+
+	lights := scene.GetLights()
+	lightSample, sampledLight, hasLight := core.SampleLight(lights, cameraVertex.Point, random)
+	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
+	}
+
+	// Check if light is visible (shadow ray)
+	shadowRay := core.NewRay(cameraVertex.Point, lightSample.Direction)
+	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, lightSample.Distance-0.001)
+	if blocked {
+		// Light is blocked, no direct contribution
+		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
+	}
+
+	// Calculate the cosine factor
+	cosine := lightSample.Direction.Dot(cameraVertex.Normal)
+	if cosine <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}, nil // Light is behind the surface
+	}
+
+	// pbrt: L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta
+	// pbrt sampled.beta: light->Sample_Li / (Sample_Li&pdf * lightDistr&lightPdf)
+	// pbrt pdfFwd: sampled.PdfLightOrigin(scene, pt, lightDistr, lightToIndex)
+	//          => pdfPos * pdfChoice // Return solid angle density for non-infinite light sources
+	//          => pdfDir for light sample not used
+	brdf := cameraVertex.Material.EvaluateBRDF(core.Vec3{}, lightSample.Direction, cameraVertex.Normal)
+	lightBeta := lightSample.Emission.Multiply(1 / lightSample.PDF) // light sample pdf contains light selection pdf
+	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosine)
+
+	// Create sampled light vertex for PBRT MIS calculation
+	sampledVertex := &Vertex{
+		Point:             lightSample.Point,
+		Normal:            lightSample.Normal,
+		Light:             sampledLight,
+		Material:          nil, // Lights don't have materials
+		Camera:            nil,
+		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
+		AreaPdfForward:    lightSample.PDF, // Light sampling PDF
+		AreaPdfReverse:    0.0,
+		IsLight:           true,
+		IsCamera:          false,
+		IsSpecular:        false,
+		Beta:              lightBeta,
+		EmittedLight:      lightSample.Emission,
+	}
+
+	bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy: brdf=%v * beta=%v * emission=%v * (cosine=%f / pdf=%f)\n", s, t, brdf, cameraVertex.Beta, lightSample.Emission, cosine, lightSample.PDF)
+
+	return lightContribution, sampledVertex
 }
 
 // evaluateLightTracingStrategy evaluates light tracing (light path hits camera)
@@ -504,8 +802,9 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 
 	// Visibility test
 	shadowRay := core.NewRay(cameraVertex.Point, direction)
-	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, distance-0.001)
+	hit, blocked := scene.GetBVH().Hit(shadowRay, 0.001, distance-0.001)
 	if blocked {
+		bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: blocked hit=%v\n", s, t, hit)
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
@@ -525,27 +824,46 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	cameraPathThroughput := cameraPath.Vertices[t-1].Beta
 	lightPathThroughput := lightPath.Vertices[s-1].Beta
 
-	// For BDPT connections, use appropriate scaling
-	var lightContribution core.Vec3
+	// Calculate light vertex BRDF for connection (PBRT: qs.f(pt, TransportMode::Importance))
+	var lightBRDF core.Vec3
 	if lightVertex.IsLight {
-		// When connecting to a light source, emission is in the beta but need to divide by pdf
-		lightContribution = core.NewVec3(1, 1, 1).Multiply(1 / lightVertex.AreaPdfForward)
+		// Light sources have identity BRDF (emission is already in throughput)
+		lightBRDF = core.NewVec3(1, 1, 1)
 	} else {
-		// When connecting to a surface hit by light, the surface acts as a secondary light source
-		// We need BRDF * cos_theta, but cos_theta is already in the geometric term
-		// So we just need the BRDF value multiplied by the surface's received radiance
-		// The received radiance is encoded in the light path throughput
-		lightContribution = bdpt.evaluateBRDF(lightVertex, direction.Multiply(-1)).Multiply(1 / lightVertex.AreaPdfForward)
+		// Surface vertex BRDF toward camera vertex
+		lightBRDF = bdpt.evaluateBRDF(lightVertex, direction.Multiply(-1))
 	}
 
-	// pbrt: L = qs.beta * qs.f(pt, TransportMode::Importance) * pt.f(qs, TransportMode::Radiance) * pt.beta;
-
-	// Combine everything: f_camera(x) * G(x,y) * [Le(light) or f_light(y)] * T_camera * T_light
-	// L = qs.beta * qs.f(pt, TransportMode::Importance) * pt.f(qs, TransportMode::Radiance) * pt.beta * G(qs, pt)
-	bdpt.logf("bdpt: brdf=%v * light=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", cameraBRDF, lightContribution, geometricTerm, cameraPathThroughput, lightPathThroughput)
-	contribution := cameraBRDF.MultiplyVec(lightContribution).Multiply(geometricTerm).MultiplyVec(cameraPathThroughput).MultiplyVec(lightPathThroughput)
+	// PBRT formula: L = qs.beta * qs.f(pt, TransportMode::Importance) * pt.f(qs, TransportMode::Radiance) * pt.beta * G
+	// Which translates to: lightThroughput * lightBRDF * cameraBRDF * cameraThroughput * G
+	bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: cameraBRDF=%v * lightBRDF=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", s, t, cameraBRDF, lightBRDF, geometricTerm, cameraPathThroughput, lightPathThroughput)
+	contribution := lightPathThroughput.MultiplyVec(lightBRDF).MultiplyVec(cameraBRDF).MultiplyVec(cameraPathThroughput).Multiply(geometricTerm)
 
 	return contribution
+}
+
+// getWorldRadius calculates the radius of the scene's bounding sphere
+// This is used for infinite light PDF calculations following PBRT
+func (bdpt *BDPTIntegrator) getWorldRadius(scene core.Scene) float64 {
+	bb := scene.GetBVH().Root.BoundingBox
+
+	// For now, use a simple heuristic based on scene shapes
+	// In a full implementation, this would use the actual scene bounds
+	shapes := scene.GetShapes()
+	if len(shapes) == 0 {
+		return 1000.0 // Default radius for empty scenes
+	}
+
+	// Calculate center and radius of bounding sphere
+	center := bb.Min.Add(bb.Max).Multiply(0.5)
+	radius := bb.Max.Subtract(center).Length()
+
+	// Ensure minimum radius for numerical stability
+	if radius < 100.0 {
+		radius = 100.0
+	}
+
+	return radius
 }
 
 func (bdpt *BDPTIntegrator) logf(format string, a ...interface{}) {

@@ -46,3 +46,4 @@ go-progressive-raytracer
 web/web
 .cursor/todo.md
 TODO.md
+/ref
