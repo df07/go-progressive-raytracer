@@ -194,6 +194,10 @@ func NewRay(origin, direction Vec3) Ray {
 	return Ray{Origin: origin, Direction: direction}
 }
 
+func NewRayTo(origin, target Vec3) Ray {
+	return NewRay(origin, target.Subtract(origin).Normalize())
+}
+
 // At returns the point at parameter t along the ray
 func (r Ray) At(t float64) Vec3 {
 	return r.Origin.Add(r.Direction.Multiply(t))

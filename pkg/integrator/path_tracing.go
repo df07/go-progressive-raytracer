@@ -49,6 +49,7 @@ func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random
 	scatter, didScatter := hit.Material.Scatter(ray, *hit, random)
 	if !didScatter {
 		// Material absorbed the ray, only return emitted light
+		pt.logf("pt absorbed[%d]: contribution=%v\n", pt.config.MaxDepth-depth, colorEmitted)
 		return colorEmitted.Multiply(rrCompensation)
 	}
 
@@ -69,15 +70,19 @@ func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random
 func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResult, scene core.Scene, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	// Update throughput with material attenuation
 	newThroughput := throughput.MultiplyVec(scatter.Attenuation)
-	return scatter.Attenuation.MultiplyVec(
-		pt.RayColor(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex))
+	incomingLight := pt.RayColor(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex)
+	contribution := scatter.Attenuation.MultiplyVec(incomingLight)
+
+	pt.logf("pt specular[%d]: contribution=%v = attenuation=%v * incomingLight=%v\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight)
+
+	return contribution
 }
 
 // calculateDiffuseColor handles diffuse material scattering with throughput tracking
 func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, scene core.Scene, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
-	directLight := pt.CalculateDirectLighting(scene, scatter, hit, random)
-	indirectLight := pt.CalculateIndirectLighting(scene, scatter, hit, depth, throughput, sampleIndex, random)
+	directLight := pt.CalculateDirectLighting(scene, scatter, hit, random, depth)
+	indirectLight := pt.CalculateIndirectLighting(scene, scatter, hit, depth, throughput, sampleIndex, random, depth)
 	return directLight.Add(indirectLight)
 }
 
@@ -90,7 +95,7 @@ func (pt *PathTracingIntegrator) GetEmittedLight(ray core.Ray, hit *core.HitReco
 }
 
 // calculateDirectLighting samples lights directly for direct illumination with the provided random generator
-func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, random *rand.Rand) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, random *rand.Rand, depth int) core.Vec3 {
 	lights := scene.GetLights()
 
 	// Sample a light
@@ -132,7 +137,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
 	if lightSample.PDF > 0 {
 		contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
-		pt.logf("pt direct: contribution=%v = brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", contribution, brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
+		pt.logf("pt direct[%d]: contribution=%v = brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", pt.config.MaxDepth-depth, contribution, brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
 
 		return contribution
 	}
@@ -141,7 +146,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 }
 
 // calculateIndirectLighting handles indirect illumination via material sampling with throughput tracking
-func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand, maxDepth int) core.Vec3 {
 	if scatter.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -168,7 +173,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 	// Indirect lighting contribution with MIS
 	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)
 
-	pt.logf("pt indirect: contribution=%v = attenuation=%v * incomingLight=%v * (cosine=%f * misWeight=%f / scatterPDF=%f)\n", contribution, scatter.Attenuation, incomingLight, cosine, misWeight, scatter.PDF)
+	pt.logf("pt indirect[%d]: contribution=%v = attenuation=%v * incomingLight=%v * (cosine=%f * misWeight=%f / scatterPDF=%f)\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight, cosine, misWeight, scatter.PDF)
 
 	return contribution
 }

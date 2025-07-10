@@ -14,7 +14,7 @@ import (
 // TestBDPTvsPathTracingCameraPath compares BDPT vs path tracing on a simple Cornell setup
 // This test isolates the camera path, testing camera rays that directly hit the light
 func TestBDPTvsPathTracingCameraPath(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	bdpt := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
 	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 3, RussianRouletteMinSamples: 10}) // disable RR
@@ -80,11 +80,103 @@ func TestBDPTvsPathTracingCameraPath(t *testing.T) {
 	}
 }
 
+// TestCornellSpecularReflections compares BDPT vs path tracing on specular reflections
+// This test checks if BDPT properly handles camera ray → mirror → light paths
+func TestCornellSpecularReflections(t *testing.T) {
+	// Create Cornell scene with mirror box and light
+	scene := createMinimalCornellScene(true)
+
+	// Setup a ray that should hit the ceiling above the mirror box and reflect to the light
+	// Mirror box is at (185, 165, 351) with size (82.5, 165, 82.5)
+	// Light is at ceiling around (278, 556, 279)
+	rayToMirror := core.NewRayTo(
+		core.NewVec3(278, 300, 100), // Camera position
+		core.NewVec3(165, 556, 390), // Ray toward ceiling above mirror box
+	)
+
+	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinSamples: 100}
+	pt := NewPathTracingIntegrator(config)
+	bdpt := NewBDPTIntegrator(config)
+
+	ptLight := core.NewVec3(0, 0, 0)
+	bdptLight := core.NewVec3(0, 0, 0)
+	ptMaxLuminance, bdptMaxLuminance := 0.0, 0.0
+	ptMaxIndex, bdptMaxIndex := 0, 0
+
+	seed := int64(42)
+	count := 50
+
+	for i := 0; i < count; i++ {
+		ptRandom := rand.New(rand.NewSource(seed + int64(i)*492))
+		ptResult := pt.RayColor(rayToMirror, scene, ptRandom, config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+
+		bdptRandom := rand.New(rand.NewSource(seed + int64(i)*492))
+		bdptResult := bdpt.RayColor(rayToMirror, scene, bdptRandom, config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+
+		ptLight = ptLight.Add(ptResult)
+		bdptLight = bdptLight.Add(bdptResult)
+
+		if ptResult.Luminance() > ptMaxLuminance {
+			ptMaxLuminance = ptResult.Luminance()
+			ptMaxIndex = i
+		}
+		if bdptResult.Luminance() > bdptMaxLuminance {
+			bdptMaxLuminance = bdptResult.Luminance()
+			bdptMaxIndex = i
+		}
+	}
+
+	ptLight = ptLight.Multiply(1.0 / float64(count))
+	bdptLight = bdptLight.Multiply(1.0 / float64(count))
+
+	ptLuminance := ptLight.Luminance()
+	bdptLuminance := bdptLight.Luminance()
+
+	t.Logf("Path tracing average: %v", ptLight)
+	t.Logf("BDPT average: %v", bdptLight)
+	t.Logf("Path tracing average luminance: %.6f", ptLuminance)
+	t.Logf("BDPT average luminance: %.6f", bdptLuminance)
+	t.Logf("Path tracing max ray luminance: %.6f", ptMaxLuminance)
+	t.Logf("BDPT max ray luminance: %.6f", bdptMaxLuminance)
+
+	// Check if results are similar
+	ratio := bdptLuminance / ptLuminance
+	if math.Abs(ratio-1.0) > 0.025 {
+		t.Errorf("FAIL: BDPT should have similar light contribution, got ratio %.3f (bdpt=%.3g, pt=%.3g)", ratio, bdptLuminance, ptLuminance)
+	}
+
+	// check max luminance
+	ratio = bdptMaxLuminance / ptMaxLuminance
+	if math.Abs(ratio-1.0) > 0.025 {
+		t.Errorf("FAIL: BDPT should have similar max luminance, got ratio %.3f (bdpt=%.3g, pt=%.3g)", ratio, bdptMaxLuminance, ptMaxLuminance)
+
+		if testing.Verbose() {
+			// re-run the ray with verbose on for the max index
+			pt.Verbose = testing.Verbose()
+			bdpt.Verbose = testing.Verbose()
+
+			ptRandom := rand.New(rand.NewSource(seed + int64(ptMaxIndex)*492))
+			bdptRandom := rand.New(rand.NewSource(seed + int64(bdptMaxIndex)*492))
+
+			t.Logf("\n=== PATH TRACING ===\n")
+			ptResult := pt.RayColor(rayToMirror, scene, ptRandom, config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+			t.Logf("\n=== BDPT ===\n")
+			bdptResult := bdpt.RayColor(rayToMirror, scene, bdptRandom, config.MaxDepth, core.NewVec3(1, 1, 1), 0)
+			if ptResult.Luminance() != ptMaxLuminance {
+				t.Errorf("FAIL: Path tracing max ray should have luminance %.6f, got %.6f", ptMaxLuminance, ptResult.Luminance())
+			}
+			if bdptResult.Luminance() != bdptMaxLuminance {
+				t.Errorf("FAIL: BDPT max ray should have luminance %.6f, got %.6f", bdptMaxLuminance, bdptResult.Luminance())
+			}
+		}
+	}
+}
+
 // TestBDPTvsPathTracingDirectLighting compares BDPT vs path tracing on a simple Cornell setup
 // This test isolates the direct lighting issue - BDPT should perform similarly to path tracing
 func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 	// Create a minimal Cornell scene: just floor + quad light
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	// Setup a ray hitting the floor center
 	rayToFloor := core.NewRay(
@@ -99,17 +191,17 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 	pathRandom := rand.New(rand.NewSource(seed))
 	pathConfig := core.SamplingConfig{MaxDepth: 5}
 	pathIntegrator := NewPathTracingIntegrator(pathConfig)
-	pathResult := pathIntegrator.RayColor(rayToFloor, scene, pathRandom, 5, core.NewVec3(1, 1, 1), 0)
+	pathResult := pathIntegrator.RayColor(rayToFloor, scene, pathRandom, pathConfig.MaxDepth, core.NewVec3(1, 1, 1), 0)
 
 	// BDPT result with debug output
 	bdptRandom := rand.New(rand.NewSource(seed))
 	bdptConfig := core.SamplingConfig{MaxDepth: 5}
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-	bdptIntegrator.Verbose = true // Enable verbose logging to see MIS weights
+	bdptIntegrator.Verbose = testing.Verbose() // Enable verbose logging to see MIS weights
 
 	// Get the final result through RayColor for comparison
 	bdptRandom = rand.New(rand.NewSource(seed)) // Reset seed
-	bdptResult := bdptIntegrator.RayColor(rayToFloor, scene, bdptRandom, 5, core.NewVec3(1, 1, 1), 0)
+	bdptResult := bdptIntegrator.RayColor(rayToFloor, scene, bdptRandom, bdptConfig.MaxDepth, core.NewVec3(1, 1, 1), 0)
 
 	t.Logf("=== FINAL COMPARISON ===")
 	t.Logf("Path tracing result: %v (luminance: %.6f)", pathResult, pathResult.Luminance())
@@ -134,7 +226,7 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 }
 
 // createMinimalCornellScene creates a Cornell scene with walls, floor and quad light
-func createMinimalCornellScene() core.Scene {
+func createMinimalCornellScene(includeBoxes bool) core.Scene {
 	// Create a basic scene
 	scene := &TestScene{
 		shapes: make([]core.Shape, 0),
@@ -201,6 +293,37 @@ func createMinimalCornellScene() core.Scene {
 	scene.lights = append(scene.lights, quadLight)
 	scene.shapes = append(scene.shapes, quadLight.Quad)
 
+	// directly copied from pkg/scene/cornell.go
+	if includeBoxes {
+		white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+		// Mirror material for the tall block - highly reflective surface
+		mirror := material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0) // Very shiny mirror
+
+		// Custom configuration: tall mirrored box on left, short white box on right
+		// This should show the red wall reflection in the mirrored surface
+
+		// Short box (white, diffuse) - positioned on the RIGHT side
+		shortBoxCenter := core.NewVec3(370.0, 82.5, 169.0) // Right side, front
+		shortBox := geometry.NewBox(
+			shortBoxCenter,                     // center position
+			core.NewVec3(82.5, 82.5, 82.5),     // size (half-extents: 165/2 for each dimension)
+			core.NewVec3(0, 18*math.Pi/180, 0), // rotation (18 degrees around Y axis)
+			white,                              // white lambertian material
+		)
+
+		// Tall box (mirrored) - positioned on the LEFT side
+		tallBoxCenter := core.NewVec3(185.0, 165.0, 351.0) // Left side, back
+		tallBox := geometry.NewBox(
+			tallBoxCenter,                       // center position
+			core.NewVec3(82.5, 165.0, 82.5),     // size (half-extents: 165/2, 330/2, 165/2)
+			core.NewVec3(0, -20*math.Pi/180, 0), // rotation (-15 degrees) - angled to catch red wall reflection
+			mirror,                              // mirror material
+		)
+
+		// Add boxes to scene
+		scene.shapes = append(scene.shapes, shortBox, tallBox)
+	}
+
 	return scene
 }
 
@@ -260,7 +383,7 @@ func (c *TestCamera) GetCameraForward() core.Vec3 {
 
 // TestLightPathDirectionAndIntersection verifies that light paths are generated correctly
 func TestLightPathDirectionAndIntersection(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	// Generate multiple light paths to test consistency
 	seed := int64(42)
@@ -339,7 +462,7 @@ func TestLightPathDirectionAndIntersection(t *testing.T) {
 
 // TestBDPTCameraPathHitsLight tests that camera paths can find light sources
 func TestBDPTCameraPathHitsLight(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	// Create a ray that should hit the light directly
 	rayToLight := core.NewRay(
@@ -392,7 +515,7 @@ func TestBDPTCameraPathHitsLight(t *testing.T) {
 
 // TestBDPTConnectionStrategy tests that BDPT can connect camera and light paths
 func TestBDPTConnectionStrategy(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	seed := int64(42)
 	random := rand.New(rand.NewSource(seed))
@@ -456,7 +579,7 @@ func TestBDPTConnectionStrategy(t *testing.T) {
 
 // TestBDPTPathIndexing verifies how paths are indexed in our implementation
 func TestBDPTPathIndexing(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	seed := int64(42)
 	random := rand.New(rand.NewSource(seed))
@@ -504,7 +627,7 @@ func TestBDPTPathIndexing(t *testing.T) {
 
 // TestBDPTvsDirectLightSampling compares BDPT s=1,t=2 with direct light sampling
 func TestBDPTvsPTDirectLightSampling(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	random := rand.New(rand.NewSource(64))
 
@@ -598,7 +721,7 @@ func TestLightPathGeneration(t *testing.T) {
 
 // TestBDPTMISWeighting tests the MIS weighting calculation specifically
 func TestBDPTMISWeighting(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	seed := int64(42)
 	random := rand.New(rand.NewSource(seed))
@@ -680,7 +803,7 @@ func TestBDPTMISWeighting(t *testing.T) {
 
 // TestBDPTIndirectLighting tests BDPT with a ray that hits a corner (indirect lighting only)
 func TestBDPTIndirectLighting(t *testing.T) {
-	scene := createMinimalCornellScene()
+	scene := createMinimalCornellScene(false)
 
 	// Ray aimed at center of top back wall, a little below the top
 	// Should see minimal direct lighting, but lots of indirect lighting
@@ -1001,8 +1124,8 @@ func TestNoBackgroundWithLight(t *testing.T) {
 
 			// Enable verbose for first sample to debug
 			if i == 0 {
-				bdpt.Verbose = true
-				pt.Verbose = true
+				bdpt.Verbose = testing.Verbose()
+				pt.Verbose = testing.Verbose()
 			} else {
 				bdpt.Verbose = false
 				pt.Verbose = false
