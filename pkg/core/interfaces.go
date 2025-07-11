@@ -87,6 +87,13 @@ type EmissionSample struct {
 	DirectionPDF float64
 }
 
+// CameraSample represents camera sampling result for t=1 strategies
+type CameraSample struct {
+	Ray    Ray     // Ray from camera toward reference point
+	Weight Vec3    // Camera importance weight (We function result)
+	PDF    float64 // Probability density for this sample
+}
+
 // Camera interface for cameras to avoid circular imports
 type Camera interface {
 	GetRay(i, j int, random *rand.Rand) Ray
@@ -96,6 +103,13 @@ type Camera interface {
 
 	// Get camera forward direction for BDPT calculations
 	GetCameraForward() Vec3
+
+	// Sample camera from a reference point for t=1 strategies
+	// Camera handles lens sampling internally, returns complete sample
+	SampleCameraFromPoint(refPoint Vec3, random *rand.Rand) *CameraSample
+
+	// Map ray back to pixel coordinates (for splat placement)
+	MapRayToPixel(ray Ray) (x, y int, ok bool)
 }
 
 // Scene interface for scene management

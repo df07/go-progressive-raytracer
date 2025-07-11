@@ -33,7 +33,26 @@ type Camera struct {
 	defocusDiskU core.Vec3 // Defocus disk horizontal radius
 	defocusDiskV core.Vec3 // Defocus disk vertical radius
 
-	// Store configuration for PDF calculations
+	// Camera coordinate system (computed once)
+	u, v, w       core.Vec3 // Orthonormal basis vectors
+	cameraForward core.Vec3 // Camera forward direction
+
+	// Computed camera properties
+	aspectRatio     float64 // Aspect ratio (width/height)
+	focusDistance   float64 // Effective focus distance
+	lensRadius      float64 // Effective lens radius
+	lensArea        float64 // Lens area
+	totalSensorArea float64 // Total sensor area
+	imagePlaneArea  float64 // Image plane area
+	imageWidth      int     // Image width in pixels
+	imageHeight     int     // Image height in pixels
+	theta           float64 // Field of view in radians
+	viewportWidth   float64 // Width of the viewport
+	viewportHeight  float64 // Height of the viewport
+	cosTotalWidth   float64 // Cosine of half the field of view width
+	cosTotalHeight  float64 // Cosine of half the field of view height
+
+	// Store configuration for reference
 	config CameraConfig
 }
 
@@ -50,21 +69,38 @@ func NewCamera(config CameraConfig) *Camera {
 		focusDistance = config.Center.Subtract(config.LookAt).Length()
 	}
 
-	imageHeight := int(float64(config.Width) / config.AspectRatio) // Calculate height from width
+	// Calculate lens properties
+	lensRadius := config.Aperture / 2
+	if lensRadius == 0 {
+		lensRadius = 1e-6 // Treat pinhole as tiny lens for calculations
+	}
+	lensArea := math.Pi * lensRadius * lensRadius
+	if config.Aperture == 0 {
+		lensArea = 1.0 // Pinhole camera
+	}
 
-	// Calculate viewport dimensions
-	theta := config.VFov * math.Pi / 180.0 // Convert degrees to radians
+	// Calculate image dimensions and plane area
+	imageWidth := config.Width
+	imageHeight := int(float64(imageWidth) / config.AspectRatio)
+	theta := config.VFov * math.Pi / 180.0
 	h := math.Tan(theta / 2.0)
 	viewportHeight := 2.0 * h * focusDistance
 	viewportWidth := viewportHeight * config.AspectRatio
+	imagePlaneArea := viewportWidth * viewportHeight
 
 	// Calculate the vectors across the horizontal and down the vertical viewport edges
 	viewportU := u.Multiply(viewportWidth)  // Vector across viewport horizontal edge
 	viewportV := v.Multiply(viewportHeight) // Vector up viewport vertical edge
 
 	// Calculate the horizontal and vertical delta vectors from pixel to pixel
-	pixelDeltaU := viewportU.Multiply(1.0 / float64(config.Width))
+	pixelDeltaU := viewportU.Multiply(1.0 / float64(imageWidth))
 	pixelDeltaV := viewportV.Multiply(1.0 / float64(imageHeight))
+
+	// Camera sensor area (in world units)
+	// The sensor area is the area of one pixel times the number of pixels
+	pixelAreaU := pixelDeltaU.Length()
+	pixelAreaV := pixelDeltaV.Length()
+	totalSensorArea := pixelAreaU * pixelAreaV * float64(imageWidth) * float64(imageHeight)
 
 	// Calculate the location of the upper left pixel
 	halfViewportU := viewportU.Multiply(0.5)
@@ -80,14 +116,35 @@ func NewCamera(config CameraConfig) *Camera {
 	defocusDiskU := u.Multiply(config.Aperture / 2)
 	defocusDiskV := v.Multiply(config.Aperture / 2)
 
+	// calculate the camera forward direction
+	cameraForward := config.LookAt.Subtract(config.Center).Normalize()
+	cosTotalWidth := math.Cos(theta / 2.0)
+	cosTotalHeight := math.Cos(theta / 2.0)
+
 	return &Camera{
-		center:       config.Center,
-		pixel00Loc:   pixel00Loc,
-		pixelDeltaU:  pixelDeltaU,
-		pixelDeltaV:  pixelDeltaV,
-		defocusDiskU: defocusDiskU,
-		defocusDiskV: defocusDiskV,
-		config:       config,
+		center:          config.Center,
+		pixel00Loc:      pixel00Loc,
+		pixelDeltaU:     pixelDeltaU,
+		pixelDeltaV:     pixelDeltaV,
+		defocusDiskU:    defocusDiskU,
+		defocusDiskV:    defocusDiskV,
+		u:               u,
+		v:               v,
+		w:               w,
+		focusDistance:   focusDistance,
+		lensRadius:      lensRadius,
+		lensArea:        lensArea,
+		viewportWidth:   viewportWidth,
+		viewportHeight:  viewportHeight,
+		totalSensorArea: totalSensorArea,
+		imagePlaneArea:  imagePlaneArea,
+		imageWidth:      config.Width,
+		imageHeight:     imageHeight,
+		theta:           theta,
+		cosTotalWidth:   cosTotalWidth,
+		cosTotalHeight:  cosTotalHeight,
+		cameraForward:   cameraForward,
+		config:          config,
 	}
 }
 
@@ -114,50 +171,26 @@ func (c *Camera) GetRay(i, j int, random *rand.Rand) core.Ray {
 // CalculateRayPDFs calculates the area and direction PDFs for a camera ray
 // This is needed for BDPT to properly balance camera and light path PDFs
 func (c *Camera) CalculateRayPDFs(ray core.Ray) (areaPDF, directionPDF float64) {
-	// Calculate image dimensions
-	imageHeight := int(float64(c.config.Width) / c.config.AspectRatio)
-
-	// Camera sensor area (in world units)
-	// The sensor area is the area of one pixel times the number of pixels
-	pixelAreaU := c.pixelDeltaU.Length()
-	pixelAreaV := c.pixelDeltaV.Length()
-	totalSensorArea := pixelAreaU * pixelAreaV * float64(c.config.Width) * float64(imageHeight)
 
 	// Area PDF: uniform sampling over the sensor area
-	areaPDF = 1.0 / totalSensorArea
+	areaPDF = 1.0 / c.totalSensorArea
 
 	// Direction PDF: based on solid angle subtended by the pixel
 	// For a pinhole camera, this is proportional to cos^3(theta) / distance^2
 	// where theta is angle from optical axis
 
-	// Calculate focus distance
-	focusDistance := c.config.FocusDistance
-	if focusDistance <= 0 {
-		focusDistance = c.config.Center.Subtract(c.config.LookAt).Length()
-	}
-
 	// Ray direction from camera center (normalized)
 	rayDir := ray.Direction.Normalize()
 
-	// Camera forward direction (toward LookAt)
-	cameraForward := c.config.LookAt.Subtract(c.config.Center).Normalize()
-
 	// Cosine of angle between ray and camera forward direction
-	cosTheta := rayDir.Dot(cameraForward)
+	cosTheta := rayDir.Dot(c.cameraForward)
 	if cosTheta <= 0 {
 		// Ray pointing away from camera forward direction - invalid
 		return 0, 0
 	}
 
-	// Direction PDF includes cos^3 term for perspective projection
-	// and normalization by solid angle of the entire image plane
-	theta := c.config.VFov * math.Pi / 180.0
-	h := math.Tan(theta / 2.0)
-	viewportHeight := 2.0 * h * focusDistance
-	viewportWidth := viewportHeight * c.config.AspectRatio
-
 	// Total solid angle subtended by the viewport
-	totalSolidAngle := viewportWidth * viewportHeight / (focusDistance * focusDistance)
+	totalSolidAngle := c.viewportWidth * c.viewportHeight / (c.focusDistance * c.focusDistance)
 
 	// Direction PDF: cos^3(theta) normalized by total solid angle
 	directionPDF = (cosTheta * cosTheta * cosTheta) / totalSolidAngle
@@ -167,7 +200,98 @@ func (c *Camera) CalculateRayPDFs(ray core.Ray) (areaPDF, directionPDF float64) 
 
 // GetCameraForward returns the camera's forward direction (toward LookAt)
 func (c *Camera) GetCameraForward() core.Vec3 {
-	return c.config.LookAt.Subtract(c.config.Center).Normalize()
+	return c.cameraForward
+}
+
+// SampleCameraFromPoint samples the camera from a reference point for t=1 strategies
+// Camera handles lens sampling internally, returns complete sample
+func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, random *rand.Rand) *core.CameraSample {
+	// Sample lens coordinates using concentric disk sampling
+	lensCoords := core.RandomInUnitDisk(random).Multiply(c.lensRadius)
+
+	// Transform lens point to world space using stored camera basis vectors
+	lensPoint := c.center.Add(c.u.Multiply(lensCoords.X)).Add(c.v.Multiply(lensCoords.Y))
+
+	// Create ray from lens toward reference point
+	direction := refPoint.Subtract(lensPoint).Normalize()
+	ray := core.NewRay(lensPoint, direction)
+
+	// Calculate PDF (inverse square law + lens area + cosine)
+	distance := refPoint.Subtract(lensPoint).Length()
+
+	cosTheta := math.Max(0, c.cameraForward.Dot(direction))
+	if cosTheta == 0 {
+		return nil // Ray doesn't hit camera front
+	}
+
+	pdf := (distance * distance) / (cosTheta * c.lensArea)
+
+	// Calculate camera importance weight
+	importance := c.EvaluateRayImportance(ray)
+	if importance.Luminance() == 0 {
+		return nil // Ray doesn't contribute
+	}
+
+	return &core.CameraSample{
+		Ray:    ray,
+		Weight: importance,
+		PDF:    pdf,
+	}
+}
+
+// EvaluateRayImportance calculates the camera importance function for a ray
+func (c *Camera) EvaluateRayImportance(ray core.Ray) core.Vec3 {
+	// Check if ray is forward-facing with respect to the camera
+	cosTheta := ray.Direction.Dot(c.cameraForward)
+
+	if cosTheta < c.cosTotalWidth {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Return importance for point on image plane
+	// PBRT formula: cos^4(theta) / (A * lensArea)
+	importance := math.Pow(cosTheta, 4) / (c.imagePlaneArea * c.lensArea)
+
+	return core.Vec3{X: importance, Y: importance, Z: importance}
+}
+
+// MapRayToPixel maps a ray back to pixel coordinates (for splat placement)
+func (c *Camera) MapRayToPixel(ray core.Ray) (int, int, bool) {
+	// Find intersection with image plane
+	// Ray: origin + t * direction
+	// Image plane: center - w * focusDistance
+	imagePlaneCenter := c.center.Subtract(c.w.Multiply(c.focusDistance))
+
+	// Solve for t: (origin + t * direction - imagePlaneCenter) dot w = 0
+	toPlane := imagePlaneCenter.Subtract(ray.Origin)
+	t := toPlane.Dot(c.w) / ray.Direction.Dot(c.w)
+
+	if t <= 0 {
+		return 0, 0, false // Ray going wrong direction
+	}
+
+	// Find hit point on image plane
+	hitPoint := ray.Origin.Add(ray.Direction.Multiply(t))
+
+	// Convert to image plane coordinates
+	relativePoint := hitPoint.Subtract(imagePlaneCenter)
+	planeX := relativePoint.Dot(c.u)
+	planeY := relativePoint.Dot(c.v)
+
+	// Convert to viewport coordinates and normalize to [0,1] range
+	normalizedX := (planeX + c.viewportWidth/2) / c.viewportWidth
+	normalizedY := (planeY + c.viewportHeight/2) / c.viewportHeight
+
+	// Convert to pixel coordinates
+	pixelX := int(normalizedX * float64(c.imageWidth))
+	pixelY := int(normalizedY * float64(c.imageHeight))
+
+	// Check bounds
+	if pixelX >= 0 && pixelX < c.imageWidth && pixelY >= 0 && pixelY < c.imageHeight {
+		return pixelX, pixelY, true
+	}
+
+	return 0, 0, false
 }
 
 // MergeCameraConfig merges camera configuration overrides with defaults

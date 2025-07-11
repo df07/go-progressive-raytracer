@@ -51,6 +51,14 @@ func (m *MockCamera) GetCameraForward() core.Vec3 {
 	return core.NewVec3(0, 0, -1)
 }
 
+func (m *MockCamera) SampleCameraFromPoint(point core.Vec3, random *rand.Rand) *core.CameraSample {
+	return nil
+}
+
+func (m *MockCamera) MapRayToPixel(ray core.Ray) (int, int, bool) {
+	return 0, 0, true
+}
+
 // createTestScene creates a simple scene with a sphere for testing
 func createTestScene() *MockScene {
 	// Create a simple lambertian sphere
