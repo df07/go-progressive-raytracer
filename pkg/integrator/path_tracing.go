@@ -23,20 +23,20 @@ func NewPathTracingIntegrator(config core.SamplingConfig) *PathTracingIntegrator
 }
 
 // RayColor computes the color for a single ray using unidirectional path tracing
-func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, sampleIndex int) (core.Vec3, []core.SplatRay) {
+func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand) (core.Vec3, []core.SplatRay) {
 	depth := pt.config.MaxDepth
 	throughput := core.Vec3{X: 1.0, Y: 1.0, Z: 1.0}
-	return pt.rayColorRecursive(ray, scene, random, depth, throughput, sampleIndex), nil
+	return pt.rayColorRecursive(ray, scene, random, depth, throughput), nil
 }
 
-func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scene, random *rand.Rand, depth int, throughput core.Vec3, sampleIndex int) core.Vec3 {
+func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scene, random *rand.Rand, depth int, throughput core.Vec3) core.Vec3 {
 	// If we've exceeded the ray bounce limit, no more light is gathered
 	if depth <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
 	// Apply Russian Roulette termination
-	shouldTerminate, rrCompensation := pt.ApplyRussianRoulette(depth, throughput, sampleIndex, random)
+	shouldTerminate, rrCompensation := pt.ApplyRussianRoulette(depth, throughput, random)
 	if shouldTerminate {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -62,9 +62,9 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 	// Handle scattering based on material type
 	var colorScattered core.Vec3
 	if scatter.IsSpecular() {
-		colorScattered = pt.calculateSpecularColor(scatter, scene, depth, throughput, sampleIndex, random)
+		colorScattered = pt.calculateSpecularColor(scatter, scene, depth, throughput, random)
 	} else {
-		colorScattered = pt.calculateDiffuseColor(scatter, hit, scene, depth, throughput, sampleIndex, random)
+		colorScattered = pt.calculateDiffuseColor(scatter, hit, scene, depth, throughput, random)
 	}
 
 	// Apply Russian Roulette compensation to the final result
@@ -73,10 +73,10 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 }
 
 // calculateSpecularColor handles specular material scattering with the provided random generator
-func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResult, scene core.Scene, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
+func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResult, scene core.Scene, depth int, throughput core.Vec3, random *rand.Rand) core.Vec3 {
 	// Update throughput with material attenuation
 	newThroughput := throughput.MultiplyVec(scatter.Attenuation)
-	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex)
+	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, random, depth-1, newThroughput)
 	contribution := scatter.Attenuation.MultiplyVec(incomingLight)
 
 	pt.logf("pt specular[%d]: contribution=%v = attenuation=%v * incomingLight=%v\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight)
@@ -85,10 +85,10 @@ func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResu
 }
 
 // calculateDiffuseColor handles diffuse material scattering with throughput tracking
-func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, scene core.Scene, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
+func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, scene core.Scene, depth int, throughput core.Vec3, random *rand.Rand) core.Vec3 {
 	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
 	directLight := pt.CalculateDirectLighting(scene, scatter, hit, random, depth)
-	indirectLight := pt.CalculateIndirectLighting(scene, scatter, hit, depth, throughput, sampleIndex, random, depth)
+	indirectLight := pt.CalculateIndirectLighting(scene, scatter, hit, depth, throughput, random)
 	return directLight.Add(indirectLight)
 }
 
@@ -152,7 +152,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 }
 
 // calculateIndirectLighting handles indirect illumination via material sampling with throughput tracking
-func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand, maxDepth int) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, random *rand.Rand) core.Vec3 {
 	if scatter.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -174,7 +174,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 	newThroughput := throughput.MultiplyVec(scatter.Attenuation).Multiply(cosine / scatter.PDF)
 
 	// Get incoming light from the scattered direction with throughput tracking
-	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex)
+	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, random, depth-1, newThroughput)
 
 	// Indirect lighting contribution with MIS
 	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)
@@ -186,12 +186,12 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 
 // applyRussianRoulette determines if a ray should be terminated and returns the compensation factor
 // Returns (shouldTerminate, compensationFactor)
-func (pt *PathTracingIntegrator) ApplyRussianRoulette(depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) (bool, float64) {
+func (pt *PathTracingIntegrator) ApplyRussianRoulette(depth int, throughput core.Vec3, random *rand.Rand) (bool, float64) {
 	// Apply Russian Roulette after minimum bounces AND minimum samples per pixel
 	initialDepth := pt.config.MaxDepth
 	currentBounce := initialDepth - depth
 
-	shouldApplyRR := currentBounce >= pt.config.RussianRouletteMinBounces && sampleIndex >= pt.config.RussianRouletteMinSamples
+	shouldApplyRR := currentBounce >= pt.config.RussianRouletteMinBounces
 
 	if !shouldApplyRR {
 		return false, 1.0 // Don't terminate, no compensation needed

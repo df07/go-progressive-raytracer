@@ -74,7 +74,6 @@ func createCornellSamplingConfig() core.SamplingConfig {
 		SamplesPerPixel:           150,
 		MaxDepth:                  40,
 		RussianRouletteMinBounces: 16,    // Need a lot of bounces for indirect lighting
-		RussianRouletteMinSamples: 8,     // Fewer samples before RR
 		AdaptiveMinSamples:        0.20,  // 20% of max samples minimum to avoid black pixels on front box
 		AdaptiveThreshold:         0.005, // Lower threshold (0.5%)
 	}

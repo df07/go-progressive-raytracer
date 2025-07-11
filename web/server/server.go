@@ -38,7 +38,6 @@ type RenderRequest struct {
 	MaxSamples         int     `json:"maxSamples"`         // Maximum samples per pixel
 	MaxPasses          int     `json:"maxPasses"`          // Maximum number of passes
 	RRMinBounces       int     `json:"rrMinBounces"`       // Russian Roulette minimum bounces
-	RRMinSamples       int     `json:"rrMinSamples"`       // Russian Roulette minimum samples
 	AdaptiveMinSamples float64 `json:"adaptiveMinSamples"` // Adaptive sampling minimum samples as percentage (0.0-1.0)
 	AdaptiveThreshold  float64 `json:"adaptiveThreshold"`  // Adaptive sampling relative error threshold
 	Integrator         string  `json:"integrator"`         // Integrator type: "path-tracing" or "bdpt"
@@ -274,7 +273,6 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 			"maxPasses":                 webMaxPasses,
 			"maxDepth":                  config.MaxDepth,
 			"russianRouletteMinBounces": config.RussianRouletteMinBounces,
-			"russianRouletteMinSamples": config.RussianRouletteMinSamples,
 			"adaptiveMinSamples":        config.AdaptiveMinSamples,
 			"adaptiveThreshold":         config.AdaptiveThreshold,
 			"cornellGeometry":           "boxes",
@@ -301,10 +299,6 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"max": 10000,
 			},
 			"russianRouletteMinBounces": map[string]int{
-				"min": 1,
-				"max": 1000,
-			},
-			"russianRouletteMinSamples": map[string]int{
 				"min": 1,
 				"max": 1000,
 			},

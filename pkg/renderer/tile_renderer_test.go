@@ -18,7 +18,7 @@ type MockIntegrator struct {
 	callCount   int
 }
 
-func (m *MockIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, sampleIndex int) (core.Vec3, []core.SplatRay) {
+func (m *MockIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand) (core.Vec3, []core.SplatRay) {
 	m.callCount++
 	return m.returnColor, nil
 }

@@ -17,7 +17,7 @@ func TestBDPTvsPathTracingCameraPath(t *testing.T) {
 	scene := createMinimalCornellScene(false)
 
 	bdpt := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
-	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 3, RussianRouletteMinSamples: 10}) // disable RR
+	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}) // disable RR
 
 	// Camera is at 278, 400, -200
 	// Ceiling is at 0, 556, 0 to 556,556,556
@@ -51,8 +51,8 @@ func TestBDPTvsPathTracingCameraPath(t *testing.T) {
 	}
 
 	// bdpt contribution from camera path should be the same as path tracing
-	bdptContribution, _ := bdpt.RayColor(rayToLight, scene, random, 0)
-	ptContribution, _ := pt.RayColor(rayToLight, scene, random, 0)
+	bdptContribution, _ := bdpt.RayColor(rayToLight, scene, random)
+	ptContribution, _ := pt.RayColor(rayToLight, scene, random)
 
 	bdptLuminance := bdptContribution.Luminance()
 	pathLuminance := ptContribution.Luminance()
@@ -94,7 +94,7 @@ func TestCornellSpecularReflections(t *testing.T) {
 		core.NewVec3(165, 556, 390), // Ray toward ceiling above mirror box
 	)
 
-	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinSamples: 100}
+	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
 	pt := NewPathTracingIntegrator(config)
 	bdpt := NewBDPTIntegrator(config)
 
@@ -109,10 +109,10 @@ func TestCornellSpecularReflections(t *testing.T) {
 	for i := 0; i < count; i++ {
 		//fmt.Printf("i=%d\n", i)
 		ptRandom := rand.New(rand.NewSource(seed + int64(i)*492))
-		ptResult, _ := pt.RayColor(rayToMirror, scene, ptRandom, 0)
+		ptResult, _ := pt.RayColor(rayToMirror, scene, ptRandom)
 
 		bdptRandom := rand.New(rand.NewSource(seed + int64(i)*492))
-		bdptResult, _ := bdpt.RayColor(rayToMirror, scene, bdptRandom, 0)
+		bdptResult, _ := bdpt.RayColor(rayToMirror, scene, bdptRandom)
 
 		ptLight = ptLight.Add(ptResult)
 		bdptLight = bdptLight.Add(bdptResult)
@@ -161,9 +161,9 @@ func TestCornellSpecularReflections(t *testing.T) {
 			bdptRandom := rand.New(rand.NewSource(seed + int64(bdptMaxIndex)*492))
 
 			t.Logf("\n=== PATH TRACING ===\n")
-			ptResult, _ := pt.RayColor(rayToMirror, scene, ptRandom, 0)
+			ptResult, _ := pt.RayColor(rayToMirror, scene, ptRandom)
 			t.Logf("\n=== BDPT ===\n")
-			bdptResult, _ := bdpt.RayColor(rayToMirror, scene, bdptRandom, 0)
+			bdptResult, _ := bdpt.RayColor(rayToMirror, scene, bdptRandom)
 			if ptResult.Luminance() != ptMaxLuminance {
 				t.Errorf("FAIL: Path tracing max ray should have luminance %.6f, got %.6f", ptMaxLuminance, ptResult.Luminance())
 			}
@@ -193,7 +193,7 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 	pathRandom := rand.New(rand.NewSource(seed))
 	pathConfig := core.SamplingConfig{MaxDepth: 5}
 	pathIntegrator := NewPathTracingIntegrator(pathConfig)
-	pathResult, _ := pathIntegrator.RayColor(rayToFloor, scene, pathRandom, 0)
+	pathResult, _ := pathIntegrator.RayColor(rayToFloor, scene, pathRandom)
 
 	// BDPT result with debug output
 	bdptRandom := rand.New(rand.NewSource(seed))
@@ -203,7 +203,7 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 
 	// Get the final result through RayColor for comparison
 	bdptRandom = rand.New(rand.NewSource(seed)) // Reset seed
-	bdptResult, _ := bdptIntegrator.RayColor(rayToFloor, scene, bdptRandom, 0)
+	bdptResult, _ := bdptIntegrator.RayColor(rayToFloor, scene, bdptRandom)
 
 	t.Logf("=== FINAL COMPARISON ===")
 	t.Logf("Path tracing result: %v (luminance: %.6f)", pathResult, pathResult.Luminance())
@@ -634,7 +634,7 @@ func TestBDPTvsPTDirectLightSampling(t *testing.T) {
 	random := rand.New(rand.NewSource(64))
 
 	bdpt := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 1})
-	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 1, RussianRouletteMinSamples: 100}) // disable RR
+	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 1, RussianRouletteMinBounces: 100}) // disable RR
 
 	rayToFloor := core.NewRay(
 		core.NewVec3(278, 400, -200),
@@ -650,8 +650,8 @@ func TestBDPTvsPTDirectLightSampling(t *testing.T) {
 	//bdptContribution := bdpt.evaluateConnectionStrategy(cameraPath, lightPath, 1, 2, scene)
 	//t.Logf("BDPT s=1,t=2 contribution: %v (luminance: %.6f)", bdptContribution, bdptContribution.Luminance())
 
-	bdptContribution, _ := bdpt.RayColor(rayToFloor, scene, random, 0)
-	ptContribution, _ := pt.RayColor(rayToFloor, scene, random, 0)
+	bdptContribution, _ := bdpt.RayColor(rayToFloor, scene, random)
+	ptContribution, _ := pt.RayColor(rayToFloor, scene, random)
 
 	t.Logf("BDPT contribution: %v (luminance: %.3f)", bdptContribution, bdptContribution.Luminance())
 	t.Logf("PT contribution: %v (luminance: %.3f)", ptContribution, ptContribution.Luminance())
@@ -820,19 +820,19 @@ func TestBDPTIndirectLighting(t *testing.T) {
 	numSamples := 10
 	var pathTotal, bdptTotal core.Vec3
 
-	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 5, RussianRouletteMinSamples: 10})
+	pt := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 5, RussianRouletteMinBounces: 100})
 	bdpt := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
 	//bdpt.Verbose = true
 
 	for i := 0; i < numSamples; i++ {
 		// Path tracing sample
 		pathRandom := rand.New(rand.NewSource(seed + int64(i)))
-		pathSample, _ := pt.RayColor(rayToCorner, scene, pathRandom, i)
+		pathSample, _ := pt.RayColor(rayToCorner, scene, pathRandom)
 		pathTotal = pathTotal.Add(pathSample)
 
 		// BDPT sample
 		bdptRandom := rand.New(rand.NewSource(seed + int64(i)))
-		bdptSample, _ := bdpt.RayColor(rayToCorner, scene, bdptRandom, i)
+		bdptSample, _ := bdpt.RayColor(rayToCorner, scene, bdptRandom)
 		bdptTotal = bdptTotal.Add(bdptSample)
 	}
 
@@ -901,12 +901,12 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 		random := rand.New(rand.NewSource(int64(42 + i)))
 
 		// Path tracing result
-		ptResult, _ := pathTracer.RayColor(ray, testScene, random, i)
+		ptResult, _ := pathTracer.RayColor(ray, testScene, random)
 		pathTracingTotal = pathTracingTotal.Add(ptResult)
 
 		// BDPT result
 		random = rand.New(rand.NewSource(int64(42 + i))) // Reset seed for fair comparison
-		bdptResult, _ := bdptTracer.RayColor(ray, testScene, random, i)
+		bdptResult, _ := bdptTracer.RayColor(ray, testScene, random)
 		bdptTotal = bdptTotal.Add(bdptResult)
 	}
 
@@ -995,7 +995,7 @@ func TestBDPTSpecularHandling(t *testing.T) {
 	}
 
 	// Should produce a ray color with valid luminance
-	result, _ := bdpt.RayColor(ray, testScene, random, 0)
+	result, _ := bdpt.RayColor(ray, testScene, random)
 	t.Logf("Final RayColor result: %v (luminance: %.6f)", result, result.Luminance())
 
 	// Result should be valid (not NaN/Inf, not black, not too bright)
@@ -1018,7 +1018,7 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene
 		lights = append(lights, light)
 	}
 
-	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinSamples: 100, RussianRouletteMinBounces: 100}
+	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
 
 	testScene := &MockScene{
 		lights:      lights,
@@ -1065,8 +1065,8 @@ func TestBackgroundHandling(t *testing.T) {
 
 		// compare bdpt and pt results
 		t.Logf("=== Testing %s ray ===", testRay.name)
-		bdptResult, _ := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), 0)
-		ptResult, _ := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), 0)
+		bdptResult, _ := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)))
+		ptResult, _ := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)))
 
 		t.Logf("%s: BDPT=%v, PT=%v", testRay.name, bdptResult, ptResult)
 
@@ -1090,8 +1090,8 @@ func TestBackgroundWithLight(t *testing.T) {
 
 	for _, testRay := range testRays {
 		// compare bdpt and pt results
-		bdptResult, _ := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), 0)
-		ptResult, _ := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)), 0)
+		bdptResult, _ := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)))
+		ptResult, _ := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(42)))
 
 		t.Logf("%s: BDPT=%v, PT=%v", testRay.name, bdptResult, ptResult)
 
@@ -1132,8 +1132,8 @@ func TestNoBackgroundWithLight(t *testing.T) {
 				pt.Verbose = false
 			}
 
-			bdptResult, _ := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(seed)), 0)
-			ptResult, _ := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(seed)), 0)
+			bdptResult, _ := bdpt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(seed)))
+			ptResult, _ := pt.RayColor(testRay.ray, testScene, rand.New(rand.NewSource(seed)))
 
 			bdptSum = bdptSum.Add(bdptResult)
 			ptSum = ptSum.Add(ptResult)

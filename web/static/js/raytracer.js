@@ -93,7 +93,6 @@ class ProgressiveRaytracer {
               document.getElementById('maxSamples').value = config.defaults.samplesPerPixel;
               document.getElementById('maxPasses').value = config.defaults.maxPasses;
               document.getElementById('rrMinBounces').value = config.defaults.russianRouletteMinBounces;
-              document.getElementById('rrMinSamples').value = config.defaults.russianRouletteMinSamples;
               document.getElementById('adaptiveMinSamples').value = config.defaults.adaptiveMinSamples;
               document.getElementById('adaptiveThreshold').value = config.defaults.adaptiveThreshold;
               
@@ -122,7 +121,6 @@ class ProgressiveRaytracer {
           { id: 'maxSamples', limits: limits.maxSamples },
           { id: 'maxPasses', limits: limits.maxPasses },
           { id: 'rrMinBounces', limits: limits.russianRouletteMinBounces },
-          { id: 'rrMinSamples', limits: limits.russianRouletteMinSamples },
           { id: 'adaptiveMinSamples', limits: limits.adaptiveMinSamples },
           { id: 'adaptiveThreshold', limits: limits.adaptiveThreshold },
       ];
@@ -336,7 +334,6 @@ class ProgressiveRaytracer {
           maxSamples: document.getElementById('maxSamples').value,
           maxPasses: document.getElementById('maxPasses').value,
           rrMinBounces: document.getElementById('rrMinBounces').value,
-          rrMinSamples: document.getElementById('rrMinSamples').value,
           adaptiveMinSamples: document.getElementById('adaptiveMinSamples').value,
           adaptiveThreshold: document.getElementById('adaptiveThreshold').value,
           integrator: document.getElementById('integrator').value
@@ -378,8 +375,7 @@ class ProgressiveRaytracer {
           height: { min: 100, max: 2000 },
           maxSamples: { min: 1, max: 10000 },
           maxPasses: { min: 1, max: 100 },
-          russianRouletteMinBounces: { min: 1, max: 20 },
-          russianRouletteMinSamples: { min: 1, max: 50 },
+          russianRouletteMinBounces: { min: 1, max: 50 },
           adaptiveMinSamples: { min: 0.01, max: 1.0 },
           adaptiveThreshold: { min: 0.001, max: 0.5 },
       };
@@ -389,7 +385,6 @@ class ProgressiveRaytracer {
       const maxSamples = parseInt(document.getElementById('maxSamples').value);
       const maxPasses = parseInt(document.getElementById('maxPasses').value);
       const rrMinBounces = parseInt(document.getElementById('rrMinBounces').value);
-      const rrMinSamples = parseInt(document.getElementById('rrMinSamples').value);
       const adaptiveMinSamples = parseFloat(document.getElementById('adaptiveMinSamples').value);
       const adaptiveThreshold = parseFloat(document.getElementById('adaptiveThreshold').value);
 
@@ -407,9 +402,6 @@ class ProgressiveRaytracer {
       }
       if (isNaN(rrMinBounces) || rrMinBounces < limits.russianRouletteMinBounces.min || rrMinBounces > limits.russianRouletteMinBounces.max) {
           return { isValid: false, error: `RR Min Bounces must be between ${limits.russianRouletteMinBounces.min} and ${limits.russianRouletteMinBounces.max}` };
-      }
-      if (isNaN(rrMinSamples) || rrMinSamples < limits.russianRouletteMinSamples.min || rrMinSamples > limits.russianRouletteMinSamples.max) {
-          return { isValid: false, error: `RR Min Samples must be between ${limits.russianRouletteMinSamples.min} and ${limits.russianRouletteMinSamples.max}` };
       }
       if (isNaN(adaptiveMinSamples) || adaptiveMinSamples < limits.adaptiveMinSamples.min || adaptiveMinSamples > limits.adaptiveMinSamples.max) {
           return { isValid: false, error: `Adaptive Min Samples must be between ${limits.adaptiveMinSamples.min} and ${limits.adaptiveMinSamples.max} (percentage of max samples)` };

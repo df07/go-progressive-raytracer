@@ -191,7 +191,6 @@ func (s *Server) setupRenderingPipeline(req *RenderRequest, logger core.Logger) 
 	sceneObj.SamplingConfig.Width = req.Width
 	sceneObj.SamplingConfig.Height = req.Height
 	sceneObj.SamplingConfig.RussianRouletteMinBounces = req.RRMinBounces
-	sceneObj.SamplingConfig.RussianRouletteMinSamples = req.RRMinSamples
 	sceneObj.SamplingConfig.AdaptiveMinSamples = req.AdaptiveMinSamples
 	sceneObj.SamplingConfig.AdaptiveThreshold = req.AdaptiveThreshold
 
@@ -380,9 +379,6 @@ func (s *Server) parseRenderRequest(r *http.Request) (*RenderRequest, error) {
 		return nil, err
 	}
 	if req.RRMinBounces, err = parseIntParam(r.URL.Query(), "rrMinBounces", 5, 1, 1000); err != nil {
-		return nil, err
-	}
-	if req.RRMinSamples, err = parseIntParam(r.URL.Query(), "rrMinSamples", 8, 1, 1000); err != nil {
 		return nil, err
 	}
 	if req.AdaptiveMinSamples, err = parseFloatParam(r.URL.Query(), "adaptiveMinSamples", 0.15, 0.01, 1.0); err != nil {

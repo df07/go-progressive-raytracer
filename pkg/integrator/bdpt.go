@@ -64,7 +64,7 @@ func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 
 // RayColorWithSplats computes color with support for ray-based splatting
 // Returns (pixel color, splat rays)
-func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, sampleIndex int) (core.Vec3, []core.SplatRay) {
+func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand) (core.Vec3, []core.SplatRay) {
 	// for now, both paths have the same max depth
 	cameraMaxDepth := bdpt.config.MaxDepth
 	lightMaxDepth := bdpt.config.MaxDepth

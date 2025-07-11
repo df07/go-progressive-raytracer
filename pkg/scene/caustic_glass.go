@@ -74,8 +74,7 @@ func createCausticGlassSamplingConfig() core.SamplingConfig {
 	return core.SamplingConfig{
 		SamplesPerPixel:           8192,  // Match PBRT pixelsamples
 		MaxDepth:                  20,    // Match PBRT maxdepth
-		RussianRouletteMinBounces: 10,    // Conservative for caustics
-		RussianRouletteMinSamples: 16,    // More samples before RR for caustics
+		RussianRouletteMinBounces: 16,    // Conservative for caustics
 		AdaptiveMinSamples:        0.2,   // 20% minimum samples for complex caustics
 		AdaptiveThreshold:         0.005, // Tighter threshold for caustic quality
 	}
