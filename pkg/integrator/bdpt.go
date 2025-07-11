@@ -422,9 +422,9 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		vertex := &cameraPath.Vertices[i]
 		ri *= remap0(vertex.AreaPdfReverse) / remap0(vertex.AreaPdfForward)
 		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular {
-			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g -> %.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, sumRi+ri)
 			sumRi += ri
 		}
+		bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g, hasSpecularAfter=%t\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, hasSpecularAfter)
 	}
 
 	// Consider hypothetical connection strategies along the light subpath
@@ -438,12 +438,13 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 			deltaLightVertex = lightPath.Vertices[i-1].IsSpecular
 		} else {
 			deltaLightVertex = vertex.IsLight && vertex.IsSpecular // Assuming delta lights are specular
+			deltaLightVertex = vertex.IsLight && vertex.IsSpecular // TODO: light needs to tell if it is delta
 		}
 
 		if !vertex.IsSpecular && !deltaLightVertex {
-			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight lightPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g -> %.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, sumRi+ri)
 			sumRi += ri
 		}
+		bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight lightPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi)
 	}
 
 	return 1.0 / (1.0 + sumRi)
@@ -627,7 +628,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 				// s=0: Pure camera path
 				contribution = bdpt.evaluatePathTracingStrategy(cameraPath, t)
 				if contribution.Luminance() > 0 {
-					bdpt.logf(" (s=%d,t=%d) Path tracing PDF: %g\n", s, t, contribution)
+					bdpt.logf(" (s=%d,t=%d) evaluatePathTracingStrategy returned contribution=%0.3g\n", s, t, contribution)
 				}
 			} else if t == 1 {
 				// t=1 is light path direct to camera, which might hit a different pixel
@@ -637,7 +638,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 				// s=1: Direct lighting
 				// Use direct light sampling to avoid challenges with choosing a light point on the wrong side of the light
 				contribution, sampledVertex = bdpt.evaluateDirectLightingStrategy(cameraPath, s, t, scene, random)
-				bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy returned contribution=%v\n", s, t, contribution)
+				bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy returned contribution=%0.3g\n", s, t, contribution)
 			} else {
 				// All other cases: Connection strategies (including s=0, t<last)
 				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
