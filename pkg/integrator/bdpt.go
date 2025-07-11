@@ -254,7 +254,9 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		pdfRev, isReverseDelta := hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
 		// For delta functions in BDPT, set reverse PDF to 0 (like PBRT)
 		if isReverseDelta {
+			vertex.IsSpecular = true
 			pdfRev = 0.0
+			pdfDir = 0.0
 		}
 		vertexPrev.AreaPdfReverse = vertex.convertPDFDensity(vertexPrev, pdfRev)
 
@@ -421,7 +423,26 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 	for i := t - 1; i > 0; i-- {
 		vertex := &cameraPath.Vertices[i]
 		ri *= remap0(vertex.AreaPdfReverse) / remap0(vertex.AreaPdfForward)
-		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular {
+
+		// Check if there's a specular vertex later in the path
+		hasSpecularAfter := false
+		for j := i + 1; j < t; j++ {
+			if cameraPath.Vertices[j].IsSpecular {
+				hasSpecularAfter = true
+				break
+			}
+		}
+
+		// HACK: Exclude connection strategies that would require connecting through specular vertices
+		// This compensates for not implementing t=1 strategies (light tracing to camera)
+		// TODO: Remove this hack once t=1 strategies are implemented
+		//
+		// The issue: MIS heavily downweights path tracing strategies expecting t=1 to be more efficient
+		// for specular reflection paths. Since we skip t=1, we need to prevent MIS from considering
+		// impossible connection strategies that would connect through specular vertices.
+		//
+		// Only add to sumRi if no specular vertex follows (meaning connection is viable)
+		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular && !hasSpecularAfter {
 			sumRi += ri
 		}
 		bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g, hasSpecularAfter=%t\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, hasSpecularAfter)
@@ -437,7 +458,6 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if i > 0 {
 			deltaLightVertex = lightPath.Vertices[i-1].IsSpecular
 		} else {
-			deltaLightVertex = vertex.IsLight && vertex.IsSpecular // Assuming delta lights are specular
 			deltaLightVertex = vertex.IsLight && vertex.IsSpecular // TODO: light needs to tell if it is delta
 		}
 
