@@ -50,7 +50,8 @@ func (tr *TileRenderer) adaptiveSamplePixelWithIntegrator(camera core.Camera, i,
 	for ps.SampleCount < maxSamples && !tr.shouldStopSampling(ps, maxSamples, samplingConfig) {
 		ray := camera.GetRay(i, j, random)
 		// Use integrator to compute color with proper depth and throughput
-		color := tr.integrator.RayColor(ray, tr.scene, random, samplingConfig.MaxDepth, core.Vec3{X: 1.0, Y: 1.0, Z: 1.0}, ps.SampleCount)
+		color, _ := tr.integrator.RayColor(ray, tr.scene, random, ps.SampleCount)
+		// TODO: handle splat rays
 		ps.AddSample(color)
 	}
 

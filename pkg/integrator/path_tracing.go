@@ -23,7 +23,13 @@ func NewPathTracingIntegrator(config core.SamplingConfig) *PathTracingIntegrator
 }
 
 // RayColor computes the color for a single ray using unidirectional path tracing
-func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, depth int, throughput core.Vec3, sampleIndex int) core.Vec3 {
+func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, sampleIndex int) (core.Vec3, []core.SplatRay) {
+	depth := pt.config.MaxDepth
+	throughput := core.Vec3{X: 1.0, Y: 1.0, Z: 1.0}
+	return pt.rayColorRecursive(ray, scene, random, depth, throughput, sampleIndex), nil
+}
+
+func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scene, random *rand.Rand, depth int, throughput core.Vec3, sampleIndex int) core.Vec3 {
 	// If we've exceeded the ray bounce limit, no more light is gathered
 	if depth <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
@@ -70,7 +76,7 @@ func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, random
 func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResult, scene core.Scene, depth int, throughput core.Vec3, sampleIndex int, random *rand.Rand) core.Vec3 {
 	// Update throughput with material attenuation
 	newThroughput := throughput.MultiplyVec(scatter.Attenuation)
-	incomingLight := pt.RayColor(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex)
+	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex)
 	contribution := scatter.Attenuation.MultiplyVec(incomingLight)
 
 	pt.logf("pt specular[%d]: contribution=%v = attenuation=%v * incomingLight=%v\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight)
@@ -168,7 +174,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 	newThroughput := throughput.MultiplyVec(scatter.Attenuation).Multiply(cosine / scatter.PDF)
 
 	// Get incoming light from the scattered direction with throughput tracking
-	incomingLight := pt.RayColor(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex)
+	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, random, depth-1, newThroughput, sampleIndex)
 
 	// Indirect lighting contribution with MIS
 	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)

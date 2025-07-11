@@ -4,10 +4,17 @@ import (
 	"math/rand"
 )
 
+// SplatRay represents a ray-based color contribution that needs to be mapped to pixels
+type SplatRay struct {
+	Ray   Ray  // Ray that should contribute to some pixel
+	Color Vec3 // Color contribution
+}
+
 // Integrator defines the interface for light transport algorithms
 type Integrator interface {
-	// RayColor computes the color for a single ray (matches current rayColorRecursive signature)
-	RayColor(ray Ray, scene Scene, random *rand.Rand, depth int, throughput Vec3, sampleIndex int) Vec3
+	// RayColor computes color for a ray, with support for ray-based splatting
+	// Returns (pixel color, splat rays)
+	RayColor(ray Ray, scene Scene, random *rand.Rand, sampleIndex int) (Vec3, []SplatRay)
 }
 
 // Shape interface for objects that can be hit by rays

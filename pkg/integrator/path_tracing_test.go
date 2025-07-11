@@ -111,26 +111,21 @@ func TestPathTracingBackgroundGradient(t *testing.T) {
 // TestPathTracingDepthTermination tests that ray depth is properly limited
 func TestPathTracingDepthTermination(t *testing.T) {
 	scene := createTestScene()
-	config := core.SamplingConfig{
-		MaxDepth:                  2,  // Very shallow depth
-		RussianRouletteMinBounces: 10, // Disable Russian roulette
-		RussianRouletteMinSamples: 10,
-	}
-	integrator := NewPathTracingIntegrator(config)
 	random := rand.New(rand.NewSource(42))
 
 	// Ray pointing at the sphere
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
-	throughput := core.Vec3{X: 1, Y: 1, Z: 1}
 
 	// Test with depth 0 (should return black)
-	colorDepth0 := integrator.RayColor(ray, scene, random, 0, throughput, 0)
+	integrator := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 0, RussianRouletteMinBounces: 100})
+	colorDepth0, _ := integrator.RayColor(ray, scene, random, 0)
 	if colorDepth0 != (core.Vec3{}) {
 		t.Errorf("Expected black color for depth 0, got %v", colorDepth0)
 	}
 
 	// Test with positive depth (should return some color)
-	colorDepth2 := integrator.RayColor(ray, scene, random, 2, throughput, 0)
+	integrator = NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100})
+	colorDepth2, _ := integrator.RayColor(ray, scene, random, 0)
 	if colorDepth2 == (core.Vec3{}) {
 		t.Error("Expected non-black color for positive depth")
 	}
@@ -200,7 +195,7 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 		bottomColor: core.NewVec3(1.0, 1.0, 1.0),
 		camera:      camera,
 		config: core.SamplingConfig{
-			MaxDepth:                  10,
+			MaxDepth:                  5,
 			RussianRouletteMinBounces: 5,
 			RussianRouletteMinSamples: 3,
 		},
@@ -211,9 +206,8 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 
 	// Ray hitting the metallic sphere
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
-	throughput := core.Vec3{X: 1, Y: 1, Z: 1}
 
-	color := integrator.RayColor(ray, scene, random, 5, throughput, 0)
+	color, _ := integrator.RayColor(ray, scene, random, 0)
 
 	// Should get some reflection color (not black)
 	if color == (core.Vec3{}) {
@@ -250,9 +244,8 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 
 	// Ray hitting the emissive sphere
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
-	throughput := core.Vec3{X: 1, Y: 1, Z: 1}
 
-	color := integrator.RayColor(ray, scene, random, 5, throughput, 0)
+	color, _ := integrator.RayColor(ray, scene, random, 0)
 
 	// Should get the emission color
 	if color == (core.Vec3{}) {
@@ -273,9 +266,8 @@ func TestPathTracingMissedRay(t *testing.T) {
 
 	// Ray that misses the sphere (pointing up)
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0))
-	throughput := core.Vec3{X: 1, Y: 1, Z: 1}
 
-	color := integrator.RayColor(ray, scene, random, 5, throughput, 0)
+	color, _ := integrator.RayColor(ray, scene, random, 0)
 
 	// Should get background gradient color
 	if color == (core.Vec3{}) {
@@ -298,14 +290,13 @@ func TestPathTracingDeterministic(t *testing.T) {
 	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
 
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
-	throughput := core.Vec3{X: 1, Y: 1, Z: 1}
 
 	// Render the same ray with the same random seed twice
 	random1 := rand.New(rand.NewSource(42))
-	color1 := integrator.RayColor(ray, scene, random1, 5, throughput, 0)
+	color1, _ := integrator.RayColor(ray, scene, random1, 0)
 
 	random2 := rand.New(rand.NewSource(42))
-	color2 := integrator.RayColor(ray, scene, random2, 5, throughput, 0)
+	color2, _ := integrator.RayColor(ray, scene, random2, 0)
 
 	// Results should be identical
 	if color1 != color2 {

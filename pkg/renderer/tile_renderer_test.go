@@ -18,9 +18,9 @@ type MockIntegrator struct {
 	callCount   int
 }
 
-func (m *MockIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, depth int, throughput core.Vec3, sampleIndex int) core.Vec3 {
+func (m *MockIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, sampleIndex int) (core.Vec3, []core.SplatRay) {
 	m.callCount++
-	return m.returnColor
+	return m.returnColor, nil
 }
 
 // MockScene for tile renderer testing

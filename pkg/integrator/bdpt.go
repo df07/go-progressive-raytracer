@@ -48,9 +48,10 @@ type BDPTIntegrator struct {
 
 // bdptStrategy represents a single BDPT path construction strategy
 type bdptStrategy struct {
-	s, t         int       // Light path length, camera path length
-	contribution core.Vec3 // Radiance contribution
-	misWeight    float64   // MIS weight
+	s, t         int             // Light path length, camera path length
+	contribution core.Vec3       // Radiance contribution
+	misWeight    float64         // MIS weight
+	splatRays    []core.SplatRay // Splat rays for t=1 strategies
 }
 
 // NewBDPTIntegrator creates a new BDPT integrator
@@ -61,22 +62,29 @@ func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 	}
 }
 
-// RayColor computes the color for a single ray using BDPT
-func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, maxDepth int, throughput core.Vec3, sampleIndex int) core.Vec3 {
+// RayColorWithSplats computes color with support for ray-based splatting
+// Returns (pixel color, splat rays)
+func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand, sampleIndex int) (core.Vec3, []core.SplatRay) {
+	// for now, both paths have the same max depth
+	cameraMaxDepth := bdpt.config.MaxDepth
+	lightMaxDepth := bdpt.config.MaxDepth
+
 	// Generate camera path with vertices
-	cameraPath := bdpt.generateCameraSubpath(ray, scene, random, maxDepth, throughput, sampleIndex)
+	cameraPath := bdpt.generateCameraSubpath(ray, scene, random, cameraMaxDepth)
 
 	// Generate a light path
-	lightPath := bdpt.generateLightSubpath(scene, random, maxDepth)
+	lightPath := bdpt.generateLightSubpath(scene, random, lightMaxDepth)
 
 	// Evaluate all BDPT strategies with proper MIS weighting
 	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, random)
+
+	// evaluateBDPTStrategies now returns both color and splats
 	return bdpt.evaluateBDPTStrategies(strategies)
 }
 
 // generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
 // Each vertex stores forward/reverse PDFs needed for MIS weight calculation
-func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene, random *rand.Rand, maxDepth int, throughput core.Vec3, sampleIndex int) Path {
+func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene, random *rand.Rand, maxDepth int) Path {
 	path := Path{
 		Vertices: make([]Vertex, 0, maxDepth),
 		Length:   0,
@@ -621,18 +629,30 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex Vertex, to Verte
 //
 // Multiple Importance Sampling (MIS) optimally combines all strategies using
 // the power heuristic to minimize variance.
-func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(strategies []bdptStrategy) core.Vec3 {
+func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(strategies []bdptStrategy) (core.Vec3, []core.SplatRay) {
 	// Apply MIS weighting to all strategies
 	totalContribution := core.Vec3{X: 0, Y: 0, Z: 0}
+	var allSplatRays []core.SplatRay
+
 	for _, strategy := range strategies {
 		if strategy.t > 1 { // t=1 strategies hit the camera directly, not necessarily at the point we're calculating
 			// Use PBRT MIS weight calculation
 			bdpt.logf(" (s=%d,t=%d) evaluateBDPTStrategies: contribution=%v, PBRT weight=%0.3g\n", strategy.s, strategy.t, strategy.contribution, strategy.misWeight)
 			totalContribution = totalContribution.Add(strategy.contribution.Multiply(strategy.misWeight))
+		} else if strategy.t == 1 && len(strategy.splatRays) > 0 {
+			// t=1 strategies contribute via splats
+			for _, splatRay := range strategy.splatRays {
+				// Apply MIS weighting to splat contribution
+				weightedSplat := core.SplatRay{
+					Ray:   splatRay.Ray,
+					Color: splatRay.Color.Multiply(strategy.misWeight),
+				}
+				allSplatRays = append(allSplatRays, weightedSplat)
+			}
 		}
 	}
 
-	return totalContribution
+	return totalContribution, allSplatRays
 }
 
 // generateBDPTStrategies generates all valid BDPT strategies for the given camera and light paths
