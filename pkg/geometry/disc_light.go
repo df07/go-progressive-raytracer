@@ -19,6 +19,10 @@ func NewDiscLight(center, normal core.Vec3, radius float64, material core.Materi
 	}
 }
 
+func (dl *DiscLight) Type() core.LightType {
+	return core.LightTypeArea
+}
+
 // Sample implements the Light interface - samples a point on the disc for direct lighting
 func (dl *DiscLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
 	// Sample a point on the disc

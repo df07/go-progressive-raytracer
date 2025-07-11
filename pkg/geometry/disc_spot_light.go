@@ -100,6 +100,10 @@ func NewDiscSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaA
 	}
 }
 
+func (dsl *DiscSpotLight) Type() core.LightType {
+	return core.LightTypeArea
+}
+
 // Sample implements the Light interface - samples a point on the disc for direct lighting
 func (dsl *DiscSpotLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
 	// Sample the underlying disc light

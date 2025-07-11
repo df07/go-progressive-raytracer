@@ -12,6 +12,10 @@ type MockLight struct {
 	pdf      float64
 }
 
+func (ml *MockLight) Type() LightType {
+	return LightTypeArea
+}
+
 func (ml *MockLight) Sample(point Vec3, random *rand.Rand) LightSample {
 	return LightSample{
 		Point:     Vec3{X: 0, Y: 1, Z: 0},

@@ -38,6 +38,10 @@ func NewPointSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDelta
 	}
 }
 
+func (sl *PointSpotLight) Type() core.LightType {
+	return core.LightTypePoint
+}
+
 // Sample implements the Light interface - samples a point on the light for direct lighting
 func (sl *PointSpotLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
 	// For a point light, the sample point is always the light position

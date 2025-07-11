@@ -19,6 +19,10 @@ func NewSphereLight(center core.Vec3, radius float64, material core.Material) *S
 	}
 }
 
+func (sl *SphereLight) Type() core.LightType {
+	return core.LightTypeArea
+}
+
 // Sample implements the Light interface - samples a point on the sphere for direct lighting
 func (sl *SphereLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
 	// Vector from shading point to sphere center

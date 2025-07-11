@@ -41,8 +41,17 @@ type Emitter interface {
 	Emit(rayIn Ray, hit HitRecord) Vec3
 }
 
+type LightType string
+
+const (
+	LightTypeArea  LightType = "area"
+	LightTypePoint LightType = "point"
+)
+
 // Light interface for objects that can be sampled for direct lighting
 type Light interface {
+	Type() LightType
+
 	// Sample samples light toward a specific point for direct lighting
 	// Returns LightSample with direction FROM shading point TO light
 	Sample(point Vec3, random *rand.Rand) LightSample

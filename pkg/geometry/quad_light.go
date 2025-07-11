@@ -26,6 +26,10 @@ func NewQuadLight(corner, u, v core.Vec3, material core.Material) *QuadLight {
 	}
 }
 
+func (ql *QuadLight) Type() core.LightType {
+	return core.LightTypeArea
+}
+
 // Sample implements the Light interface - samples a point on the quad for direct lighting
 func (ql *QuadLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
 	// Sample uniformly on the quad surface

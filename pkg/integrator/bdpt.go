@@ -458,7 +458,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if i > 0 {
 			deltaLightVertex = lightPath.Vertices[i-1].IsSpecular
 		} else {
-			deltaLightVertex = vertex.IsLight && vertex.IsSpecular // TODO: light needs to tell if it is delta
+			deltaLightVertex = vertex.IsLight && vertex.Light.Type() == core.LightTypePoint
 		}
 
 		if !vertex.IsSpecular && !deltaLightVertex {
