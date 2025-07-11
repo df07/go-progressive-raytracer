@@ -452,13 +452,13 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 // Helper functions for PBRT MIS calculations
 
 // calculateVertexPdf implements PBRT's Vertex::Pdf
-func (bdpt *BDPTIntegrator) calculateVertexPdf(from Vertex, prev *Vertex, next Vertex, scene core.Scene) float64 {
-	if from.IsLight {
-		return bdpt.calculateLightPdf(from, next, scene)
+func (bdpt *BDPTIntegrator) calculateVertexPdf(curr Vertex, prev *Vertex, next Vertex, scene core.Scene) float64 {
+	if curr.IsLight {
+		return bdpt.calculateLightPdf(curr, next, scene)
 	}
 
 	// Compute directions to preceding and next vertex
-	wn := next.Point.Subtract(from.Point)
+	wn := next.Point.Subtract(curr.Point)
 	if wn.LengthSquared() == 0 {
 		return 0
 	}
@@ -466,32 +466,32 @@ func (bdpt *BDPTIntegrator) calculateVertexPdf(from Vertex, prev *Vertex, next V
 
 	var wp core.Vec3
 	if prev != nil {
-		wp = prev.Point.Subtract(from.Point)
+		wp = prev.Point.Subtract(curr.Point)
 		if wp.LengthSquared() == 0 {
 			return 0
 		}
 		wp = wp.Normalize()
 	} else {
 		// CHECK(type == VertexType::Camera) equivalent
-		if !from.IsCamera {
+		if !curr.IsCamera {
 			return 0
 		}
 	}
 
 	var pdf float64
-	if from.IsCamera {
+	if curr.IsCamera {
 		// ei.camera->Pdf_We(ei.SpawnRay(wn), &unused, &pdf);
 		// Use our camera PDF implementation
-		ray := core.NewRay(from.Point, wn)
-		if from.Camera != nil {
-			_, pdf = from.Camera.CalculateRayPDFs(ray)
+		ray := core.NewRay(curr.Point, wn)
+		if curr.Camera != nil {
+			_, pdf = curr.Camera.CalculateRayPDFs(ray)
 		}
 		if pdf == 0 {
 			return 0
 		}
-	} else if from.Material != nil {
+	} else if curr.Material != nil {
 		// pdf = si.bsdf->Pdf(wp, wn);
-		materialPdf, isDelta := from.Material.PDF(wp, wn, from.Normal)
+		materialPdf, isDelta := curr.Material.PDF(wp, wn, curr.Normal)
 		if isDelta {
 			return 0
 		}
@@ -503,29 +503,29 @@ func (bdpt *BDPTIntegrator) calculateVertexPdf(from Vertex, prev *Vertex, next V
 
 	// Return probability per unit area at vertex _next_
 	// return ConvertDensity(pdf, next);
-	return from.convertPDFDensity(next, pdf)
+	return curr.convertPDFDensity(next, pdf)
 }
 
 // calculateLightPdf implements PBRT's Vertex::PdfLight
-func (bdpt *BDPTIntegrator) calculateLightPdf(from Vertex, to Vertex, scene core.Scene) float64 {
-	w := to.Point.Subtract(from.Point)
+func (bdpt *BDPTIntegrator) calculateLightPdf(curr Vertex, to Vertex, scene core.Scene) float64 {
+	w := to.Point.Subtract(curr.Point)
 	invDist2 := 1.0 / w.LengthSquared()
 	w = w.Multiply(math.Sqrt(invDist2))
 
 	var pdf float64
-	if from.IsLight {
+	if curr.IsLight {
 		// Handle infinite area lights (background)
-		if from.IsInfiniteLight {
+		if curr.IsInfiniteLight {
 			// PBRT: Compute planar sampling density for infinite light sources
 			worldRadius := bdpt.getWorldRadius(scene)
 			pdf = 1.0 / (math.Pi * worldRadius * worldRadius)
-		} else if from.Light != nil {
+		} else if curr.Light != nil {
 			// Use the light's EmissionPDF which gives area PDF
-			areaPdf := from.Light.EmissionPDF(from.Point, w)
+			areaPdf := curr.Light.EmissionPDF(curr.Point, w)
 
 			// Convert to directional PDF: pdfDir = areaPdf / cos(theta)
 			// where cos(theta) is angle between light normal and emission direction
-			cosTheta := w.Dot(from.Normal)
+			cosTheta := w.Dot(curr.Normal)
 			if cosTheta <= 0 {
 				return 0
 			}
