@@ -190,6 +190,7 @@ class ProgressiveRaytracer {
           case 'sphereGridSize': return 'Grid Size';
           case 'materialFinish': return 'Material Finish';
           case 'dragonMaterialFinish': return 'Dragon Material';
+          case 'lightType': return 'Light Type';
           default: return key.charAt(0).toUpperCase() + key.slice(1);
       }
   }
@@ -233,6 +234,10 @@ class ProgressiveRaytracer {
       if (params.dragonMaterialFinish) {
           url += url.includes('?') ? '&' : '?';
           url += `dragonMaterialFinish=${params.dragonMaterialFinish}`;
+      }
+      if (params.lightType) {
+          url += url.includes('?') ? '&' : '?';
+          url += `lightType=${params.lightType}`;
       }
       
       return url;
@@ -363,6 +368,11 @@ class ProgressiveRaytracer {
       const dragonMaterialFinish = document.getElementById('dragonMaterialFinish');
       if (dragonMaterialFinish) {
           params.dragonMaterialFinish = dragonMaterialFinish.value;
+      }
+
+      const lightType = document.getElementById('lightType');
+      if (lightType) {
+          params.lightType = lightType.value;
       }
       
       return params;

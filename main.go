@@ -115,7 +115,7 @@ func createScene(sceneType string) *scene.Scene {
 		sceneObj = scene.NewDragonScene(true, "gold", renderer.NewDefaultLogger()) // Default to gold material
 	case "caustic-glass":
 		fmt.Println("Using caustic glass scene...")
-		sceneObj = scene.NewCausticGlassScene(true, renderer.NewDefaultLogger())
+		sceneObj = scene.NewCausticGlassScene(true, core.LightTypeArea, renderer.NewDefaultLogger())
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()

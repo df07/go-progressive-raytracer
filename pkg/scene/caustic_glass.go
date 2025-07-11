@@ -14,7 +14,7 @@ import (
 // NewCausticGlassScene creates a scene with glass caustic geometry
 // Based on the glass.pbrt scene configuration
 // If loadMesh is false, creates the scene structure without loading the PLY files
-func NewCausticGlassScene(loadMesh bool, logger core.Logger, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.Logger, cameraOverrides ...renderer.CameraConfig) *Scene {
 	// Setup camera based on PBRT scene configuration
 	cameraConfig := setupCausticGlassCamera(cameraOverrides...)
 	camera := renderer.NewCamera(cameraConfig)
@@ -30,7 +30,7 @@ func NewCausticGlassScene(loadMesh bool, logger core.Logger, cameraOverrides ...
 	}
 
 	// Add lighting based on PBRT scene
-	addCausticGlassLighting(s)
+	addCausticGlassLighting(s, lightType)
 
 	// Load and add meshes only if requested
 	if loadMesh {
@@ -84,14 +84,18 @@ func createCausticGlassSamplingConfig() core.SamplingConfig {
 // LightSource "spot" "point from" [ 0 5 9 ] "point to" [ -5 2.7500000000 0 ]
 // "rgb I" [ 139.8113403320 118.6366500854 105.3887557983 ]
 // LightSource "infinite" "rgb L" [ 0.1000000015 0.1000000015 0.1000000015 ]
-func addCausticGlassLighting(s *Scene) {
+func addCausticGlassLighting(s *Scene, lightType core.LightType) {
 	// Main spot light using exact PBRT parameters
 	spotFrom := core.NewVec3(0, 5, 9)
 	spotIntensity := core.NewVec3(139.8113403320, 118.6366500854, 105.3887557983)
 
 	// Use disc spot light
 	spotTo := core.NewVec3(-5, 2.7500000000, 0)
-	s.AddSpotLight(spotFrom, spotTo, spotIntensity, 30.0, 5.0, 0.7)
+	if lightType == core.LightTypePoint {
+		s.AddPointSpotLight(spotFrom, spotTo, spotIntensity, 30.0, 5.0, 0.7)
+	} else {
+		s.AddSpotLight(spotFrom, spotTo, spotIntensity, 30.0, 5.0, 0.7)
+	}
 
 	// Infinite light is handled by the background colors (already set to 0.1, 0.1, 0.1)
 }
