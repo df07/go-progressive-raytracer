@@ -86,7 +86,13 @@ func NewCamera(config CameraConfig) *Camera {
 	h := math.Tan(theta / 2.0)
 	viewportHeight := 2.0 * h * focusDistance
 	viewportWidth := viewportHeight * config.AspectRatio
-	imagePlaneArea := viewportWidth * viewportHeight
+
+	// pbrt: Compute image plane area at z=1 for camera importance function
+	// This matches PBRT's approach of normalizing to unit distance
+	hAtZ1 := math.Tan(theta / 2.0)
+	viewportHeightAtZ1 := 2.0 * hAtZ1 * 1.0 // At z=1
+	viewportWidthAtZ1 := viewportHeightAtZ1 * config.AspectRatio
+	imagePlaneArea := viewportWidthAtZ1 * viewportHeightAtZ1
 
 	// Calculate the vectors across the horizontal and down the vertical viewport edges
 	viewportU := u.Multiply(viewportWidth)  // Vector across viewport horizontal edge
@@ -118,8 +124,13 @@ func NewCamera(config CameraConfig) *Camera {
 
 	// calculate the camera forward direction
 	cameraForward := config.LookAt.Subtract(config.Center).Normalize()
-	cosTotalWidth := math.Cos(theta / 2.0)
-	cosTotalHeight := math.Cos(theta / 2.0)
+
+	// Compute cosTotalWidth like PBRT: direction to corner of image
+	// Find corner of viewport in camera space
+	cornerPoint := core.NewVec3(-viewportWidth/2, -viewportHeight/2, -focusDistance)
+	cornerDirection := cornerPoint.Normalize()
+	cosTotalWidth := cornerDirection.Z // Z component is cosine of angle from forward direction
+	cosTotalHeight := cosTotalWidth    // Same for both since we check corners
 
 	return &Camera{
 		center:          config.Center,
@@ -164,38 +175,34 @@ func (c *Camera) GetRay(i, j int, random *rand.Rand) core.Ray {
 		rayOrigin = c.center.Add(offset)
 	}
 
-	rayDirection := pixelSample.Subtract(rayOrigin)
+	rayDirection := pixelSample.Subtract(rayOrigin).Normalize()
 	return core.NewRay(rayOrigin, rayDirection)
 }
 
 // CalculateRayPDFs calculates the area and direction PDFs for a camera ray
 // This is needed for BDPT to properly balance camera and light path PDFs
-func (c *Camera) CalculateRayPDFs(ray core.Ray) (areaPDF, directionPDF float64) {
-
-	// Area PDF: uniform sampling over the sensor area
-	areaPDF = 1.0 / c.totalSensorArea
-
-	// Direction PDF: based on solid angle subtended by the pixel
-	// For a pinhole camera, this is proportional to cos^3(theta) / distance^2
-	// where theta is angle from optical axis
-
-	// Ray direction from camera center (normalized)
-	rayDir := ray.Direction.Normalize()
+func (c *Camera) CalculateRayPDFs(ray core.Ray) (areaPDF, dirPDF float64) {
 
 	// Cosine of angle between ray and camera forward direction
-	cosTheta := rayDir.Dot(c.cameraForward)
-	if cosTheta <= 0 {
-		// Ray pointing away from camera forward direction - invalid
+	cosTheta := ray.Direction.Dot(c.cameraForward)
+	if cosTheta <= c.cosTotalWidth {
 		return 0, 0
 	}
 
-	// Total solid angle subtended by the viewport
-	totalSolidAngle := c.viewportWidth * c.viewportHeight / (c.focusDistance * c.focusDistance)
+	// Check if ray hits within image bounds using existing MapRayToPixel
+	_, _, inBounds := c.MapRayToPixel(ray)
+	if !inBounds {
+		return 0, 0
+	}
 
-	// Direction PDF: cos^3(theta) normalized by total solid angle
-	directionPDF = (cosTheta * cosTheta * cosTheta) / totalSolidAngle
+	// pbrt: *pdfPos = 1 / lensArea;
+	// pbrt: *pdfDir = 1 / (A * Pow<3>(cosTheta));
+	// pbrt: A = std::abs((pMax.x - pMin.x) * (pMax.y - pMin.y)); // image plane area
 
-	return areaPDF, directionPDF
+	areaPDF = 1.0 / c.lensArea
+	dirPDF = 1.0 / (c.imagePlaneArea * math.Pow(cosTheta, 3))
+
+	return areaPDF, dirPDF
 }
 
 // GetCameraForward returns the camera's forward direction (toward LookAt)
@@ -214,17 +221,14 @@ func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, random *rand.Rand) *c
 
 	// Create ray from lens toward reference point
 	direction := refPoint.Subtract(lensPoint).Normalize()
+	distance := refPoint.Subtract(lensPoint).Length()
 	ray := core.NewRay(lensPoint, direction)
 
-	// Calculate PDF (inverse square law + lens area + cosine)
-	distance := refPoint.Subtract(lensPoint).Length()
-
-	cosTheta := math.Max(0, c.cameraForward.Dot(direction))
-	if cosTheta == 0 {
-		return nil // Ray doesn't hit camera front
-	}
-
-	pdf := (distance * distance) / (cosTheta * c.lensArea)
+	// Calculate PDF for camera sampling
+	// pbrt: Float lensArea = lensRadius != 0 ? (Pi * Sqr(lensRadius)) : 1;
+	// pbrt: Float pdf = Sqr(dist) / (AbsDot(lensIntr.n, wi) * lensArea);
+	cosine := c.cameraForward.AbsDot(direction)
+	pdf := (distance * distance) / (cosine * c.lensArea)
 
 	// Calculate camera importance weight
 	importance := c.EvaluateRayImportance(ray)
@@ -242,15 +246,15 @@ func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, random *rand.Rand) *c
 // EvaluateRayImportance calculates the camera importance function for a ray
 func (c *Camera) EvaluateRayImportance(ray core.Ray) core.Vec3 {
 	// Check if ray is forward-facing with respect to the camera
-	cosTheta := ray.Direction.Dot(c.cameraForward)
+	cosine := ray.Direction.Dot(c.cameraForward)
 
-	if cosTheta < c.cosTotalWidth {
+	if cosine < c.cosTotalWidth {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
 	// Return importance for point on image plane
-	// PBRT formula: cos^4(theta) / (A * lensArea)
-	importance := math.Pow(cosTheta, 4) / (c.imagePlaneArea * c.lensArea)
+	// PBRT formula: We = 1 / (A * lensArea * cos^4(theta))
+	importance := 1.0 / (c.imagePlaneArea * c.lensArea * math.Pow(cosine, 4))
 
 	return core.Vec3{X: importance, Y: importance, Z: importance}
 }

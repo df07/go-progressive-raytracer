@@ -42,7 +42,7 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 	}
 
 	// Check for intersections with objects using scene's BVH
-	hit, isHit := scene.GetBVH().Hit(ray, 0.001, 1000.0)
+	hit, isHit := scene.GetBVH().Hit(ray, 0.001, math.Inf(1))
 	if !isHit {
 		bgColor := pt.BackgroundGradient(ray, scene)
 		return bgColor.Multiply(rrCompensation)

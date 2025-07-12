@@ -177,7 +177,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		vertexPrev := path.Vertices[path.Length-1]
 
 		// Check for intersections
-		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, 1e100)
+		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, math.Inf(1))
 		if !isHit {
 			if !isCameraPath {
 				break
