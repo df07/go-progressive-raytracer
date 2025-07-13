@@ -639,6 +639,7 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(strategies []bdptStrategy) (c
 					Ray:   splatRay.Ray,
 					Color: splatRay.Color.Multiply(strategy.misWeight),
 				}
+				bdpt.logf(" (s=%d,t=%d) evaluateBDPTStrategies: splat contribution=%v, PBRT weight=%0.3g\n", strategy.s, strategy.t, splatRay.Color, strategy.misWeight)
 				allSplatRays = append(allSplatRays, weightedSplat)
 			}
 		}
@@ -655,6 +656,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 		for t := 1; t <= cameraPath.Length; t++ {
 			var contribution core.Vec3
 			var sampledVertex *Vertex
+			var splatRays []core.SplatRay
 
 			if s == 0 {
 				// s=0: Pure camera path
@@ -663,9 +665,11 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 					bdpt.logf(" (s=%d,t=%d) evaluatePathTracingStrategy returned contribution=%0.3g\n", s, t, contribution)
 				}
 			} else if t == 1 {
-				// t=1 is light path direct to camera, which might hit a different pixel
-				// skip it for now
-				continue
+				// t=1: Light path direct to camera (light tracing)
+				splatRays, sampledVertex = bdpt.evaluateLightTracingStrategy(lightPath, s, scene, random)
+				if len(splatRays) > 0 {
+					bdpt.logf(" (s=%d,t=%d) evaluateLightTracingStrategy returned splat contribution=%v\n", s, t, splatRays[0].Color)
+				}
 			} else if s == 1 {
 				// s=1: Direct lighting
 				// Use direct light sampling to avoid challenges with choosing a light point on the wrong side of the light
@@ -676,7 +680,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
 			}
 
-			if contribution.Luminance() > 0 {
+			if contribution.Luminance() > 0 || len(splatRays) > 0 {
 				misWeight := bdpt.calculateMISWeight(cameraPath, lightPath, sampledVertex, s, t, scene)
 
 				strategies = append(strategies, bdptStrategy{
@@ -684,6 +688,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 					t:            t,
 					contribution: contribution,
 					misWeight:    misWeight,
+					splatRays:    splatRays,
 				})
 			}
 		}
@@ -774,10 +779,75 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, s, t
 }
 
 // evaluateLightTracingStrategy evaluates light tracing (light path hits camera)
-func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path) core.Vec3 {
-	// For now, return zero since we don't implement camera sampling from light paths
-	// Full implementation would trace light path and check if it hits the camera
-	return core.Vec3{X: 0, Y: 0, Z: 0}
+// Returns (direct contribution, splat rays, sampled camera vertex)
+func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, scene core.Scene, random *rand.Rand) ([]core.SplatRay, *Vertex) {
+	if s < 1 || s > lightPath.Length {
+		return nil, nil
+	}
+
+	// Get the light vertex we're connecting to the camera
+	lightVertex := lightPath.Vertices[s-1]
+
+	// Skip specular vertices (can't connect through delta functions)
+	if lightVertex.IsSpecular {
+		return nil, nil
+	}
+
+	// Sample the camera from this light vertex
+	camera := scene.GetCamera()
+	cameraSample := camera.SampleCameraFromPoint(lightVertex.Point, random)
+	if cameraSample == nil {
+		return nil, nil
+	}
+
+	// Visibility test
+	shadowRay := core.NewRay(lightVertex.Point, cameraSample.Ray.Direction.Multiply(-1))
+	distance := lightVertex.Point.Subtract(cameraSample.Ray.Origin).Length()
+	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, distance-0.001)
+	if blocked {
+		return nil, nil
+	}
+
+	// pbrt: L = qs.beta * qs.f(sampled, TransportMode::Importance) * sampled.beta;
+	// pbrt: sampled.beta = Wi / pdf
+
+	brdf := bdpt.evaluateBRDF(lightVertex, cameraSample.Ray.Direction.Multiply(-1))
+	cameraBeta := cameraSample.Weight.Multiply(1 / cameraSample.PDF)
+
+	cosine := cameraSample.Ray.Direction.Multiply(-1).Dot(lightVertex.Normal)
+	if cosine <= 0 {
+		return nil, nil
+	}
+
+	lightContribution := brdf.MultiplyVec(cameraBeta).MultiplyVec(lightVertex.Beta).Multiply(cosine)
+
+	// Create the sampled camera vertex for MIS weight calculation
+	// This represents the dynamically sampled camera vertex
+	sampledCameraVertex := &Vertex{
+		Point:             cameraSample.Ray.Origin,
+		Normal:            cameraSample.Ray.Direction.Multiply(-1), // Camera "normal" points back along ray
+		Material:          nil,                                     // Cameras don't have materials
+		Light:             nil,                                     // Cameras are not lights
+		Camera:            camera,                                  // Store camera reference
+		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0},             // Camera is the starting point
+		AreaPdfForward:    0.0,                                     // Will be computed by MIS weight calculation
+		AreaPdfReverse:    0.0,                                     // Will be computed by MIS weight calculation
+		IsLight:           false,
+		IsCamera:          true,
+		IsSpecular:        false,
+		Beta:              cameraBeta,                  // Wi / pdf from camera sampling
+		EmittedLight:      core.Vec3{X: 0, Y: 0, Z: 0}, // Cameras don't emit light
+	}
+
+	// Create splat ray for this contribution
+	splatRay := core.SplatRay{
+		Ray:   cameraSample.Ray,
+		Color: lightContribution,
+	}
+
+	bdpt.logf(" (s=%d,t=1) evaluateLightTracingStrategy: brdf=%v * cameraBeta=%v * lightVertex.Beta=%v * cosine=%f\n", s, brdf, cameraBeta, lightVertex.Beta, cosine)
+
+	return []core.SplatRay{splatRay}, sampledCameraVertex
 }
 
 // evaluateBRDF evaluates the BRDF at a vertex for a given outgoing direction

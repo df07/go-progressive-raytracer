@@ -71,9 +71,6 @@ func NewCamera(config CameraConfig) *Camera {
 
 	// Calculate lens properties
 	lensRadius := config.Aperture / 2
-	if lensRadius == 0 {
-		lensRadius = 1e-6 // Treat pinhole as tiny lens for calculations
-	}
 	lensArea := math.Pi * lensRadius * lensRadius
 	if config.Aperture == 0 {
 		lensArea = 1.0 // Pinhole camera
@@ -129,8 +126,10 @@ func NewCamera(config CameraConfig) *Camera {
 	// Find corner of viewport in camera space
 	cornerPoint := core.NewVec3(-viewportWidth/2, -viewportHeight/2, -focusDistance)
 	cornerDirection := cornerPoint.Normalize()
-	cosTotalWidth := cornerDirection.Z // Z component is cosine of angle from forward direction
-	cosTotalHeight := cosTotalWidth    // Same for both since we check corners
+	// Cosine of angle between forward direction (0,0,-1) and corner direction
+	forwardDirection := core.NewVec3(0, 0, -1)
+	cosTotalWidth := cornerDirection.Dot(forwardDirection)
+	cosTotalHeight := cosTotalWidth // Same for both since we check corners
 
 	return &Camera{
 		center:          config.Center,

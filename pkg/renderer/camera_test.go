@@ -217,20 +217,28 @@ func TestCameraCalculateRayPDFs_ScaleConsistency(t *testing.T) {
 
 	areaPDF, _ := camera.CalculateRayPDFs(ray)
 
-	// Area PDF should be in the same order of magnitude as light area PDFs
+	// For pinhole cameras, PBRT sets lens area = 1.0 as normalization
 	// Cornell box quad light is 130x105 = 13650 units^2
 	// So light area PDF ≈ 1/13650 ≈ 7.3e-5
 	lightAreaPDF := 1.0 / (130.0 * 105.0)
+	lightArea := 130.0 * 105.0
 
-	// Camera area PDF should be in a similar range (maybe 1-2 orders of magnitude different)
+	// For pinhole camera, area PDF should be 1.0 (PBRT normalization)
+	expectedCameraAreaPDF := 1.0
 	ratio := areaPDF / lightAreaPDF
 
 	t.Logf("Camera area PDF: %e", areaPDF)
 	t.Logf("Light area PDF: %e", lightAreaPDF)
 	t.Logf("Ratio (camera/light): %f", ratio)
 
-	// The ratio should be reasonable (not 1000x different)
-	if ratio < 0.001 || ratio > 1000.0 {
-		t.Errorf("Camera area PDF scale seems inconsistent with light area PDF. Ratio: %f", ratio)
+	// Verify pinhole camera area PDF is 1.0
+	if math.Abs(areaPDF-expectedCameraAreaPDF) > 1e-6 {
+		t.Errorf("Pinhole camera area PDF should be 1.0, got %f", areaPDF)
+	}
+
+	// Ratio should equal light area (camera PDF = 1.0, light PDF = 1/area)
+	expectedRatio := lightArea
+	if math.Abs(ratio-expectedRatio) > 1.0 {
+		t.Errorf("PDF ratio should equal light area. Expected %f, got %f", expectedRatio, ratio)
 	}
 }

@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 
@@ -223,16 +224,27 @@ func TestWeFunction(t *testing.T) {
 	edgeCos4 := edgeCosTheta * edgeCosTheta * edgeCosTheta * edgeCosTheta
 	t.Logf("Center cos^4: %f", centerCos4)
 	t.Logf("Edge cos^4: %f", edgeCos4)
-	t.Logf("Expected center/edge ratio: %f", centerCos4/edgeCos4)
-	t.Logf("Actual center/edge ratio: %f", centerWe.Luminance()/edgeWe.Luminance())
 
-	// Center should have higher importance than edge due to cos^4 falloff
-	if centerWe.Luminance() <= edgeWe.Luminance() {
-		t.Error("Center ray should have higher importance than edge ray")
+	// PBRT importance formula: We = 1 / (A * lensArea * cos^4(theta))
+	// So edge rays (smaller cos^4) have HIGHER importance than center rays
+	expectedRatio := centerCos4 / edgeCos4 // Expected edge/center ratio = 1.0/0.25 = 4.0
+	actualRatio := edgeWe.Luminance() / centerWe.Luminance()
+	t.Logf("Expected edge/center importance ratio: %f", expectedRatio)
+	t.Logf("Actual edge/center importance ratio: %f", actualRatio)
+
+	// Edge rays should have higher importance than center due to cos^4 in denominator
+	if edgeWe.Luminance() <= centerWe.Luminance() {
+		t.Error("Edge ray should have higher importance than center ray (PBRT formula)")
+	}
+
+	// Check the ratio is approximately correct (allowing some tolerance)
+	tolerance := 0.01
+	if math.Abs(actualRatio-expectedRatio) > tolerance {
+		t.Errorf("Importance ratio mismatch. Expected %.3f, got %.3f", expectedRatio, actualRatio)
 	}
 
 	// Test ray outside field of view (should have zero importance)
-	outsideDirection := core.NewVec3(2, 0, -1).Normalize() // Way off to the side
+	outsideDirection := core.NewVec3(5, 0, -1).Normalize() // Way off to the side (more extreme)
 	outsideRay := core.NewRay(core.NewVec3(0, 0, 0), outsideDirection)
 	outsideWe := camera.EvaluateRayImportance(outsideRay)
 
