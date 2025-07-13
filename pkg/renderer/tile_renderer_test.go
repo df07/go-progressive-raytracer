@@ -117,7 +117,8 @@ func TestTileRendererPixelSampling(t *testing.T) {
 	targetSamples := 4
 
 	// Render the tile
-	stats := renderer.RenderTileBounds(bounds, pixelStats, random, targetSamples)
+	queue := NewSplatQueue()
+	stats := renderer.RenderTileBounds(bounds, pixelStats, queue, random, targetSamples)
 
 	// Check that integrator was called
 	if mockIntegrator.callCount == 0 {
@@ -169,7 +170,8 @@ func TestTileRendererAdaptiveSampling(t *testing.T) {
 	random := rand.New(rand.NewSource(42))
 	targetSamples := 100 // High target
 
-	stats := renderer.RenderTileBounds(bounds, pixelStats, random, targetSamples)
+	queue := NewSplatQueue()
+	stats := renderer.RenderTileBounds(bounds, pixelStats, queue, random, targetSamples)
 
 	// With consistent color, adaptive sampling should stop early
 	actualSamples := pixelStats[0][0].SampleCount
@@ -205,7 +207,8 @@ func TestTileRendererStatistics(t *testing.T) {
 	random := rand.New(rand.NewSource(42))
 	targetSamples := 5
 
-	stats := renderer.RenderTileBounds(bounds, pixelStats, random, targetSamples)
+	queue := NewSplatQueue()
+	stats := renderer.RenderTileBounds(bounds, pixelStats, queue, random, targetSamples)
 
 	// Check basic statistics
 	expectedPixels := 6
@@ -253,7 +256,8 @@ func TestTileRendererDeterministic(t *testing.T) {
 		pixelStats1[i] = make([]PixelStats, 2)
 	}
 	random1 := rand.New(rand.NewSource(123))
-	stats1 := renderer.RenderTileBounds(bounds, pixelStats1, random1, targetSamples)
+	queue1 := NewSplatQueue()
+	stats1 := renderer.RenderTileBounds(bounds, pixelStats1, queue1, random1, targetSamples)
 
 	// Second render with same seed
 	pixelStats2 := make([][]PixelStats, 2)
@@ -261,7 +265,8 @@ func TestTileRendererDeterministic(t *testing.T) {
 		pixelStats2[i] = make([]PixelStats, 2)
 	}
 	random2 := rand.New(rand.NewSource(123))
-	stats2 := renderer.RenderTileBounds(bounds, pixelStats2, random2, targetSamples)
+	queue2 := NewSplatQueue()
+	stats2 := renderer.RenderTileBounds(bounds, pixelStats2, queue2, random2, targetSamples)
 
 	// Results should be identical
 	if stats1.TotalSamples != stats2.TotalSamples {
@@ -295,8 +300,8 @@ func TestTileRendererBoundsClipping(t *testing.T) {
 	// Only render a 2x2 subset
 	bounds := image.Rect(1, 1, 3, 3)
 	random := rand.New(rand.NewSource(42))
-
-	stats := renderer.RenderTileBounds(bounds, pixelStats, random, 2)
+	queue := NewSplatQueue()
+	stats := renderer.RenderTileBounds(bounds, pixelStats, queue, random, 2)
 
 	// Should only have processed 4 pixels
 	if stats.TotalPixels != 4 {

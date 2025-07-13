@@ -14,6 +14,7 @@ type TileTask struct {
 	TargetSamples int
 	TaskID        int            // For deterministic ordering
 	PixelStats    [][]PixelStats // Shared pixel stats array to write to
+	SplatQueue    *SplatQueue    // Shared splat queue for cross-tile contributions
 }
 
 // TileResult contains the result from rendering a tile
@@ -115,7 +116,7 @@ func (w *Worker) run(wg *sync.WaitGroup) {
 	for task := range w.taskQueue {
 		// Render the tile using the tile renderer
 		// Each tile has non-overlapping bounds, so this is thread-safe
-		stats := w.tileRenderer.RenderTileBounds(task.Tile.Bounds, task.PixelStats, task.Tile.Random, task.TargetSamples)
+		stats := w.tileRenderer.RenderTileBounds(task.Tile.Bounds, task.PixelStats, task.SplatQueue, task.Tile.Random, task.TargetSamples)
 
 		// Send result back with just the stats
 		result := TileResult{

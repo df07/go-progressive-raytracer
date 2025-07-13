@@ -23,36 +23,54 @@ func NewTileRenderer(scene core.Scene, integratorInst core.Integrator) *TileRend
 }
 
 // RenderTileBounds renders pixels within the specified bounds using the integrator
-func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]PixelStats, random *rand.Rand, targetSamples int) RenderStats {
+func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]PixelStats, splatQueue *SplatQueue, random *rand.Rand, targetSamples int) RenderStats {
 	camera := tr.scene.GetCamera()
 	samplingConfig := tr.scene.GetSamplingConfig()
 
 	// Initialize statistics tracking for this specific bounds
 	stats := tr.initRenderStatsForBounds(bounds, targetSamples)
 
+	// Step 1: Regular tile processing with splat generation
 	for j := bounds.Min.Y; j < bounds.Max.Y; j++ {
 		for i := bounds.Min.X; i < bounds.Max.X; i++ {
-			samplesUsed := tr.adaptiveSamplePixelWithIntegrator(camera, i, j, &pixelStats[j][i], random, targetSamples, samplingConfig)
+			samplesUsed := tr.adaptiveSamplePixelWithSplats(camera, i, j, &pixelStats[j][i], splatQueue, random, targetSamples, samplingConfig)
 			tr.updateStats(&stats, samplesUsed)
 		}
 	}
+
+	// Step 2: Extract and apply splats affecting this tile
+	splatQueue.ExtractSplatsForTile(bounds)
+	/*for _, splat := range tileSplats {
+		// Apply splat to pixel (coordinates already computed)
+		pixelStats[splat.Y][splat.X].AddSample(splat.Color)
+	}*/
 
 	// Finalize statistics
 	tr.finalizeStats(&stats)
 	return stats
 }
 
-// adaptiveSamplePixelWithIntegrator uses adaptive sampling with the integrator
-func (tr *TileRenderer) adaptiveSamplePixelWithIntegrator(camera core.Camera, i, j int, ps *PixelStats, random *rand.Rand, maxSamples int, samplingConfig core.SamplingConfig) int {
+// adaptiveSamplePixelWithSplats uses adaptive sampling with the integrator and handles splat contributions
+func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera core.Camera, i, j int, ps *PixelStats, splatQueue *SplatQueue, random *rand.Rand, maxSamples int, samplingConfig core.SamplingConfig) int {
 	initialSampleCount := ps.SampleCount
 
 	// Take samples until we reach convergence or max samples
 	for ps.SampleCount < maxSamples && !tr.shouldStopSampling(ps, maxSamples, samplingConfig) {
 		ray := camera.GetRay(i, j, random)
-		// Use integrator to compute color with proper depth and throughput
-		color, _ := tr.integrator.RayColor(ray, tr.scene, random)
-		// TODO: handle splat rays
-		ps.AddSample(color)
+
+		// Use enhanced integrator with splat support
+		pixelColor, splatRays := tr.integrator.RayColor(ray, tr.scene, random)
+
+		// Add regular contribution
+		ps.AddSample(pixelColor)
+
+		// Process splat contributions
+		for _, splatRay := range splatRays {
+			// Map ray to pixel coordinates and add to queue
+			if x, y, ok := camera.MapRayToPixel(splatRay.Ray); ok {
+				splatQueue.AddSplat(x, y, splatRay.Color)
+			}
+		}
 	}
 
 	return ps.SampleCount - initialSampleCount

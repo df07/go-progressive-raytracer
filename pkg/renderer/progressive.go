@@ -50,6 +50,7 @@ type ProgressiveRaytracer struct {
 	tiles       []*Tile         // Tile management
 	currentPass int             // Progressive state
 	pixelStats  [][]PixelStats  // Shared pixel statistics array (global image coordinates)
+	splatQueue  *SplatQueue     // Shared splat queue for BDPT t=1 strategies
 	integrator  core.Integrator // Light transport integrator for actual rendering
 	workerPool  *WorkerPool     // Worker pool for parallel processing
 	logger      core.Logger     // Logger for rendering output
@@ -68,6 +69,9 @@ func NewProgressiveRaytracer(scene core.Scene, config ProgressiveConfig, integra
 		pixelStats[y] = make([]PixelStats, width)
 	}
 
+	// Create shared splat queue for BDPT t=1 strategies
+	splatQueue := NewSplatQueue()
+
 	// Create worker pool
 	workerPool := NewWorkerPool(scene, integratorInst, width, height, config.TileSize, config.NumWorkers)
 
@@ -77,6 +81,7 @@ func NewProgressiveRaytracer(scene core.Scene, config ProgressiveConfig, integra
 		tiles:       tiles,
 		currentPass: 0,
 		pixelStats:  pixelStats,
+		splatQueue:  splatQueue,
 		integrator:  integratorInst,
 		workerPool:  workerPool,
 		logger:      logger,
@@ -139,6 +144,7 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(Til
 			TargetSamples: targetSamples,
 			TaskID:        taskID,
 			PixelStats:    pr.pixelStats, // Pass shared pixel stats array
+			SplatQueue:    pr.splatQueue, // Pass shared splat queue
 		}
 		pr.workerPool.SubmitTask(task)
 		taskID++
@@ -181,6 +187,9 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(Til
 
 	// Assemble image and calculate final stats from actual pixel data
 	img, stats := pr.assembleCurrentImage(targetSamples)
+
+	// Clear any remaining splats that weren't processed (for cleanup)
+	pr.splatQueue.Clear()
 
 	return img, stats, nil
 }

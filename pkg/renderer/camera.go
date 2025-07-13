@@ -211,6 +211,7 @@ func (c *Camera) GetCameraForward() core.Vec3 {
 
 // SampleCameraFromPoint samples the camera from a reference point for t=1 strategies
 // Camera handles lens sampling internally, returns complete sample
+// Equivalent to pbrt PerspectiveCamera::SampleWi
 func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, random *rand.Rand) *core.CameraSample {
 	// Sample lens coordinates using concentric disk sampling
 	lensCoords := core.RandomInUnitDisk(random).Multiply(c.lensRadius)
