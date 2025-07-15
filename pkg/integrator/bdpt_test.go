@@ -101,8 +101,8 @@ func TestCornellSpecularReflections(t *testing.T) {
 	// Mirror box is at (185, 165, 351) with size (82.5, 165, 82.5)
 	// Light is at ceiling around (278, 556, 279)
 	rayToMirror := core.NewRayTo(
-		core.NewVec3(278, 300, 100), // Camera position
-		core.NewVec3(165, 556, 390), // Ray toward ceiling above mirror box
+		core.NewVec3(278, 278, -800), // Camera position
+		core.NewVec3(165, 556, 390),  // Ray toward ceiling above mirror box
 	)
 
 	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
@@ -202,6 +202,95 @@ func TestCornellSpecularReflections(t *testing.T) {
 				t.Errorf("FAIL: BDPT max ray should have luminance %.6f, got %.6f", bdptMaxLuminance, bdptResult.Luminance())
 			}
 		}
+	}
+}
+
+func TestCornellSpecularReflectionPaths(t *testing.T) {
+	// Create Cornell scene with mirror box and light
+	scene := createMinimalCornellScene(true)
+
+	// Setup a ray that should hit the ceiling above the mirror box and reflect to the light
+	// Mirror box is at (185, 165, 351) with size (82.5, 165, 82.5)
+	// Light is at ceiling around (278, 556, 279)
+	rayToMirror := core.NewRayTo(
+		core.NewVec3(278, 278, -800), // Camera position
+		core.NewVec3(165, 556, 390),  // Ray toward ceiling above mirror box
+	)
+
+	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
+	bdpt := NewBDPTIntegrator(config)
+
+	// generate camera paths until we find camera -> ceiling -> mirror -> light
+	// then generate light paths until we find mirror -> ceiling -> camera
+	// then compare the two paths
+
+	var cameraPath *Path
+	var cameraPathIndex int
+	for i := 0; i < 1000; i++ {
+		random := rand.New(rand.NewSource(42 + int64(i)))
+		path := bdpt.generateCameraSubpath(rayToMirror, scene, random, 4)
+		if path.Length == 4 &&
+			path.Vertices[3].IsLight &&
+			path.Vertices[2].IsSpecular &&
+			path.Vertices[1].Point.Y > 555.99 {
+			cameraPath = &path
+			cameraPathIndex = i
+			break
+		}
+	}
+
+	if cameraPath == nil {
+		t.Fatalf("FAIL: No camera path found")
+	} else {
+		LogPath(t, "Camera", *cameraPath)
+
+		if testing.Verbose() {
+			t.Logf("== VERBOSE bdpt.generateCameraSubpath ==")
+			random := rand.New(rand.NewSource(42 + int64(cameraPathIndex)))
+			bdpt.Verbose = testing.Verbose()
+			bdpt.generateCameraSubpath(rayToMirror, scene, random, 4)
+			bdpt.Verbose = false
+		}
+	}
+
+	// generate light paths until we find mirror -> ceiling -> camera
+	// then compare the two paths
+	var lightPath *Path
+	var lightPathIndex int
+	for i := 0; i < 10000; i++ {
+		random := rand.New(rand.NewSource(42 + int64(i)))
+		path := bdpt.generateLightSubpath(scene, random, 3)
+		if path.Length == 3 &&
+			path.Vertices[1].IsSpecular &&
+			path.Vertices[2].Point.Y > 555.99 &&
+			path.Vertices[2].Point.Subtract(cameraPath.Vertices[1].Point).Length() < 10 {
+			lightPath = &path
+			lightPathIndex = i
+			break
+		}
+	}
+
+	if lightPath == nil {
+		t.Errorf("FAIL: No light path found")
+	} else {
+		LogPath(t, "Light", *lightPath)
+
+		if testing.Verbose() {
+			t.Logf("== VERBOSE bdpt.generateLightSubpath ==")
+			random := rand.New(rand.NewSource(42 + int64(lightPathIndex)))
+			bdpt.Verbose = testing.Verbose()
+			bdpt.generateLightSubpath(scene, random, 3)
+			bdpt.Verbose = false
+		}
+	}
+
+	if cameraPath != nil && lightPath != nil {
+		bdpt.Verbose = testing.Verbose()
+		misWeightT4S0 := bdpt.calculateMISWeight(*cameraPath, *lightPath, nil, 0, 4, scene)
+		t.Logf("  (t=4, s=0) MIS weight: %.6f", misWeightT4S0)
+
+		misWeightT1S3 := bdpt.calculateMISWeight(*cameraPath, *lightPath, nil, 3, 1, scene)
+		t.Logf("  (t=1, s=3) MIS weight: %.6f", misWeightT1S3)
 	}
 }
 
@@ -365,6 +454,7 @@ type TestScene struct {
 	shapes []core.Shape
 	lights []core.Light
 	bvh    *core.BVH
+	camera *renderer.Camera
 }
 
 func (s *TestScene) GetShapes() []core.Shape { return s.shapes }
@@ -383,18 +473,22 @@ func (s *TestScene) GetSamplingConfig() core.SamplingConfig {
 	return core.SamplingConfig{MaxDepth: 5, SamplesPerPixel: 1}
 }
 func (s *TestScene) GetCamera() core.Camera {
-	// Create a realistic camera for PDF testing - matches Cornell box setup exactly
-	config := renderer.CameraConfig{
-		Center:        core.NewVec3(278, 278, -800), // Cornell box camera position
-		LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
-		Up:            core.NewVec3(0, 1, 0),        // Standard up direction
-		Width:         400,
-		AspectRatio:   1.0,  // Square aspect ratio for Cornell box
-		VFov:          40.0, // Official Cornell field of view
-		Aperture:      0.0,  // No depth of field for Cornell box
-		FocusDistance: 0.0,  // Auto-calculate focus distance
+	if s.camera == nil {
+		// Create a realistic camera for PDF testing - matches Cornell box setup exactly
+		config := renderer.CameraConfig{
+			Center:        core.NewVec3(278, 278, -800), // Cornell box camera position
+			LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
+			Up:            core.NewVec3(0, 1, 0),        // Standard up direction
+			Width:         400,
+			AspectRatio:   1.0,  // Square aspect ratio for Cornell box
+			VFov:          40.0, // Official Cornell field of view
+			Aperture:      0.0,  // No depth of field for Cornell box
+			FocusDistance: 0.0,  // Auto-calculate focus distance
+		}
+		s.camera = renderer.NewCamera(config)
 	}
-	return renderer.NewCamera(config)
+
+	return s.camera
 }
 
 // TestLightPathDirectionAndIntersection verifies that light paths are generated correctly
@@ -686,15 +780,18 @@ func LogPath(t *testing.T, name string, path Path) {
 	t.Logf("=== %s path (length: %d) ===", name, path.Length)
 	for i, vertex := range path.Vertices {
 		if vertex.IsLight {
-			t.Logf("  %s[%d]: pos=%v, fwdPdf=%f, beta=%f, IsLight=true, Emission=%v (luminance=%v)",
-				name, i, vertex.Point, vertex.AreaPdfForward, vertex.Beta, vertex.EmittedLight, vertex.EmittedLight.Luminance())
+			t.Logf("  %s[%d]: LIGHT    pos=%v, fwdPdf=%0.3g, revPdf=%0.3g, beta=%f, Emission=%v (luminance=%v)",
+				name, i, vertex.Point, vertex.AreaPdfForward, vertex.AreaPdfReverse, vertex.Beta, vertex.EmittedLight, vertex.EmittedLight.Luminance())
 
 		} else if vertex.IsCamera {
-			t.Logf("  %s[%d]: pos=%v, fwdPdf=%f, beta=%f, IsCamera=true",
-				name, i, vertex.Point, vertex.AreaPdfForward, vertex.Beta)
+			t.Logf("  %s[%d]: CAMERA   pos=%v, fwdPdf=%0.3g, revPdf=%0.3g, beta=%f",
+				name, i, vertex.Point, vertex.AreaPdfForward, vertex.AreaPdfReverse, vertex.Beta)
+		} else if vertex.IsSpecular {
+			t.Logf("  %s[%d]: SPECULAR pos=%v, fwdPdf=%0.3g, revPdf=%0.3g, beta=%f, Material=%v",
+				name, i, vertex.Point, vertex.AreaPdfForward, vertex.AreaPdfReverse, vertex.Beta, vertex.Material != nil)
 		} else {
-			t.Logf("  %s[%d]: pos=%v, fwdPdf=%f, beta=%f, Material=%v",
-				name, i, vertex.Point, vertex.AreaPdfForward, vertex.Beta, vertex.Material != nil)
+			t.Logf("  %s[%d]: MATERIAL pos=%v, fwdPdf=%0.3g, revPdf=%0.3g, beta=%f, Material=%v",
+				name, i, vertex.Point, vertex.AreaPdfForward, vertex.AreaPdfReverse, vertex.Beta, vertex.Material != nil)
 		}
 
 	}
