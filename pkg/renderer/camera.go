@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 
@@ -54,6 +55,9 @@ type Camera struct {
 
 	// Store configuration for reference
 	config CameraConfig
+
+	// Verbose logging bool
+	verbose bool
 }
 
 // NewCamera creates a camera with the given configuration
@@ -155,6 +159,7 @@ func NewCamera(config CameraConfig) *Camera {
 		cosTotalHeight:  cosTotalHeight,
 		cameraForward:   cameraForward,
 		config:          config,
+		verbose:         false,
 	}
 }
 
@@ -329,4 +334,15 @@ func MergeCameraConfig(defaultConfig CameraConfig, override CameraConfig) Camera
 	}
 
 	return result
+}
+
+// SetVerbose sets the verbose logging bool
+func (c *Camera) SetVerbose(verbose bool) {
+	c.verbose = verbose
+}
+
+func (c *Camera) logf(format string, a ...interface{}) {
+	if c.verbose {
+		fmt.Printf(format, a...)
+	}
 }

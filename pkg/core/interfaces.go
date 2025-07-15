@@ -110,6 +110,9 @@ type Camera interface {
 
 	// Map ray back to pixel coordinates (for splat placement)
 	MapRayToPixel(ray Ray) (x, y int, ok bool)
+
+	// Verbose logging bool
+	SetVerbose(verbose bool)
 }
 
 // Scene interface for scene management

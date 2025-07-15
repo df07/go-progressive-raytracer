@@ -59,6 +59,8 @@ func (m *MockCamera) MapRayToPixel(ray core.Ray) (int, int, bool) {
 	return 0, 0, true
 }
 
+func (m *MockCamera) SetVerbose(verbose bool) {}
+
 // createTestScene creates a simple scene with a sphere for testing
 func createTestScene() *MockScene {
 	// Create a simple lambertian sphere
