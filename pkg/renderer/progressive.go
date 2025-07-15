@@ -188,9 +188,6 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(Til
 	// Assemble image and calculate final stats from actual pixel data
 	img, stats := pr.assembleCurrentImage(targetSamples)
 
-	// Clear any remaining splats that weren't processed (for cleanup)
-	pr.splatQueue.Clear()
-
 	return img, stats, nil
 }
 
