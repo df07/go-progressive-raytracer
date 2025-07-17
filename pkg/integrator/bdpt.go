@@ -668,7 +668,9 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 			var sampledVertex *Vertex
 			var splatRays []core.SplatRay
 
-			if s == 0 {
+			if s == 1 && t == 1 {
+				// pbrt does not implement s=1,t=1 strategy. These paths are captured by s=0,t=1
+				continue
 				// s=0: Pure camera path
 				contribution = bdpt.evaluatePathTracingStrategy(cameraPath, t)
 				if contribution.Luminance() > 0 {
@@ -791,7 +793,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, s, t
 // evaluateLightTracingStrategy evaluates light tracing (light path hits camera)
 // Returns (direct contribution, splat rays, sampled camera vertex)
 func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, scene core.Scene, random *rand.Rand) ([]core.SplatRay, *Vertex) {
-	if s < 1 || s > lightPath.Length {
+	if s <= 1 || s > lightPath.Length {
 		return nil, nil
 	}
 
