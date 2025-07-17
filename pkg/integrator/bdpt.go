@@ -240,6 +240,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		}
 
 		// Material scattered - capture the scatter information
+		pdfFwd = scatter.PDF
 		vertex.IsSpecular = scatter.IsSpecular()
 
 		// Handle specular vs diffuse materials differently (like path tracer does)
@@ -671,6 +672,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 			if s == 1 && t == 1 {
 				// pbrt does not implement s=1,t=1 strategy. These paths are captured by s=0,t=1
 				continue
+			} else if s == 0 {
 				// s=0: Pure camera path
 				contribution = bdpt.evaluatePathTracingStrategy(cameraPath, t)
 				if contribution.Luminance() > 0 {
