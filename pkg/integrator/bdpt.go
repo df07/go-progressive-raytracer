@@ -116,6 +116,7 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 
 	// Continue the camera path by tracing the ray through the scene
 	beta := core.Vec3{X: 1, Y: 1, Z: 1}
+	bdpt.logf("generateCameraSubpath: ray=%v, beta=%v, directionPDF=%0.6g\n", ray, beta, directionPDF)
 	bdpt.extendPath(&path, ray, beta, directionPDF, scene, random, maxDepth, true) // Pass maxDepth through because camera doesn't count as a vertex
 
 	return path
@@ -151,7 +152,7 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		IsLight:           true,
 		IsCamera:          false,
 		IsSpecular:        false,
-		Beta:              emissionSample.Emission, // Include emission in throughput
+		Beta:              emissionSample.Emission, // PBRT: light vertex stores raw emission, transport beta used for path continuation
 		EmittedLight:      emissionSample.Emission, // Already properly scaled
 	}
 
@@ -172,7 +173,7 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 
 // extendPath extends a path by tracing a ray through the scene, handling intersections and scattering
 // This is the common logic shared between camera and light path generation after the initial vertex
-func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta core.Vec3, pdfDir float64, scene core.Scene, random *rand.Rand, maxBounces int, isCameraPath bool) {
+func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta core.Vec3, pdfFwd float64, scene core.Scene, random *rand.Rand, maxBounces int, isCameraPath bool) {
 	for bounces := 0; bounces < maxBounces; bounces++ {
 		vertexPrev := path.Vertices[path.Length-1]
 
@@ -192,7 +193,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
 				Material:          nil,
 				IncomingDirection: currentRay.Direction.Multiply(-1),
-				AreaPdfForward:    pdfDir,                  // Keep as solid angle PDF for infinite area light
+				AreaPdfForward:    pdfFwd,                  // Keep as solid angle PDF for infinite area light
 				AreaPdfReverse:    0.0,                     // Cannot generate rays towards background
 				IsLight:           bgColor.Luminance() > 0, // Only mark as light if background actually emits
 				IsCamera:          false,                   // No camera vertices in path extension
@@ -225,8 +226,9 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			EmittedLight:      emittedLight, // Captured during path generation
 		}
 
-		// Set forward direction PDF into this vertex (PBRT: prev.ConvertDensity(pdf, v))
-		vertex.AreaPdfForward = vertexPrev.convertPDFDensity(vertex, pdfDir)
+		// Set forward PDF into this vertex, from the pdf of the previous vertex
+		// pbrt: prev.ConvertDensity(pdf, v)
+		vertex.AreaPdfForward = vertexPrev.convertPDFDensity(vertex, pdfFwd)
 
 		// Try to scatter the ray
 		scatter, didScatter := hit.Material.Scatter(currentRay, *hit, random)
@@ -239,7 +241,6 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 
 		// Material scattered - capture the scatter information
 		vertex.IsSpecular = scatter.IsSpecular()
-		pdfDir = scatter.PDF // PDF for the direction we scattered, also used in next bounce
 
 		// Handle specular vs diffuse materials differently (like path tracer does)
 		cosTheta := scatter.Scattered.Direction.AbsDot(hit.Normal)
@@ -248,16 +249,21 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			beta = beta.MultiplyVec(scatter.Attenuation)
 		} else {
 			// For diffuse materials: standard Monte Carlo integration with PDF
-			beta = beta.MultiplyVec(scatter.Attenuation).Multiply(cosTheta / pdfDir)
+			beta = beta.MultiplyVec(scatter.Attenuation).Multiply(cosTheta / scatter.PDF)
 		}
 
+		// pbrt: Float pdfRev = bsdf.PDF(bs->wi, wo, !mode)
 		pdfRev, isReverseDelta := hit.Material.PDF(scatter.Scattered.Direction, currentRay.Direction.Multiply(-1), hit.Normal)
+
 		// For delta functions in BDPT, set reverse PDF to 0 (like PBRT)
 		if isReverseDelta {
 			vertex.IsSpecular = true
 			pdfRev = 0.0
-			pdfDir = 0.0
+			pdfFwd = 0.0
 		}
+
+		// Set reverse PDF into the previous vertex, from the pdf of the current vertex
+		// pbrt: prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
 		vertexPrev.AreaPdfReverse = vertex.convertPDFDensity(vertexPrev, pdfRev)
 
 		path.Vertices = append(path.Vertices, vertex)
@@ -297,6 +303,7 @@ func (v *Vertex) convertPDFDensity(next Vertex, pdfDir float64) float64 {
 // This compares forward vs reverse PDFs to properly weight different path construction strategies
 func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
 	if s+t == 2 {
+		bdpt.logf(" (s=%d,t=%d) calculateMISWeight: s+t==2, weight=1.0\n", s, t)
 		return 1.0
 	}
 
@@ -305,7 +312,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 	if s == 0 && t > 1 {
 		lastVertex := cameraPath.Vertices[t-1]
 		if lastVertex.IsInfiniteLight {
-			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight: infinite light hit, weight=1.0\n", s, t)
+			bdpt.logf(" (s=%d,t=%d) calculateMISWeight: infinite light hit, weight=1.0\n", s, t)
 			return 1.0
 		}
 	}
@@ -380,11 +387,11 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if s > 0 {
 			// pt.AreaPdfReverse = qs.Pdf(scene, qsMinus, *pt)
 			pt.AreaPdfReverse = bdpt.calculateVertexPdf(*qs, qsMinus, *pt, scene)
-			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 1 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
+			bdpt.logf(" (s=%d,t=%d) calculateMISWeight 1 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
 		} else {
 			// pt.AreaPdfReverse = pt.PdfLightOrigin(scene, *ptMinus, lightPdf, lightToIndex)
 			pt.AreaPdfReverse = bdpt.calculateLightOriginPdf(*pt, *ptMinus, scene)
-			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 2 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
+			bdpt.logf(" (s=%d,t=%d) calculateMISWeight 2 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
 		}
 	}
 
@@ -394,11 +401,11 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if s > 0 {
 			// ptMinus.AreaPdfReverse = pt.Pdf(scene, qs, *ptMinus)
 			ptMinus.AreaPdfReverse = bdpt.calculateVertexPdf(*pt, qs, *ptMinus, scene)
-			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 1 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
+			bdpt.logf(" (s=%d,t=%d) calculateMISWeight 1 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
 		} else {
 			// ptMinus.AreaPdfReverse = pt.PdfLight(scene, *ptMinus)
 			ptMinus.AreaPdfReverse = bdpt.calculateLightPdf(*pt, *ptMinus, scene)
-			bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight 2 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
+			bdpt.logf(" (s=%d,t=%d) calculateMISWeight 2 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
 		}
 	}
 
@@ -408,6 +415,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if pt != nil {
 			// qs.AreaPdfReverse = pt.Pdf(scene, ptMinus, *qs)
 			qs.AreaPdfReverse = bdpt.calculateVertexPdf(*pt, ptMinus, *qs, scene)
+			bdpt.logf(" (s=%d,t=%d) calculateMISWeight 3 remap qs: qs.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalQsPdfRev, qs.AreaPdfReverse)
 		}
 	}
 	if qsMinus != nil {
@@ -415,6 +423,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if qs != nil && pt != nil {
 			// qsMinus.AreaPdfReverse = qs.Pdf(scene, pt, *qsMinus)
 			qsMinus.AreaPdfReverse = bdpt.calculateVertexPdf(*qs, pt, *qsMinus, scene)
+			bdpt.logf(" (s=%d,t=%d) calculateMISWeight 4 remap qsMinus: qsMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalQsMinusPdfRev, qsMinus.AreaPdfReverse)
 		}
 	}
 
@@ -445,7 +454,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular && !hasSpecularAfter {
 			sumRi += ri
 		}
-		bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g, hasSpecularAfter=%t\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, hasSpecularAfter)
+		bdpt.logf(" (s=%d,t=%d) calculateMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g, hasSpecularAfter=%t\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, hasSpecularAfter)
 	}
 
 	// Consider hypothetical connection strategies along the light subpath
@@ -464,9 +473,10 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		if !vertex.IsSpecular && !deltaLightVertex {
 			sumRi += ri
 		}
-		bdpt.logf(" (s=%d,t=%d) calculatePBRTMISWeight lightPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi)
+		bdpt.logf(" (s=%d,t=%d) calculateMISWeight lightPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi)
 	}
 
+	bdpt.logf(" (s=%d,t=%d) calculateMISWeight: sumRi=%0.3g, weight=%0.3f\n", s, t, sumRi, 1.0/(1.0+sumRi))
 	return 1.0 / (1.0 + sumRi)
 }
 
@@ -748,7 +758,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, s, t
 	}
 
 	// pbrt: L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta
-	// pbrt sampled.beta: light->Sample_Li / (Sample_Li&pdf * lightDistr&lightPdf)
+	// pbrt sampled.beta: light->Sample_Li / (Sample_Li &pdf * lightDistr &lightPdf)
 	// pbrt pdfFwd: sampled.PdfLightOrigin(scene, pt, lightDistr, lightToIndex)
 	//          => pdfPos * pdfChoice // Return solid angle density for non-infinite light sources
 	//          => pdfDir for light sample not used
@@ -785,7 +795,7 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 		return nil, nil
 	}
 
-	// Get the light vertex we're connecting to the camera
+	// Get the light path vertex we're connecting to the camera
 	lightVertex := lightPath.Vertices[s-1]
 
 	// Skip specular vertices (can't connect through delta functions)
@@ -799,6 +809,8 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	if cameraSample == nil {
 		return nil, nil
 	}
+
+	bdpt.logf(" (s=%d,t=1) SampleCameraFromPoint: Weight=%v, PDF=%f\n", s, cameraSample.Weight, cameraSample.PDF)
 
 	// Visibility test
 	shadowRay := core.NewRay(lightVertex.Point, cameraSample.Ray.Direction.Multiply(-1))
@@ -819,7 +831,11 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 		return nil, nil
 	}
 
-	lightContribution := brdf.MultiplyVec(cameraBeta).MultiplyVec(lightVertex.Beta).Multiply(cosine)
+	lightContribution := brdf.MultiplyVec(cameraBeta).MultiplyVec(lightVertex.Beta)
+
+	if lightVertex.Material != nil {
+		lightContribution = lightContribution.Multiply(cosine)
+	}
 
 	// Create the sampled camera vertex for MIS weight calculation
 	// This represents the dynamically sampled camera vertex

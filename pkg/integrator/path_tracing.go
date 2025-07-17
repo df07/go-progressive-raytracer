@@ -55,7 +55,11 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 	scatter, didScatter := hit.Material.Scatter(ray, *hit, random)
 	if !didScatter {
 		// Material absorbed the ray, only return emitted light
-		pt.logf("pt absorbed[%d]: contribution=%v\n", pt.config.MaxDepth-depth, colorEmitted)
+		if colorEmitted.Luminance() > 0 {
+			pt.logf("      pt[%d]    light: contribution=%v\n", pt.config.MaxDepth-depth, colorEmitted)
+		} else {
+			pt.logf("      pt[%d] absorbed: contribution=0\n", pt.config.MaxDepth-depth)
+		}
 		return colorEmitted.Multiply(rrCompensation)
 	}
 
@@ -79,7 +83,7 @@ func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResu
 	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, random, depth-1, newThroughput)
 	contribution := scatter.Attenuation.MultiplyVec(incomingLight)
 
-	pt.logf("pt specular[%d]: contribution=%v = attenuation=%v * incomingLight=%v\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight)
+	pt.logf("      pt[%d] specular: contribution=%v = attenuation=%v * incomingLight=%v\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight)
 
 	return contribution
 }
@@ -143,7 +147,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
 	if lightSample.PDF > 0 {
 		contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
-		pt.logf("pt direct[%d]: contribution=%v = brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", pt.config.MaxDepth-depth, contribution, brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
+		pt.logf("      pt[%d]   direct: contribution=%v = brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", pt.config.MaxDepth-depth, contribution, brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
 
 		return contribution
 	}
@@ -179,7 +183,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 	// Indirect lighting contribution with MIS
 	contribution := scatter.Attenuation.Multiply(cosine * misWeight / scatter.PDF).MultiplyVec(incomingLight)
 
-	pt.logf("pt indirect[%d]: contribution=%v = attenuation=%v * incomingLight=%v * (cosine=%f * misWeight=%f / scatterPDF=%f)\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight, cosine, misWeight, scatter.PDF)
+	pt.logf("      pt[%d] indirect: contribution=%v = attenuation=%v * incomingLight=%v * (cosine=%f * misWeight=%f / scatterPDF=%f)\n", pt.config.MaxDepth-depth, contribution, scatter.Attenuation, incomingLight, cosine, misWeight, scatter.PDF)
 
 	return contribution
 }
