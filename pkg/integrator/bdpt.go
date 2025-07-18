@@ -34,6 +34,19 @@ type Vertex struct {
 	EmittedLight core.Vec3 // Light emitted from this vertex
 }
 
+// IsOnSurface returns true if this vertex is on a surface with meaningful geometry
+// Matches PBRT's Vertex::IsOnSurface() which checks if geometric normal is non-zero
+// For light vertices: only area lights (not point lights) are considered "on surface"
+// For surface vertices: check if vertex has material (surface interaction)
+func (v *Vertex) IsOnSurface() bool {
+	if v.IsLight && v.Light != nil {
+		// Light vertices: only area lights are "on surface", not point lights
+		return v.Light.Type() == core.LightTypeArea
+	}
+	// Non-light vertices: check if has material (surface interaction)
+	return v.Material != nil
+}
+
 // Path represents a sequence of vertices in a light transport path
 type Path struct {
 	Vertices []Vertex
@@ -291,8 +304,8 @@ func (v *Vertex) convertPDFDensity(next Vertex, pdfDir float64) float64 {
 
 	// Follow PBRT's ConvertDensity exactly
 	pdf := pdfDir
-	// Only multiply by cosine if next vertex is on a surface
-	if next.Material != nil { // IsOnSurface equivalent
+	// Only multiply by cosine if next vertex is on a surface (PBRT's IsOnSurface)
+	if next.IsOnSurface() {
 		cosTheta := direction.Multiply(math.Sqrt(invDist2)).Dot(next.Normal)
 		pdf *= math.Abs(cosTheta) // Use absolute value like PBRT
 	}
@@ -837,7 +850,7 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 
 	lightContribution := brdf.MultiplyVec(cameraBeta).MultiplyVec(lightVertex.Beta)
 
-	if lightVertex.Material != nil {
+	if lightVertex.IsOnSurface() {
 		lightContribution = lightContribution.Multiply(cosine)
 	}
 
