@@ -208,6 +208,7 @@ func TestCornellSpecularReflections(t *testing.T) {
 func TestCornellSpecularReflectionPaths(t *testing.T) {
 	// Create Cornell scene with mirror box and light
 	scene := createMinimalCornellScene(true)
+	camera := scene.GetCamera()
 
 	// Setup a ray that should hit the ceiling above the mirror box and reflect to the light
 	// Mirror box is at (185, 165, 351) with size (82.5, 165, 82.5)
@@ -275,6 +276,7 @@ func TestCornellSpecularReflectionPaths(t *testing.T) {
 			LogPath(t, "Camera", *cameraPath)
 
 			bdpt.Verbose = testing.Verbose()
+			camera.SetVerbose(testing.Verbose())
 
 			t.Logf("== VERBOSE bdpt.generateCameraSubpath ==")
 			random := rand.New(rand.NewSource(42 + int64(cameraPathIndex)))
@@ -282,7 +284,9 @@ func TestCornellSpecularReflectionPaths(t *testing.T) {
 
 			t.Logf("== VERBOSE bdpt.evaluatePathTracingStrategy ==")
 			bdpt.evaluatePathTracingStrategy(*cameraPath, 4)
+
 			bdpt.Verbose = false
+			camera.SetVerbose(false)
 		}
 	}
 
@@ -316,12 +320,16 @@ func TestCornellSpecularReflectionPaths(t *testing.T) {
 
 			t.Logf("== VERBOSE bdpt.generateLightSubpath ==")
 			random := rand.New(rand.NewSource(42 + int64(lightPathIndex)))
-			bdpt.Verbose = testing.Verbose()
-			bdpt.generateLightSubpath(scene, random, 3)
 
+			bdpt.Verbose = testing.Verbose()
+			camera.SetVerbose(testing.Verbose())
+
+			bdpt.generateLightSubpath(scene, random, 3)
 			splatContributionT1S3, _ := bdpt.evaluateLightTracingStrategy(*lightPath, 3, scene, rand.New(rand.NewSource(42)))
 			t.Logf("  (t=1, s=3) splat contribution: %v", splatContributionT1S3[0].Color)
+
 			bdpt.Verbose = false
+			camera.SetVerbose(false)
 		}
 	}
 
