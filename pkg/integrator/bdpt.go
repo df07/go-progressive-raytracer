@@ -317,6 +317,11 @@ func (v *Vertex) convertSolidAngleToAreaPdf(next Vertex, pdf float64) float64 {
 // calculateMISWeight implements PBRT's MIS weighting for BDPT strategies
 // This compares forward vs reverse PDFs to properly weight different path construction strategies
 func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+	disableMISWeight := false
+	if disableMISWeight {
+		return 1.0 / float64(s+t-1)
+	}
+
 	if s+t == 2 {
 		bdpt.logf(" (s=%d,t=%d) calculateMISWeight: s+t==2, weight=1.0\n", s, t)
 		return 1.0
@@ -448,28 +453,11 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		vertex := &cameraPath.Vertices[i]
 		ri *= remap0(vertex.AreaPdfReverse) / remap0(vertex.AreaPdfForward)
 
-		// Check if there's a specular vertex later in the path
-		hasSpecularAfter := false
-		for j := i + 1; j < t; j++ {
-			if cameraPath.Vertices[j].IsSpecular {
-				hasSpecularAfter = true
-				break
-			}
-		}
-
-		// HACK: Exclude connection strategies that would require connecting through specular vertices
-		// This compensates for not implementing t=1 strategies (light tracing to camera)
-		// TODO: Remove this hack once t=1 strategies are implemented
-		//
-		// The issue: MIS heavily downweights path tracing strategies expecting t=1 to be more efficient
-		// for specular reflection paths. Since we skip t=1, we need to prevent MIS from considering
-		// impossible connection strategies that would connect through specular vertices.
-		//
 		// Only add to sumRi if no specular vertex follows (meaning connection is viable)
-		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular && !hasSpecularAfter {
+		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular {
 			sumRi += ri
 		}
-		bdpt.logf(" (s=%d,t=%d) calculateMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g, hasSpecularAfter=%t\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi, hasSpecularAfter)
+		bdpt.logf(" (s=%d,t=%d) calculateMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi)
 	}
 
 	// Consider hypothetical connection strategies along the light subpath
