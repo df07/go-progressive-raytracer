@@ -701,7 +701,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 			} else if s == 1 {
 				// s=1: Direct lighting
 				// Use direct light sampling to avoid challenges with choosing a light point on the wrong side of the light
-				contribution, sampledVertex = bdpt.evaluateDirectLightingStrategy(cameraPath, s, t, scene, random)
+				contribution, sampledVertex = bdpt.evaluateDirectLightingStrategy(cameraPath, t, scene, random)
 				bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy returned contribution=%0.3g\n", s, t, contribution)
 			} else {
 				// All other cases: Connection strategies (including s=0, t<last)
@@ -744,11 +744,7 @@ func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path, t int) 
 	return contribution
 }
 
-func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, s, t int, scene core.Scene, random *rand.Rand) (core.Vec3, *Vertex) {
-	if s != 1 {
-		return core.Vec3{X: 0, Y: 0, Z: 0}, nil // Only s=1 is valid for direct lighting
-	}
-
+func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t int, scene core.Scene, random *rand.Rand) (core.Vec3, *Vertex) {
 	cameraVertex := cameraPath.Vertices[t-1]
 
 	if cameraVertex.IsSpecular || cameraVertex.Material == nil {
@@ -801,7 +797,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, s, t
 		EmittedLight:      lightSample.Emission,
 	}
 
-	bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy: brdf=%v * beta=%v * emission=%v * (cosine=%f / pdf=%f)\n", s, t, brdf, cameraVertex.Beta, lightSample.Emission, cosine, lightSample.PDF)
+	bdpt.logf(" (s=1,t=%d) evaluateDirectLightingStrategy: L=%v => brdf=%v * beta=%v * emission=%v * (cosine=%f / pdf=%f)\n", t, lightContribution, brdf, cameraVertex.Beta, lightSample.Emission, cosine, lightSample.PDF)
 
 	return lightContribution, sampledVertex
 }
