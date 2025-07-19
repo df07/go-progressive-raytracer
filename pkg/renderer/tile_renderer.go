@@ -39,11 +39,11 @@ func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]
 	}
 
 	// Step 2: Extract and apply splats affecting this tile
-	splatQueue.ExtractSplatsForTile(bounds)
-	/*for _, splat := range tileSplats {
+	tileSplats := splatQueue.ExtractSplatsForTile(bounds)
+	for _, splat := range tileSplats {
 		// Apply splat to pixel (coordinates already computed)
-		pixelStats[splat.Y][splat.X].AddSample(splat.Color)
-	}*/
+		pixelStats[splat.Y][splat.X].AddSplat(splat.Color)
+	}
 
 	// Finalize statistics
 	tr.finalizeStats(&stats)

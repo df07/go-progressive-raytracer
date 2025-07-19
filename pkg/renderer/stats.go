@@ -20,6 +20,19 @@ type PixelStats struct {
 	SampleCount      int       // Number of samples taken
 }
 
+// AddSplat adds light from bidirectional path connections without affecting sampling statistics
+// Splats represent deterministic light contributions discovered through BDPT connections,
+// not stochastic samples from the primary sampling distribution. Including them in luminance
+// statistics would corrupt variance calculations since:
+// 1. Splats arrive after samples are processed, making attribution timing unclear
+// 2. Multiple splats would be incorrectly attributed to the "last sample"
+// 3. Race conditions make sample-to-splat mapping unreliable
+// This may cause adaptive sampling to think pixels have "converged" prematurely when
+// splats contribute significant light, but this is preferable to corrupted variance stats.
+func (ps *PixelStats) AddSplat(color core.Vec3) {
+	ps.ColorAccum = ps.ColorAccum.Add(color)
+}
+
 // AddSample adds a new color sample to the pixel statistics
 func (ps *PixelStats) AddSample(color core.Vec3) {
 	ps.ColorAccum = ps.ColorAccum.Add(color)
