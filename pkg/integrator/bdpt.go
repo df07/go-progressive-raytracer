@@ -988,7 +988,6 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 
 	// PBRT formula: L = qs.beta * qs.f(pt, TransportMode::Importance) * pt.f(qs, TransportMode::Radiance) * pt.beta * G
 	// Which translates to: lightThroughput * lightBRDF * cameraBRDF * cameraThroughput * G
-	bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: cameraBRDF=%v * lightBRDF=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", s, t, cameraBRDF, lightBRDF, geometricTerm, cameraPathThroughput, lightPathThroughput)
 	contribution := lightPathThroughput.MultiplyVec(lightBRDF).MultiplyVec(cameraBRDF).MultiplyVec(cameraPathThroughput).Multiply(geometricTerm)
 	bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: L=%v => cameraBRDF=%v * lightBRDF=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", s, t, contribution, cameraBRDF, lightBRDF, geometricTerm, cameraPathThroughput, lightPathThroughput)
 
