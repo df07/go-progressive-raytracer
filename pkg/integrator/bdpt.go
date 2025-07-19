@@ -75,7 +75,7 @@ func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 	}
 }
 
-// RayColorWithSplats computes color with support for ray-based splatting
+// RayColor computes color with support for ray-based splatting
 // Returns (pixel color, splat rays)
 func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand) (core.Vec3, []core.SplatRay) {
 	// for now, both paths have the same max depth
@@ -172,14 +172,12 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 	path.Vertices = append(path.Vertices, lightVertex)
 	path.Length++
 
-	// Continue the light path by bouncing off surfaces using the common path extension logic
-	currentRay := core.NewRay(emissionSample.Point, emissionSample.Direction)
-
 	// Use the common path extension logic (maxDepth-1 because light counts as a vertex in pt)
-	// PBRT formula: beta = Le * |cos(theta)| / (lightPdf * pdfPos * pdfDir)
-	forwardThroughput := emissionSample.Emission.Multiply(math.Abs(cosTheta) / (lightSelectionPdf * emissionSample.AreaPDF * emissionSample.DirectionPDF))
-	bdpt.logf("generateLightSubpath: forwardThroughput=%v, cosTheta=%f, lightSelectionPdf=%f, AreaPDF=%f, DirectionPDF=%f\n", forwardThroughput, math.Abs(cosTheta), lightSelectionPdf, emissionSample.AreaPDF, emissionSample.DirectionPDF)
-	bdpt.extendPath(&path, currentRay, forwardThroughput, emissionSample.DirectionPDF, scene, random, maxDepth-1, false)
+	// PBRT formula: beta = Le * |cos(theta)| / (lightSelectionPdf * areaPdf * pdfDir)
+	ray := core.NewRay(emissionSample.Point, emissionSample.Direction)
+	beta := emissionSample.Emission.Multiply(math.Abs(cosTheta) / (lightSelectionPdf * emissionSample.AreaPDF * emissionSample.DirectionPDF))
+	bdpt.logf("generateLightSubpath: forwardThroughput=%v, cosTheta=%f, lightSelectionPdf=%f, AreaPDF=%f, DirectionPDF=%f\n", beta, math.Abs(cosTheta), lightSelectionPdf, emissionSample.AreaPDF, emissionSample.DirectionPDF)
+	bdpt.extendPath(&path, ray, beta, emissionSample.DirectionPDF, scene, random, maxDepth-1, false)
 
 	return path
 }
@@ -241,7 +239,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 
 		// Set forward PDF into this vertex, from the pdf of the previous vertex
 		// pbrt: prev.ConvertDensity(pdf, v)
-		vertex.AreaPdfForward = vertexPrev.convertPDFDensity(vertex, pdfFwd)
+		vertex.AreaPdfForward = vertexPrev.convertSolidAngleToAreaPdf(vertex, pdfFwd)
 
 		// Try to scatter the ray
 		scatter, didScatter := hit.Material.Scatter(currentRay, *hit, random)
@@ -278,7 +276,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 
 		// Set reverse PDF into the previous vertex, from the pdf of the current vertex
 		// pbrt: prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
-		vertexPrev.AreaPdfReverse = vertex.convertPDFDensity(vertexPrev, pdfRev)
+		vertexPrev.AreaPdfReverse = vertex.convertSolidAngleToAreaPdf(vertexPrev, pdfRev)
 
 		path.Vertices = append(path.Vertices, vertex)
 		path.Length++
@@ -288,11 +286,13 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 	}
 }
 
-// Return probability per unit area at vertex to
-func (v *Vertex) convertPDFDensity(next Vertex, pdfDir float64) float64 {
-	// For infinite area lights (background), keep solid angle PDF as-is
+// convertSolidAngleToAreaPdf converts a directional PDF to an area PDF
+// PBRT equivalent: Vertex::ConvertDensity
+// Converts from solid angle PDF (per steradian) to area PDF (per unit area)
+// Note: special case for infinite area lights (background): returns solid angle pdf
+func (v *Vertex) convertSolidAngleToAreaPdf(next Vertex, pdf float64) float64 {
 	if next.IsInfiniteLight {
-		return pdfDir
+		return pdf
 	}
 
 	direction := next.Point.Subtract(v.Point)
@@ -303,7 +303,8 @@ func (v *Vertex) convertPDFDensity(next Vertex, pdfDir float64) float64 {
 	invDist2 := 1.0 / distanceSquared
 
 	// Follow PBRT's ConvertDensity exactly
-	pdf := pdfDir
+	// Formula: area_pdf = solid_angle_pdf * distance² / |cos(theta)|
+
 	// Only multiply by cosine if next vertex is on a surface (PBRT's IsOnSurface)
 	if next.IsOnSurface() {
 		cosTheta := direction.Multiply(math.Sqrt(invDist2)).Dot(next.Normal)
@@ -548,7 +549,7 @@ func (bdpt *BDPTIntegrator) calculateVertexPdf(curr Vertex, prev *Vertex, next V
 
 	// Return probability per unit area at vertex _next_
 	// return ConvertDensity(pdf, next);
-	return curr.convertPDFDensity(next, pdf)
+	return curr.convertSolidAngleToAreaPdf(next, pdf)
 }
 
 // calculateLightPdf implements PBRT's Vertex::PdfLight
@@ -837,8 +838,15 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 		return nil, nil
 	}
 
-	// pbrt: L = qs.beta * qs.f(sampled, TransportMode::Importance) * sampled.beta;
-	// pbrt: sampled.beta = Wi / pdf
+	// PBRT formula: L = qs.beta * qs.f(sampled, TransportMode::Importance) * sampled.beta;
+	// where sampled.beta = Wi / pdf
+
+	// NOTE: PBRT uses TransportMode::Importance vs ::Radiance to handle the mathematical difference between
+	// radiance transport and importance transport in bidirectional path tracing. This matters for:
+	// 1. Non-symmetric BSDFs (especially dielectric materials with refraction)
+	// 2. Shading normals vs geometry normals
+	// Since we use symmetric materials with geometry normals, we can ignore the transport mode distinction.
+	// TODO: We do have dielectric materials with refraction - need to implement proper transport mode handling for those.
 
 	brdf := bdpt.evaluateBRDF(lightVertex, cameraSample.Ray.Direction.Multiply(-1))
 	cameraBeta := cameraSample.Weight.Multiply(1 / cameraSample.PDF)
@@ -853,6 +861,14 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	if lightVertex.IsOnSurface() {
 		lightContribution = lightContribution.Multiply(cosine)
 	}
+
+	if lightContribution.Luminance() <= 0 {
+		bdpt.logf(" Light contribution is <= 0: %v\n", lightContribution)
+		return nil, nil
+	}
+
+	// NOTE: PBRT includes a scaling factor for crop windows here (see https://github.com/mmp/pbrt-v4/issues/347)
+	// This compensates for splats from rays outside the crop window. We can ignore this because we don't implement crop windows.
 
 	// Create the sampled camera vertex for MIS weight calculation
 	// This represents the dynamically sampled camera vertex
@@ -878,7 +894,7 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 		Color: lightContribution,
 	}
 
-	bdpt.logf(" (s=%d,t=1) evaluateLightTracingStrategy: brdf=%v * cameraBeta=%v * lightVertex.Beta=%v * cosine=%f\n", s, brdf, cameraBeta, lightVertex.Beta, cosine)
+	bdpt.logf(" (s=%d,t=1) evaluateLightTracingStrategy: L=%v => brdf=%v * cameraBeta=%v * lightVertex.Beta=%v * cosine=%f\n", s, lightContribution, brdf, cameraBeta, lightVertex.Beta, cosine)
 
 	return []core.SplatRay{splatRay}, sampledCameraVertex
 }
@@ -974,6 +990,7 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	// Which translates to: lightThroughput * lightBRDF * cameraBRDF * cameraThroughput * G
 	bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: cameraBRDF=%v * lightBRDF=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", s, t, cameraBRDF, lightBRDF, geometricTerm, cameraPathThroughput, lightPathThroughput)
 	contribution := lightPathThroughput.MultiplyVec(lightBRDF).MultiplyVec(cameraBRDF).MultiplyVec(cameraPathThroughput).Multiply(geometricTerm)
+	bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: L=%v => cameraBRDF=%v * lightBRDF=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", s, t, contribution, cameraBRDF, lightBRDF, geometricTerm, cameraPathThroughput, lightPathThroughput)
 
 	return contribution
 }

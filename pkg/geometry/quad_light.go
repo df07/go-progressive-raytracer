@@ -112,6 +112,7 @@ func (ql *QuadLight) PDF(point core.Vec3, direction core.Vec3) float64 {
 }
 
 // SampleEmission implements the Light interface - samples emission from the quad surface
+// Used for BDPT light path generation
 func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
 	// Sample point uniformly on quad surface
 	alpha := random.Float64()
@@ -122,8 +123,13 @@ func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
 	emissionDir := core.RandomCosineDirection(ql.Normal, random)
 
 	// Calculate PDFs separately for BDPT
+	// areaPDF: probability per unit area on the light surface
+	// Units: [1/length²]
 	areaPDF := 1.0 / ql.Area
-	// For cosine-weighted direction sampling: PDF = cos(θ)/π
+
+	// directionPDF: probability per unit solid angle for cosine-weighted hemisphere sampling
+	// PBRT formula: PDF = cos(θ)/π
+	// Units: [1/steradian]
 	cosTheta := emissionDir.Dot(ql.Normal)
 	directionPDF := cosTheta / math.Pi
 

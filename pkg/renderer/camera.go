@@ -230,12 +230,16 @@ func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, random *rand.Rand) *c
 	ray := core.NewRay(lensPoint, direction)
 
 	// Calculate PDF for camera sampling
-	// pbrt: Float lensArea = lensRadius != 0 ? (Pi * Sqr(lensRadius)) : 1;
-	// pbrt: Float pdf = Sqr(dist) / (AbsDot(lensIntr.n, wi) * lensArea);
-	cosine := c.cameraForward.AbsDot(direction)
+	// PBRT formula: Float pdf = Sqr(dist) / (AbsDot(lensIntr.n, wi) * lensArea);
+	// Units: [length²] / ([dimensionless] * [length²]) = [dimensionless]
+	// This is a solid angle PDF - probability per unit solid angle as seen from the reference point
+	cosine := c.cameraForward.AbsDot(ray.Direction)
 	pdf := (distance * distance) / (cosine * c.lensArea)
+	c.logf("SampleCameraFromPoint: lensPoint=%v, direction=%v, distance=%f, cosine=%f, pdf=%f\n", lensPoint, direction, distance, cosine, pdf)
 
 	// Calculate camera importance weight
+	// 	importance = 1.0 / (c.imagePlaneArea * c.lensArea * cos^4
+	// 	importance / pdf = 1 / distance^2 * imagePlaneArea * cos^3
 	importance := c.EvaluateRayImportance(ray)
 	if importance.Luminance() == 0 {
 		return nil // Ray doesn't contribute
@@ -249,6 +253,7 @@ func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, random *rand.Rand) *c
 }
 
 // EvaluateRayImportance calculates the camera importance function for a ray
+// This is the We function in PBRT - represents camera sensor responsivity
 func (c *Camera) EvaluateRayImportance(ray core.Ray) core.Vec3 {
 	// Check if ray is forward-facing with respect to the camera
 	cosine := ray.Direction.Dot(c.cameraForward)
@@ -259,6 +264,7 @@ func (c *Camera) EvaluateRayImportance(ray core.Ray) core.Vec3 {
 
 	// Return importance for point on image plane
 	// PBRT formula: We = 1 / (A * lensArea * cos^4(theta))
+	// This represents the camera's sensitivity to incident radiance
 	importance := 1.0 / (c.imagePlaneArea * c.lensArea * math.Pow(cosine, 4))
 
 	return core.Vec3{X: importance, Y: importance, Z: importance}
