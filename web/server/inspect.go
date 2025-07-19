@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -124,7 +125,7 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 	ray := camera.GetRay(pixelX, pixelY, inspectRandom)
 
 	// Cast the ray and find the first intersection using scene's BVH
-	hit, isHit := sceneObj.GetBVH().Hit(ray, 0.001, 1000.0)
+	hit, isHit := sceneObj.GetBVH().Hit(ray, 0.001, math.Inf(1))
 	if !isHit {
 		return InspectResult{Hit: false}
 	}
