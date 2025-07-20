@@ -26,11 +26,11 @@ func TestBDPTT1StrategySpecularReflections(t *testing.T) {
 	bdpt.Verbose = true // Enable logging to see t=1 strategy details
 
 	// Test a single ray to examine the strategies generated
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Generate camera and light paths
-	cameraPath := bdpt.generateCameraSubpath(rayToMirror, scene, random, 3)
-	lightPath := bdpt.generateLightSubpath(scene, random, 3)
+	cameraPath := bdpt.generateCameraSubpath(rayToMirror, scene, sampler, 3)
+	lightPath := bdpt.generateLightSubpath(scene, sampler, 3)
 
 	t.Logf("=== PATH ANALYSIS ===")
 	t.Logf("Camera path length: %d", cameraPath.Length)
@@ -44,7 +44,7 @@ func TestBDPTT1StrategySpecularReflections(t *testing.T) {
 	}
 
 	// Generate all BDPT strategies
-	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, random)
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, sampler)
 
 	t.Logf("=== STRATEGY ANALYSIS ===")
 	t.Logf("Generated %d total strategies", len(strategies))
@@ -128,8 +128,8 @@ func TestBDPTT1StrategyImprovement(t *testing.T) {
 
 	count := 20
 	for i := 0; i < count; i++ {
-		random := rand.New(rand.NewSource(42 + int64(i)*492))
-		result, splats := bdpt.RayColor(rayToMirror, scene, random)
+		sampler := core.NewRandomSampler(rand.New(rand.NewSource(42 + int64(i)*492)))
+		result, splats := bdpt.RayColor(rayToMirror, scene, sampler)
 
 		bdptTotal = bdptTotal.Add(result)
 		totalSplats += len(splats)

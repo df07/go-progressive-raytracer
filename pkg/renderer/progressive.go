@@ -381,19 +381,19 @@ type Tile struct {
 	ID              int             // Unique tile identifier
 	Bounds          image.Rectangle // Pixel bounds (x0,y0,x1,y1)
 	PassesCompleted int             // Number of passes completed for this tile
-	Random          *rand.Rand      // Tile-specific random generator for deterministic results
+	Sampler         core.Sampler    // Tile-specific random generator for deterministic results
 }
 
 // NewTile creates a new tile with the specified bounds
 func NewTile(id int, bounds image.Rectangle) *Tile {
 	// Create deterministic random generator based on tile ID
-	random := rand.New(rand.NewSource(int64(id + 42))) // +42 to avoid seed 0
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(int64(id + 42)))) // +42 to avoid seed 0
 
 	return &Tile{
 		ID:              id,
 		Bounds:          bounds,
 		PassesCompleted: 0,
-		Random:          random,
+		Sampler:         sampler,
 	}
 }
 

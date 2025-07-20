@@ -54,9 +54,9 @@ func TestPointSpotLight_Sample_WithinCone(t *testing.T) {
 
 	// Test point directly below the light (should receive full intensity)
 	testPoint := core.NewVec3(0, 1, 0)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(testPoint, random)
+	sample := light.Sample(testPoint, sampler.Get2D())
 
 	// Check that sample point is the light position
 	if sample.Point.Subtract(from).Length() > 1e-6 {
@@ -97,9 +97,9 @@ func TestPointSpotLight_Sample_OutsideCone(t *testing.T) {
 
 	// Test point far to the side (should be outside cone)
 	testPoint := core.NewVec3(10, 1, 0)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(testPoint, random)
+	sample := light.Sample(testPoint, sampler.Get2D())
 
 	// Should receive minimal or no light due to being outside cone
 	emissionMagnitude := sample.Emission.Length()

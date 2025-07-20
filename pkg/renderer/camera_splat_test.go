@@ -22,12 +22,12 @@ func TestSampleCameraFromPoint(t *testing.T) {
 		FocusDistance: 1.0,
 	}
 	camera := NewCamera(config)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Test sampling from a point in front of the camera
 	refPoint := core.NewVec3(0.5, 0.3, -2.0)
 
-	sample := camera.SampleCameraFromPoint(refPoint, random)
+	sample := camera.SampleCameraFromPoint(refPoint, sampler.Get2D())
 
 	// Should return a valid sample
 	if sample == nil {
@@ -69,12 +69,12 @@ func TestSampleCameraFromPointBehindCamera(t *testing.T) {
 		FocusDistance: 1.0,
 	}
 	camera := NewCamera(config)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Test sampling from a point behind the camera
 	refPointBehind := core.NewVec3(0, 0, 1.0) // Behind camera
 
-	sample := camera.SampleCameraFromPoint(refPointBehind, random)
+	sample := camera.SampleCameraFromPoint(refPointBehind, sampler.Get2D())
 
 	// Should return nil for points behind camera
 	if sample != nil {
@@ -95,10 +95,10 @@ func TestMapRayToPixel(t *testing.T) {
 		FocusDistance: 1.0,
 	}
 	camera := NewCamera(config)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Test center ray maps to center pixel
-	centerRay := camera.GetRay(400, 225, random) // Center of 800x450 image
+	centerRay := camera.GetRay(400, 225, sampler.Get2D(), sampler.Get2D()) // Center of 800x450 image
 
 	x, y, ok := camera.MapRayToPixel(centerRay)
 	if !ok {
@@ -129,7 +129,7 @@ func TestMapRayToPixel(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ray := camera.GetRay(tc.pixelX, tc.pixelY, random)
+			ray := camera.GetRay(tc.pixelX, tc.pixelY, sampler.Get2D(), sampler.Get2D())
 			mappedX, mappedY, ok := camera.MapRayToPixel(ray)
 
 			if !ok {
@@ -274,13 +274,13 @@ func TestCameraSamplingConsistency(t *testing.T) {
 		FocusDistance: 1.0,
 	}
 	camera := NewCamera(config)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Generate a reference point on the image plane
 	refPoint := core.NewVec3(0.2, 0.1, -1.0)
 
 	// Sample camera from this point
-	sample := camera.SampleCameraFromPoint(refPoint, random)
+	sample := camera.SampleCameraFromPoint(refPoint, sampler.Get2D())
 	if sample == nil {
 		t.Fatal("Camera sampling failed")
 	}
@@ -292,7 +292,7 @@ func TestCameraSamplingConsistency(t *testing.T) {
 	}
 
 	// Generate a ray for those pixel coordinates
-	pixelRay := camera.GetRay(x, y, random)
+	pixelRay := camera.GetRay(x, y, sampler.Get2D(), sampler.Get2D())
 
 	// The pixel ray should point in approximately the same direction as our reference point
 	pixelDirection := pixelRay.Direction.Normalize()

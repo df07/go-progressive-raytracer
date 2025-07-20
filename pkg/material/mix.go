@@ -2,7 +2,6 @@ package material
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -27,12 +26,12 @@ func NewMix(material1, material2 core.Material, ratio float64) *Mix {
 }
 
 // Scatter implements the Material interface for mix material
-func (m *Mix) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (m *Mix) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	// Choose material based on ratio
-	if random.Float64() < m.Ratio {
-		return m.Material2.Scatter(rayIn, hit, random)
+	if sampler.Get1D() < m.Ratio {
+		return m.Material2.Scatter(rayIn, hit, sampler)
 	} else {
-		return m.Material1.Scatter(rayIn, hit, random)
+		return m.Material1.Scatter(rayIn, hit, sampler)
 	}
 }
 

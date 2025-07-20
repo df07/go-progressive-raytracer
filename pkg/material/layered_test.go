@@ -30,8 +30,8 @@ func TestLayeredBasicBehavior(t *testing.T) {
 		Material:  layered,
 	}
 
-	rng := rand.New(rand.NewSource(42))
-	result, scattered := layered.Scatter(ray, hit, rng)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+	result, scattered := layered.Scatter(ray, hit, sampler)
 
 	// Basic checks
 	if !scattered {
@@ -72,8 +72,8 @@ func TestLayeredOutwardScattering(t *testing.T) {
 		Material:  layered,
 	}
 
-	rng := rand.New(rand.NewSource(42))
-	result, scattered := layered.Scatter(ray, hit, rng)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+	result, scattered := layered.Scatter(ray, hit, sampler)
 
 	if !scattered {
 		t.Error("Should scatter")
@@ -119,8 +119,8 @@ func TestLayeredInwardScattering(t *testing.T) {
 	foundInwardScattering := false
 
 	for seed := int64(0); seed < 100; seed++ {
-		rng := rand.New(rand.NewSource(seed))
-		result, scattered := layered.Scatter(ray, hit, rng)
+		sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
+		result, scattered := layered.Scatter(ray, hit, sampler)
 
 		if !scattered {
 			continue

@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"math"
-	"math/rand"
 )
 
 // Vec3 represents a 3D vector
@@ -204,10 +203,10 @@ func (r Ray) At(t float64) Vec3 {
 }
 
 // RandomCosineDirection generates a cosine-weighted random direction in hemisphere around normal
-func RandomCosineDirection(normal Vec3, random *rand.Rand) Vec3 {
+func RandomCosineDirection(normal Vec3, sample Vec2) Vec3 {
 	// Generate point in unit disk using uniform random sampling
-	a := 2.0 * math.Pi * random.Float64()
-	z := random.Float64()
+	a := 2.0 * math.Pi * sample.X
+	z := sample.Y
 	r := math.Sqrt(z)
 
 	x := r * math.Cos(a)
@@ -231,14 +230,45 @@ func RandomCosineDirection(normal Vec3, random *rand.Rand) Vec3 {
 	return tangent.Multiply(x).Add(bitangent.Multiply(y)).Add(normal.Multiply(zCoord))
 }
 
-// RandomInUnitDisk generates a random point in a unit disk (for depth of field)
-func RandomInUnitDisk(random *rand.Rand) Vec3 {
-	for {
-		// Generate random point in [-1,1] x [-1,1] square
-		p := NewVec3(2*random.Float64()-1, 2*random.Float64()-1, 0)
-		// Accept if inside unit disk
-		if p.Dot(p) <= 1.0 {
-			return p
-		}
+// RandomInUnitDisk generates a random point in a unit disk using concentric mapping
+// This avoids rejection sampling by mapping a square uniformly to a disk
+func RandomInUnitDisk(sample Vec2) Vec3 {
+	// Map sample to [-1,1]² and handle degeneracy at the origin
+	uOffset := NewVec2(2*sample.X-1, 2*sample.Y-1)
+	if uOffset.X == 0 && uOffset.Y == 0 {
+		return NewVec3(0, 0, 0)
 	}
+
+	// Apply concentric mapping to point
+	var theta, r float64
+	if math.Abs(uOffset.X) > math.Abs(uOffset.Y) {
+		r = uOffset.X
+		theta = math.Pi / 4 * (uOffset.Y / uOffset.X)
+	} else {
+		r = uOffset.Y
+		theta = math.Pi/2 - math.Pi/4*(uOffset.X/uOffset.Y)
+	}
+
+	return NewVec3(r*math.Cos(theta), r*math.Sin(theta), 0)
+}
+
+// RandomInUnitSphere generates a random point inside a unit sphere using spherical coordinates
+// This avoids rejection sampling by using the inverse CDF method
+func RandomInUnitSphere(sample Vec3) Vec3 {
+	// For uniform distribution inside sphere:
+	// r = ∛(u₁) to account for volume scaling
+	// φ = 2π * u₂ (azimuthal angle)
+	// cos(θ) = 2 * u₃ - 1 (polar angle, uniform on [-1,1])
+
+	r := math.Pow(sample.X, 1.0/3.0)
+	phi := 2 * math.Pi * sample.Y
+	cosTheta := 2*sample.Z - 1
+	sinTheta := math.Sqrt(1 - cosTheta*cosTheta)
+
+	// Convert spherical to Cartesian coordinates
+	x := r * sinTheta * math.Cos(phi)
+	y := r * sinTheta * math.Sin(phi)
+	z := r * cosTheta
+
+	return NewVec3(x, y, z)
 }

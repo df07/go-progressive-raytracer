@@ -110,8 +110,8 @@ func TestTileDeterministicRandom(t *testing.T) {
 	tile2 := NewTile(42, bounds)
 
 	// They should have the same random seed and produce the same sequence
-	val1 := tile1.Random.Float64()
-	val2 := tile2.Random.Float64()
+	val1 := tile1.Sampler.Get1D()
+	val2 := tile2.Sampler.Get1D()
 
 	if val1 != val2 {
 		t.Errorf("Tiles with same ID should produce same random values: %f != %f", val1, val2)
@@ -119,7 +119,7 @@ func TestTileDeterministicRandom(t *testing.T) {
 
 	// Different tile IDs should produce different sequences
 	tile3 := NewTile(43, bounds)
-	val3 := tile3.Random.Float64()
+	val3 := tile3.Sampler.Get1D()
 
 	if val1 == val3 {
 		t.Error("Tiles with different IDs should produce different random values")

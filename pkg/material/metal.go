@@ -1,8 +1,6 @@
 package material
 
 import (
-	"math/rand"
-
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
@@ -25,13 +23,13 @@ func NewMetal(albedo core.Vec3, fuzzness float64) *Metal {
 }
 
 // Scatter implements the Material interface for metal scattering
-func (m *Metal) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (m *Metal) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	// Calculate perfect reflection direction
 	reflected := reflect(rayIn.Direction.Normalize(), hit.Normal)
 
 	// Add fuzziness by perturbing the reflection direction
 	if m.Fuzzness > 0 {
-		perturbation := randomInUnitSphere(random).Multiply(m.Fuzzness)
+		perturbation := core.RandomInUnitSphere(sampler.Get3D()).Multiply(m.Fuzzness)
 		reflected = reflected.Add(perturbation)
 	}
 
@@ -72,20 +70,4 @@ func (m *Metal) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) 
 func reflect(v, n core.Vec3) core.Vec3 {
 	// r = v - 2*dot(v,n)*n
 	return v.Subtract(n.Multiply(2 * v.Dot(n)))
-}
-
-// randomInUnitSphere generates a random point inside a unit sphere
-func randomInUnitSphere(random *rand.Rand) core.Vec3 {
-	for {
-		// Generate random point in [-1,1]³ cube
-		p := core.Vec3{
-			X: 2*random.Float64() - 1,
-			Y: 2*random.Float64() - 1,
-			Z: 2*random.Float64() - 1,
-		}
-		// Accept if inside unit sphere
-		if p.Length() <= 1.0 {
-			return p
-		}
-	}
 }

@@ -2,7 +2,6 @@ package geometry
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -16,7 +15,7 @@ type discSpotLightMaterial struct {
 }
 
 // Scatter implements the Material interface (spot lights don't scatter, only emit)
-func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	return core.ScatterResult{}, false // No scattering, only emission
 }
 
@@ -105,9 +104,9 @@ func (dsl *DiscSpotLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the disc for direct lighting
-func (dsl *DiscSpotLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
+func (dsl *DiscSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
 	// Sample the underlying disc light
-	sample := dsl.discLight.Sample(point, random)
+	lightSample := dsl.discLight.Sample(point, sample)
 
 	// Apply spot light directional falloff
 	// Calculate direction from light position to shading point
@@ -116,9 +115,9 @@ func (dsl *DiscSpotLight) Sample(point core.Vec3, random *rand.Rand) core.LightS
 	spotAttenuation := dsl.falloff(cosAngle)
 
 	// Modify the emission with spot light falloff
-	sample.Emission = sample.Emission.Multiply(spotAttenuation)
+	lightSample.Emission = lightSample.Emission.Multiply(spotAttenuation)
 
-	return sample
+	return lightSample
 }
 
 // PDF implements the Light interface - returns the probability density for sampling a given direction
@@ -184,44 +183,31 @@ func (dsl *DiscSpotLight) GetDisc() *Disc {
 }
 
 // SampleEmission implements the Light interface - samples emission from the disc spot light surface
-func (dsl *DiscSpotLight) SampleEmission(random *rand.Rand) core.EmissionSample {
-	// Sample the underlying disc light for surface point
-	discSample := dsl.discLight.SampleEmission(random)
+func (dsl *DiscSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+	// Sample a point on the disc
+	point, normal := dsl.discLight.Disc.SampleUniform(samplePoint)
 
-	// For spot lights, we need to modify the emission direction sampling
-	// Instead of cosine-weighted hemisphere, we sample within the spot cone
+	// Sample emission within the cone
+	emissionDir := core.SampleUniformCone(dsl.direction, dsl.cosTotalWidth, sampleDirection)
 
-	// Check if the cosine-weighted sample is within the spot cone
-	cosAngleToSpot := discSample.Direction.Dot(dsl.direction)
+	// Calculate spot light falloff
+	cosTheta := emissionDir.Dot(dsl.direction)
+	spotAttenuation := dsl.falloff(cosTheta)
 
-	if cosAngleToSpot >= dsl.cosTotalWidth {
-		// Sample is within spot cone, apply spot light falloff to emission
-		spotAttenuation := dsl.falloff(cosAngleToSpot)
-		discSample.Emission = discSample.Emission.Multiply(spotAttenuation)
-		return discSample
-	} else {
-		// Sample is outside spot cone, sample within the cone using shared function
-		emissionDir := core.SampleUniformCone(dsl.direction, dsl.cosTotalWidth, random)
+	// Calculate PDF for cone sampling
+	conePDF := core.UniformConePDF(dsl.cosTotalWidth)
+	areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
 
-		// Calculate spot light falloff
-		cosTheta := emissionDir.Dot(dsl.direction)
-		spotAttenuation := dsl.falloff(cosTheta)
+	// Apply spot attenuation to emission
+	emission := dsl.emission.Multiply(spotAttenuation)
 
-		// Calculate PDF for cone sampling
-		conePDF := core.UniformConePDF(dsl.cosTotalWidth)
-		areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
-
-		// Apply spot attenuation to emission
-		emission := discSample.Emission.Multiply(spotAttenuation)
-
-		return core.EmissionSample{
-			Point:        discSample.Point,
-			Normal:       discSample.Normal,
-			Direction:    emissionDir,
-			Emission:     emission,
-			AreaPDF:      areaPDF,
-			DirectionPDF: conePDF, // Extract direction component
-		}
+	return core.EmissionSample{
+		Point:        point,
+		Normal:       normal,
+		Direction:    emissionDir,
+		Emission:     emission,
+		AreaPDF:      areaPDF,
+		DirectionPDF: conePDF, // Extract direction component
 	}
 }
 

@@ -16,7 +16,7 @@ func (ml *MockLight) Type() LightType {
 	return LightTypeArea
 }
 
-func (ml *MockLight) Sample(point Vec3, random *rand.Rand) LightSample {
+func (ml *MockLight) Sample(point Vec3, sample Vec2) LightSample {
 	return LightSample{
 		Point:     Vec3{X: 0, Y: 1, Z: 0},
 		Normal:    Vec3{X: 0, Y: -1, Z: 0},
@@ -31,7 +31,7 @@ func (ml *MockLight) PDF(point Vec3, direction Vec3) float64 {
 	return ml.pdf
 }
 
-func (ml *MockLight) SampleEmission(random *rand.Rand) EmissionSample {
+func (ml *MockLight) SampleEmission(samplePoint Vec2, sampleDirection Vec2) EmissionSample {
 	return EmissionSample{
 		Point:        Vec3{X: 0, Y: 1, Z: 0},
 		Normal:       Vec3{X: 0, Y: -1, Z: 0},
@@ -49,7 +49,7 @@ func (ml *MockLight) EmissionPDF(point Vec3, direction Vec3) float64 {
 func TestSampleLightEmission(t *testing.T) {
 	// Test with no lights
 	var emptyLights []Light
-	_, found := SampleLightEmission(emptyLights, rand.New(rand.NewSource(42)))
+	_, found := SampleLightEmission(emptyLights, NewRandomSampler(rand.New(rand.NewSource(42))))
 	if found {
 		t.Error("Expected no sample from empty light list")
 	}
@@ -60,7 +60,7 @@ func TestSampleLightEmission(t *testing.T) {
 	lights := []Light{mockLight}
 
 	random := rand.New(rand.NewSource(42))
-	sample, found := SampleLightEmission(lights, random)
+	sample, found := SampleLightEmission(lights, NewRandomSampler(random))
 
 	if !found {
 		t.Error("Expected to find sample from single light")
@@ -80,7 +80,7 @@ func TestSampleLightEmission(t *testing.T) {
 	mockLight2 := &MockLight{emission: NewVec3(3.0, 3.0, 3.0), pdf: 0.8}
 	multiLights := []Light{mockLight, mockLight2}
 
-	sample2, found2 := SampleLightEmission(multiLights, random)
+	sample2, found2 := SampleLightEmission(multiLights, NewRandomSampler(random))
 	if !found2 {
 		t.Error("Expected to find sample from multiple lights")
 	}

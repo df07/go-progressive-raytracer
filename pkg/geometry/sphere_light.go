@@ -2,7 +2,6 @@ package geometry
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -24,26 +23,26 @@ func (sl *SphereLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the sphere for direct lighting
-func (sl *SphereLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
+func (sl *SphereLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
 	// Vector from shading point to sphere center
 	toCenter := sl.Center.Subtract(point)
 	distanceToCenter := toCenter.Length()
 
 	// If point is inside the sphere, sample uniformly on the sphere
 	if distanceToCenter <= sl.Radius {
-		return sl.sampleUniform(point, random)
+		return sl.sampleUniform(point, sample)
 	}
 
 	// Sample the sphere as seen from the shading point (visible hemisphere)
-	return sl.sampleVisible(point, random)
+	return sl.sampleVisible(point, sample)
 }
 
 // sampleUniform samples uniformly on the entire sphere surface
-func (sl *SphereLight) sampleUniform(point core.Vec3, random *rand.Rand) core.LightSample {
+func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) core.LightSample {
 	// Generate uniform direction on unit sphere
-	z := 1.0 - 2.0*random.Float64() // z ∈ [-1, 1]
+	z := 1.0 - 2.0*sample.X // z ∈ [-1, 1]
 	r := math.Sqrt(math.Max(0, 1.0-z*z))
-	phi := 2.0 * math.Pi * random.Float64()
+	phi := 2.0 * math.Pi * sample.Y
 	x := r * math.Cos(phi)
 	y := r * math.Sin(phi)
 
@@ -86,7 +85,7 @@ func (sl *SphereLight) sampleUniform(point core.Vec3, random *rand.Rand) core.Li
 }
 
 // sampleVisible samples only the visible hemisphere of the sphere as seen from the shading point
-func (sl *SphereLight) sampleVisible(point core.Vec3, random *rand.Rand) core.LightSample {
+func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) core.LightSample {
 	// Vector from shading point to sphere center
 	toCenter := sl.Center.Subtract(point)
 	distanceToCenter := toCenter.Length()
@@ -111,9 +110,9 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, random *rand.Rand) core.Li
 	cosThetaMax := math.Sqrt(math.Max(0, 1.0-sinThetaMax*sinThetaMax))
 
 	// Sample direction within the cone toward the sphere
-	cosTheta := 1.0 - random.Float64()*(1.0-cosThetaMax)
+	cosTheta := 1.0 - sample.X*(1.0-cosThetaMax)
 	sinTheta := math.Sqrt(math.Max(0, 1.0-cosTheta*cosTheta))
-	phi := 2.0 * math.Pi * random.Float64()
+	phi := 2.0 * math.Pi * sample.Y
 
 	// Convert to Cartesian coordinates in local space
 	x := sinTheta * math.Cos(phi)
@@ -128,7 +127,7 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, random *rand.Rand) core.Li
 	hitRecord, hit := sl.Sphere.Hit(ray, 0.001, math.Inf(1))
 	if !hit {
 		// This shouldn't happen if our math is correct, but handle it gracefully
-		return sl.sampleUniform(point, random)
+		return sl.sampleUniform(point, sample)
 	}
 
 	// Calculate PDF for cone sampling
@@ -184,21 +183,21 @@ func (sl *SphereLight) PDF(point core.Vec3, direction core.Vec3) float64 {
 }
 
 // SampleEmission implements the Light interface - samples emission from the sphere surface
-func (sl *SphereLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+func (sl *SphereLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
 	// Sample point uniformly on ENTIRE sphere surface
-	z := 1.0 - 2.0*random.Float64() // z ∈ [-1, 1]
+	z := 1.0 - 2.0*samplePoint.X // z ∈ [-1, 1]
 	r := math.Sqrt(math.Max(0, 1.0-z*z))
-	phi := 2.0 * math.Pi * random.Float64()
+	phi := 2.0 * math.Pi * samplePoint.Y
 	x := r * math.Cos(phi)
 	y := r * math.Sin(phi)
 
 	localDir := core.NewVec3(x, y, z)
-	samplePoint := sl.Center.Add(localDir.Multiply(sl.Radius))
+	point := sl.Center.Add(localDir.Multiply(sl.Radius))
 	normal := localDir // Surface normal points outward
 
 	// Use shared emission sampling function
 	areaPDF := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
-	return core.SampleEmissionDirection(samplePoint, normal, areaPDF, sl.Material, random)
+	return core.SampleEmissionDirection(point, normal, areaPDF, sl.Material, sampleDirection)
 }
 
 // EmissionPDF implements the Light interface - calculates PDF for emission sampling

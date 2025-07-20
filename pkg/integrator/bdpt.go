@@ -3,7 +3,6 @@ package integrator
 import (
 	"fmt"
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -77,19 +76,19 @@ func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 
 // RayColor computes color with support for ray-based splatting
 // Returns (pixel color, splat rays)
-func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *rand.Rand) (core.Vec3, []core.SplatRay) {
+func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
 	// for now, both paths have the same max depth
 	cameraMaxDepth := bdpt.config.MaxDepth
 	lightMaxDepth := bdpt.config.MaxDepth
 
 	// Generate camera path with vertices
-	cameraPath := bdpt.generateCameraSubpath(ray, scene, random, cameraMaxDepth)
+	cameraPath := bdpt.generateCameraSubpath(ray, scene, sampler, cameraMaxDepth)
 
 	// Generate a light path
-	lightPath := bdpt.generateLightSubpath(scene, random, lightMaxDepth)
+	lightPath := bdpt.generateLightSubpath(scene, sampler, lightMaxDepth)
 
 	// Evaluate all BDPT strategies with proper MIS weighting
-	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, random)
+	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, sampler)
 
 	// evaluateBDPTStrategies now returns both color and splats
 	return bdpt.evaluateBDPTStrategies(strategies)
@@ -97,7 +96,7 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, random *ran
 
 // generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
 // Each vertex stores forward/reverse PDFs needed for MIS weight calculation
-func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene, random *rand.Rand, maxDepth int) Path {
+func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene, sampler core.Sampler, maxDepth int) Path {
 	path := Path{
 		Vertices: make([]Vertex, 0, maxDepth),
 		Length:   0,
@@ -130,14 +129,14 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 	// Continue the camera path by tracing the ray through the scene
 	beta := core.Vec3{X: 1, Y: 1, Z: 1}
 	bdpt.logf("generateCameraSubpath: ray=%v, beta=%v, directionPDF=%0.6g\n", ray, beta, directionPDF)
-	bdpt.extendPath(&path, ray, beta, directionPDF, scene, random, maxDepth, true) // Pass maxDepth through because camera doesn't count as a vertex
+	bdpt.extendPath(&path, ray, beta, directionPDF, scene, sampler, maxDepth, true) // Pass maxDepth through because camera doesn't count as a vertex
 
 	return path
 }
 
 // generateLightSubpath generates a light subpath with proper PDF tracking for BDPT
 // Starting from light emission, each vertex stores forward/reverse PDFs for MIS
-func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.Rand, maxDepth int) Path {
+func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, sampler core.Sampler, maxDepth int) Path {
 	path := Path{
 		Vertices: make([]Vertex, 0, maxDepth),
 		Length:   0,
@@ -149,8 +148,8 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 		return path
 	}
 
-	sampledLight := lights[random.Intn(len(lights))]
-	emissionSample := sampledLight.SampleEmission(random)
+	sampledLight := lights[int(sampler.Get1D()*float64(len(lights)))]
+	emissionSample := sampledLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
 	lightSelectionPdf := 1.0 / float64(len(lights))
 	cosTheta := emissionSample.Direction.Dot(emissionSample.Normal)
 
@@ -177,14 +176,14 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, random *rand.
 	ray := core.NewRay(emissionSample.Point, emissionSample.Direction)
 	beta := emissionSample.Emission.Multiply(math.Abs(cosTheta) / (lightSelectionPdf * emissionSample.AreaPDF * emissionSample.DirectionPDF))
 	bdpt.logf("generateLightSubpath: forwardThroughput=%v, cosTheta=%f, lightSelectionPdf=%f, AreaPDF=%f, DirectionPDF=%f\n", beta, math.Abs(cosTheta), lightSelectionPdf, emissionSample.AreaPDF, emissionSample.DirectionPDF)
-	bdpt.extendPath(&path, ray, beta, emissionSample.DirectionPDF, scene, random, maxDepth-1, false)
+	bdpt.extendPath(&path, ray, beta, emissionSample.DirectionPDF, scene, sampler, maxDepth-1, false)
 
 	return path
 }
 
 // extendPath extends a path by tracing a ray through the scene, handling intersections and scattering
 // This is the common logic shared between camera and light path generation after the initial vertex
-func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta core.Vec3, pdfFwd float64, scene core.Scene, random *rand.Rand, maxBounces int, isCameraPath bool) {
+func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta core.Vec3, pdfFwd float64, scene core.Scene, sampler core.Sampler, maxBounces int, isCameraPath bool) {
 	for bounces := 0; bounces < maxBounces; bounces++ {
 		vertexPrev := path.Vertices[path.Length-1]
 
@@ -242,7 +241,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		vertex.AreaPdfForward = vertexPrev.convertSolidAngleToAreaPdf(vertex, pdfFwd)
 
 		// Try to scatter the ray
-		scatter, didScatter := hit.Material.Scatter(currentRay, *hit, random)
+		scatter, didScatter := hit.Material.Scatter(currentRay, *hit, sampler)
 		if !didScatter {
 			// Material absorbed the ray - add vertex and terminate path
 			path.Vertices = append(path.Vertices, vertex)
@@ -662,7 +661,7 @@ func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(strategies []bdptStrategy) (c
 }
 
 // generateBDPTStrategies generates all valid BDPT strategies for the given camera and light paths
-func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene, random *rand.Rand) []bdptStrategy {
+func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene, sampler core.Sampler) []bdptStrategy {
 	strategies := make([]bdptStrategy, 0)
 
 	for s := 0; s <= lightPath.Length; s++ {
@@ -682,18 +681,19 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 				}
 			} else if t == 1 {
 				// t=1: Light path direct to camera (light tracing)
-				splatRays, sampledVertex = bdpt.evaluateLightTracingStrategy(lightPath, s, scene, random)
+				splatRays, sampledVertex = bdpt.evaluateLightTracingStrategy(lightPath, s, scene, sampler)
 				if len(splatRays) > 0 {
 					bdpt.logf(" (s=%d,t=%d) evaluateLightTracingStrategy returned splat contribution=%v\n", s, t, splatRays[0].Color)
 				}
 			} else if s == 1 {
 				// s=1: Direct lighting
 				// Use direct light sampling to avoid challenges with choosing a light point on the wrong side of the light
-				contribution, sampledVertex = bdpt.evaluateDirectLightingStrategy(cameraPath, t, scene, random)
+				contribution, sampledVertex = bdpt.evaluateDirectLightingStrategy(cameraPath, t, scene, sampler)
 				bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy returned contribution=%0.3g\n", s, t, contribution)
 			} else {
 				// All other cases: Connection strategies (including s=0, t<last)
 				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
+				bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy returned contribution=%0.3g\n", s, t, contribution)
 			}
 
 			if contribution.Luminance() > 0 || len(splatRays) > 0 {
@@ -732,7 +732,7 @@ func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path, t int) 
 	return contribution
 }
 
-func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t int, scene core.Scene, random *rand.Rand) (core.Vec3, *Vertex) {
+func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t int, scene core.Scene, sampler core.Sampler) (core.Vec3, *Vertex) {
 	cameraVertex := cameraPath.Vertices[t-1]
 
 	if cameraVertex.IsSpecular || cameraVertex.Material == nil {
@@ -740,7 +740,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	}
 
 	lights := scene.GetLights()
-	lightSample, sampledLight, hasLight := core.SampleLight(lights, cameraVertex.Point, random)
+	lightSample, sampledLight, hasLight := core.SampleLight(lights, cameraVertex.Point, sampler)
 	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
@@ -792,7 +792,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 // evaluateLightTracingStrategy evaluates light tracing (light path hits camera)
 // Returns (direct contribution, splat rays, sampled camera vertex)
-func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, scene core.Scene, random *rand.Rand) ([]core.SplatRay, *Vertex) {
+func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, scene core.Scene, sampler core.Sampler) ([]core.SplatRay, *Vertex) {
 	if s <= 1 || s > lightPath.Length {
 		return nil, nil
 	}
@@ -807,7 +807,7 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 
 	// Sample the camera from this light vertex
 	camera := scene.GetCamera()
-	cameraSample := camera.SampleCameraFromPoint(lightVertex.Point, random)
+	cameraSample := camera.SampleCameraFromPoint(lightVertex.Point, sampler.Get2D())
 	if cameraSample == nil {
 		return nil, nil
 	}

@@ -21,9 +21,9 @@ func TestSphereLight_Sample_UniformSampling(t *testing.T) {
 
 	// Point inside the sphere should use uniform sampling
 	insidePoint := core.NewVec3(0.5, 0, 0)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(insidePoint, random)
+	sample := light.Sample(insidePoint, sampler.Get2D())
 
 	// Verify sample is on the sphere surface
 	distanceToCenter := sample.Point.Subtract(center).Length()
@@ -55,9 +55,9 @@ func TestSphereLight_Sample_ConeSampling(t *testing.T) {
 
 	// Point outside the sphere should use cone sampling
 	outsidePoint := core.NewVec3(5, 0, 0)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(outsidePoint, random)
+	sample := light.Sample(outsidePoint, sampler.Get2D())
 
 	// Verify sample is on the sphere surface
 	distanceToCenter := sample.Point.Subtract(center).Length()
@@ -155,13 +155,13 @@ func TestSphereLight_Sample_MultipleDirections(t *testing.T) {
 	light := NewSphereLight(center, radius, emissiveMat)
 
 	outsidePoint := core.NewVec3(5, 0, 0)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Generate multiple samples
 	numSamples := 100
 	samples := make([]core.LightSample, numSamples)
 	for i := 0; i < numSamples; i++ {
-		samples[i] = light.Sample(outsidePoint, random)
+		samples[i] = light.Sample(outsidePoint, sampler.Get2D())
 	}
 
 	// Verify all samples are valid
@@ -194,9 +194,9 @@ func TestSphereLight_EdgeCase_ZeroRadius(t *testing.T) {
 	light := NewSphereLight(center, radius, emissiveMat)
 
 	outsidePoint := core.NewVec3(1, 0, 0)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(outsidePoint, random)
+	sample := light.Sample(outsidePoint, sampler.Get2D())
 
 	// Should still produce valid sample
 	if sample.PDF <= 0 {
@@ -214,8 +214,8 @@ func TestSphereLight_SampleEmission(t *testing.T) {
 	radius := 1.0
 	light := NewSphereLight(center, radius, emissiveMat)
 
-	random := rand.New(rand.NewSource(42))
-	sample := light.SampleEmission(random)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+	sample := light.SampleEmission(sampler.Get2D(), sampler.Get2D())
 
 	// Verify sample point is on sphere surface
 	distanceToCenter := sample.Point.Subtract(center).Length()
@@ -344,14 +344,14 @@ func TestSphereLight_EmissionSampling_Coverage(t *testing.T) {
 	radius := 1.0
 	light := NewSphereLight(center, radius, emissiveMat)
 
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 	numSamples := 1000
 
 	// Track coverage in different octants
 	octantCounts := make(map[string]int)
 
 	for i := 0; i < numSamples; i++ {
-		sample := light.SampleEmission(random)
+		sample := light.SampleEmission(sampler.Get2D(), sampler.Get2D())
 
 		// Classify by octant
 		x := sample.Point.X

@@ -123,11 +123,11 @@ func TestDiscSampleUniform(t *testing.T) {
 	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
 	disc := NewDisc(center, normal, radius, mat)
 
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 	numSamples := 1000
 
 	for i := 0; i < numSamples; i++ {
-		point, sampleNormal := disc.SampleUniform(random)
+		point, sampleNormal := disc.SampleUniform(sampler.Get2D())
 
 		// Check that sampled point is within disc radius
 		distance := point.Subtract(center).Length()

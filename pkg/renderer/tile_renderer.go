@@ -3,7 +3,6 @@ package renderer
 import (
 	"image"
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -23,7 +22,7 @@ func NewTileRenderer(scene core.Scene, integratorInst core.Integrator) *TileRend
 }
 
 // RenderTileBounds renders pixels within the specified bounds using the integrator
-func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]PixelStats, splatQueue *SplatQueue, random *rand.Rand, targetSamples int) RenderStats {
+func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]PixelStats, splatQueue *SplatQueue, sampler core.Sampler, targetSamples int) RenderStats {
 	camera := tr.scene.GetCamera()
 	samplingConfig := tr.scene.GetSamplingConfig()
 
@@ -33,7 +32,7 @@ func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]
 	// Step 1: Regular tile processing with splat generation
 	for j := bounds.Min.Y; j < bounds.Max.Y; j++ {
 		for i := bounds.Min.X; i < bounds.Max.X; i++ {
-			samplesUsed := tr.adaptiveSamplePixelWithSplats(camera, i, j, &pixelStats[j][i], splatQueue, random, targetSamples, samplingConfig)
+			samplesUsed := tr.adaptiveSamplePixelWithSplats(camera, i, j, &pixelStats[j][i], splatQueue, sampler, targetSamples, samplingConfig)
 			tr.updateStats(&stats, samplesUsed)
 		}
 	}
@@ -51,15 +50,15 @@ func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]
 }
 
 // adaptiveSamplePixelWithSplats uses adaptive sampling with the integrator and handles splat contributions
-func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera core.Camera, i, j int, ps *PixelStats, splatQueue *SplatQueue, random *rand.Rand, maxSamples int, samplingConfig core.SamplingConfig) int {
+func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera core.Camera, i, j int, ps *PixelStats, splatQueue *SplatQueue, sampler core.Sampler, maxSamples int, samplingConfig core.SamplingConfig) int {
 	initialSampleCount := ps.SampleCount
 
 	// Take samples until we reach convergence or max samples
 	for ps.SampleCount < maxSamples && !tr.shouldStopSampling(ps, maxSamples, samplingConfig) {
-		ray := camera.GetRay(i, j, random)
+		ray := camera.GetRay(i, j, sampler.Get2D(), sampler.Get2D())
 
 		// Use enhanced integrator with splat support
-		pixelColor, splatRays := tr.integrator.RayColor(ray, tr.scene, random)
+		pixelColor, splatRays := tr.integrator.RayColor(ray, tr.scene, sampler)
 
 		// Add regular contribution
 		ps.AddSample(pixelColor)

@@ -121,8 +121,8 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 
 	// Create a deterministic random generator for ray generation
 	// This ensures we get a consistent ray through the pixel center
-	inspectRandom := rand.New(rand.NewSource(0))
-	ray := camera.GetRay(pixelX, pixelY, inspectRandom)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(0)))
+	ray := camera.GetRay(pixelX, pixelY, sampler.Get2D(), sampler.Get2D())
 
 	// Cast the ray and find the first intersection using scene's BVH
 	hit, isHit := sceneObj.GetBVH().Hit(ray, 0.001, math.Inf(1))

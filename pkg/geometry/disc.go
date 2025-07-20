@@ -2,7 +2,6 @@ package geometry
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -109,10 +108,10 @@ func (d *Disc) BoundingBox() core.AABB {
 }
 
 // SampleUniform samples a random point uniformly on the disc surface
-func (d *Disc) SampleUniform(random *rand.Rand) (core.Vec3, core.Vec3) {
+func (d *Disc) SampleUniform(sample core.Vec2) (core.Vec3, core.Vec3) {
 	// Sample uniformly on unit disc using polar coordinates
-	r := math.Sqrt(random.Float64()) * d.Radius
-	theta := 2.0 * math.Pi * random.Float64()
+	r := math.Sqrt(sample.X) * d.Radius
+	theta := 2.0 * math.Pi * sample.Y
 
 	// Convert to Cartesian coordinates in disc space
 	x := r * math.Cos(theta)

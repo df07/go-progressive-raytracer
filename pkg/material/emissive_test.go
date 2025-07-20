@@ -41,9 +41,9 @@ func TestEmissive_Scatter(t *testing.T) {
 				Normal: core.NewVec3(-1, 0, 0),
 				T:      1.0,
 			}
-			random := rand.New(rand.NewSource(42))
+			sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-			_, scattered := emissive.Scatter(ray, hit, random)
+			_, scattered := emissive.Scatter(ray, hit, sampler)
 			if scattered {
 				t.Error("Emissive material should not scatter rays")
 			}

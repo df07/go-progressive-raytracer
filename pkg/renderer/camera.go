@@ -3,7 +3,6 @@ package renderer
 import (
 	"fmt"
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -164,9 +163,9 @@ func NewCamera(config CameraConfig) *Camera {
 }
 
 // GetRay generates a ray for pixel coordinates (i, j) with sub-pixel sampling using the provided random generator
-func (c *Camera) GetRay(i, j int, random *rand.Rand) core.Ray {
+func (c *Camera) GetRay(i, j int, samplePoint core.Vec2, sampleJitter core.Vec2) core.Ray {
 	// Add random offset for anti-aliasing
-	jitter := core.NewVec3(random.Float64()-0.5, random.Float64()-0.5, 0)
+	jitter := core.NewVec3(sampleJitter.X-0.5, sampleJitter.Y-0.5, 0)
 	pixelSample := c.pixel00Loc.
 		Add(c.pixelDeltaU.Multiply(float64(i) + jitter.X)).
 		Add(c.pixelDeltaV.Multiply(float64(j) + jitter.Y))
@@ -174,7 +173,7 @@ func (c *Camera) GetRay(i, j int, random *rand.Rand) core.Ray {
 	// Determine ray origin (with defocus blur if enabled)
 	rayOrigin := c.center
 	if c.defocusDiskU.Length() > 0 {
-		p := core.RandomInUnitDisk(random)
+		p := core.RandomInUnitDisk(samplePoint)
 		offset := c.defocusDiskU.Multiply(p.X).Add(c.defocusDiskV.Multiply(p.Y))
 		rayOrigin = c.center.Add(offset)
 	}
@@ -217,9 +216,9 @@ func (c *Camera) GetCameraForward() core.Vec3 {
 // SampleCameraFromPoint samples the camera from a reference point for t=1 strategies
 // Camera handles lens sampling internally, returns complete sample
 // Equivalent to pbrt PerspectiveCamera::SampleWi
-func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, random *rand.Rand) *core.CameraSample {
+func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *core.CameraSample {
 	// Sample lens coordinates using concentric disk sampling
-	lensCoords := core.RandomInUnitDisk(random).Multiply(c.lensRadius)
+	lensCoords := core.RandomInUnitDisk(sample).Multiply(c.lensRadius)
 
 	// Transform lens point to world space using stored camera basis vectors
 	lensPoint := c.center.Add(c.u.Multiply(lensCoords.X)).Add(c.v.Multiply(lensCoords.Y))

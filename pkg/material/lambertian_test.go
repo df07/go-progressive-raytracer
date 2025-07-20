@@ -11,7 +11,7 @@ import (
 func TestLambertian_PDFCalculation(t *testing.T) {
 	albedo := core.NewVec3(0.8, 0.8, 0.8)
 	lambertian := NewLambertian(albedo)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Normal pointing up (z-axis)
 	normal := core.NewVec3(0, 0, 1)
@@ -23,7 +23,7 @@ func TestLambertian_PDFCalculation(t *testing.T) {
 
 	// Test that PDF calculation matches expected formula
 	for i := 0; i < 100; i++ {
-		scatter, didScatter := lambertian.Scatter(ray, hit, random)
+		scatter, didScatter := lambertian.Scatter(ray, hit, sampler)
 		if !didScatter {
 			t.Fatal("Lambertian should always scatter")
 		}
@@ -42,7 +42,7 @@ func TestLambertian_PDFCalculation(t *testing.T) {
 func TestLambertian_EnergyConservation(t *testing.T) {
 	albedo := core.NewVec3(0.5, 0.7, 0.9)
 	lambertian := NewLambertian(albedo)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	hit := core.HitRecord{
 		Point:  core.NewVec3(0, 0, 0),
@@ -50,7 +50,7 @@ func TestLambertian_EnergyConservation(t *testing.T) {
 	}
 	ray := core.NewRay(core.NewVec3(0, 0, 1), core.NewVec3(0, 0, -1))
 
-	scatter, didScatter := lambertian.Scatter(ray, hit, random)
+	scatter, didScatter := lambertian.Scatter(ray, hit, sampler)
 	if !didScatter {
 		t.Fatal("Lambertian should always scatter")
 	}

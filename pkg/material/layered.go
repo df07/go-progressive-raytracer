@@ -1,8 +1,6 @@
 package material
 
 import (
-	"math/rand"
-
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
@@ -23,12 +21,12 @@ func NewLayered(outer, inner core.Material) *Layered {
 }
 
 // Scatter implements the Material interface for layered scattering
-func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	// Step 1: Ray hits the outer material first
 	outerHit := hit
 	outerHit.Material = l.Outer
 
-	outerResult, outerScatters := l.Outer.Scatter(rayIn, outerHit, random)
+	outerResult, outerScatters := l.Outer.Scatter(rayIn, outerHit, sampler)
 
 	// If outer material doesn't scatter, no interaction occurs
 	if !outerScatters {
@@ -55,7 +53,7 @@ func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand)
 	innerHit := hit
 	innerHit.Material = l.Inner
 
-	innerResult, innerScatters := l.Inner.Scatter(innerRay, innerHit, random)
+	innerResult, innerScatters := l.Inner.Scatter(innerRay, innerHit, sampler)
 
 	if !innerScatters {
 		// Inner material absorbs - return outer result only

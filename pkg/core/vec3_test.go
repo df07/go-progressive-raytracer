@@ -7,7 +7,7 @@ import (
 )
 
 func TestRandomCosineDirection(t *testing.T) {
-	random := rand.New(rand.NewSource(42))
+	sampler := NewRandomSampler(rand.New(rand.NewSource(42)))
 	normal := NewVec3(0, 0, 1) // Z-up normal
 
 	// Test statistical properties over many samples
@@ -16,7 +16,7 @@ func TestRandomCosineDirection(t *testing.T) {
 	belowHemisphere := 0
 
 	for i := 0; i < numSamples; i++ {
-		dir := RandomCosineDirection(normal, random)
+		dir := RandomCosineDirection(normal, sampler.Get2D())
 
 		// All directions should be unit vectors
 		length := dir.Length()
@@ -49,7 +49,7 @@ func TestRandomCosineDirection(t *testing.T) {
 }
 
 func TestRandomCosineDirection_OrthonormalBasis(t *testing.T) {
-	random := rand.New(rand.NewSource(42))
+	sampler := NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Test with different normals to verify basis creation
 	testNormals := []Vec3{
@@ -62,7 +62,7 @@ func TestRandomCosineDirection_OrthonormalBasis(t *testing.T) {
 	for _, normal := range testNormals {
 		// Generate multiple samples to test basis consistency
 		for i := 0; i < 100; i++ {
-			dir := RandomCosineDirection(normal, random)
+			dir := RandomCosineDirection(normal, sampler.Get2D())
 
 			// Direction should be unit length
 			if math.Abs(dir.Length()-1.0) > 1e-3 {

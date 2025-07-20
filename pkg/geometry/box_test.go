@@ -2,7 +2,6 @@ package geometry
 
 import (
 	"math"
-	"math/rand"
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -11,7 +10,7 @@ import (
 // DummyMaterial for testing (same as in quad_test.go)
 type DummyBoxMaterial struct{}
 
-func (d DummyBoxMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (d DummyBoxMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	return core.ScatterResult{}, false
 }
 

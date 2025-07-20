@@ -166,16 +166,16 @@ func TestCameraCalculateRayPDFs_ConsistencyWithGeneration(t *testing.T) {
 	}
 	camera := NewCamera(config)
 
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Generate several rays and check their PDFs
 	numSamples := 10
 	for i := 0; i < numSamples; i++ {
 		// Generate a ray from a random pixel
-		pixelI := random.Intn(config.Width)
-		pixelJ := random.Intn(config.Width) // Square image
+		pixelI := int(sampler.Get1D() * float64(config.Width))
+		pixelJ := int(sampler.Get1D() * float64(config.Width)) // Square image
 
-		ray := camera.GetRay(pixelI, pixelJ, random)
+		ray := camera.GetRay(pixelI, pixelJ, sampler.Get2D(), sampler.Get2D())
 		areaPDF, directionPDF := camera.CalculateRayPDFs(ray)
 
 		// Check that PDFs are positive for forward-facing rays

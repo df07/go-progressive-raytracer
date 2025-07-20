@@ -20,9 +20,9 @@ func TestDiscLightSample(t *testing.T) {
 
 	// Test point below the light
 	testPoint := core.NewVec3(0, 0, 0)
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := discLight.Sample(testPoint, random)
+	sample := discLight.Sample(testPoint, sampler.Get2D())
 
 	// Check that sample point is on the disc
 	distanceFromCenter := sample.Point.Subtract(center).Length()
@@ -117,11 +117,11 @@ func TestDiscLightSampleConsistency(t *testing.T) {
 	discLight := NewDiscLight(center, normal, radius, emissive)
 
 	testPoint := core.NewVec3(0, 0, 0)
-	random := rand.New(rand.NewSource(123))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(123)))
 
 	// Take multiple samples and check PDF consistency
 	for i := 0; i < 100; i++ {
-		sample := discLight.Sample(testPoint, random)
+		sample := discLight.Sample(testPoint, sampler.Get2D())
 		pdfFromMethod := discLight.PDF(testPoint, sample.Direction)
 
 		// The PDFs should be reasonably close (allowing for numerical precision)
@@ -142,14 +142,14 @@ func TestDiscLightSampleDistribution(t *testing.T) {
 	discLight := NewDiscLight(center, normal, radius, emissive)
 
 	testPoint := core.NewVec3(0, 0, 0)
-	random := rand.New(rand.NewSource(456))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(456)))
 
 	numSamples := 10000
 	centerCount := 0
 	outerCount := 0
 
 	for i := 0; i < numSamples; i++ {
-		sample := discLight.Sample(testPoint, random)
+		sample := discLight.Sample(testPoint, sampler.Get2D())
 
 		// Check if sample is in center circle (radius 0.5) or outer ring
 		distanceFromCenter := sample.Point.Subtract(center).Length()
@@ -182,9 +182,9 @@ func TestDiscLightEdgeCase(t *testing.T) {
 	discLight := NewDiscLight(center, normal, radius, emissive)
 
 	testPoint := core.NewVec3(0, 0.99, 0) // Very close to disc
-	random := rand.New(rand.NewSource(789))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(789)))
 
-	sample := discLight.Sample(testPoint, random)
+	sample := discLight.Sample(testPoint, sampler.Get2D())
 
 	// Should handle very small distances gracefully
 	if sample.Distance <= 0 {
@@ -214,8 +214,8 @@ func TestDiscLight_SampleEmission(t *testing.T) {
 	emissiveMat := material.NewEmissive(emission)
 	light := NewDiscLight(center, normal, radius, emissiveMat)
 
-	random := rand.New(rand.NewSource(42))
-	sample := light.SampleEmission(random)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+	sample := light.SampleEmission(sampler.Get2D(), sampler.Get2D())
 
 	// Verify sample point is on disc surface
 	distanceFromCenter := sample.Point.Subtract(center).Length()
@@ -357,7 +357,7 @@ func TestDiscLight_EmissionSampling_Coverage(t *testing.T) {
 	emissiveMat := material.NewEmissive(emission)
 	light := NewDiscLight(center, normal, radius, emissiveMat)
 
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 	numSamples := 1000
 
 	// Track coverage in different regions (center vs edge)
@@ -365,7 +365,7 @@ func TestDiscLight_EmissionSampling_Coverage(t *testing.T) {
 	edgeCount := 0
 
 	for i := 0; i < numSamples; i++ {
-		sample := light.SampleEmission(random)
+		sample := light.SampleEmission(sampler.Get2D(), sampler.Get2D())
 
 		// Classify by distance from center
 		distanceFromCenter := sample.Point.Subtract(center).Length()

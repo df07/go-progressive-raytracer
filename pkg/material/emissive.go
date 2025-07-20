@@ -1,8 +1,6 @@
 package material
 
 import (
-	"math/rand"
-
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
@@ -18,7 +16,7 @@ func NewEmissive(emission core.Vec3) *Emissive {
 
 // Scatter implements the Material interface for emissive materials
 // Emissive materials don't scatter rays - they only emit light
-func (e *Emissive) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (e *Emissive) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	// Emissive materials don't scatter - they absorb all incoming rays
 	return core.ScatterResult{}, false
 }

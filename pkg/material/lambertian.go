@@ -2,7 +2,6 @@ package material
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -18,9 +17,9 @@ func NewLambertian(albedo core.Vec3) *Lambertian {
 }
 
 // Scatter implements the Material interface for lambertian scattering
-func (l *Lambertian) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (l *Lambertian) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	// Generate cosine-weighted random direction in hemisphere around normal
-	scatterDirection := core.RandomCosineDirection(hit.Normal, random)
+	scatterDirection := core.RandomCosineDirection(hit.Normal, sampler.Get2D())
 	scattered := core.Ray{Origin: hit.Point, Direction: scatterDirection}
 
 	// Calculate PDF: cos(θ) / π where θ is angle from normal

@@ -24,8 +24,8 @@ func TestDielectricBasicBehavior(t *testing.T) {
 		Material:  glass,
 	}
 
-	rng := rand.New(rand.NewSource(42))
-	result, scattered := glass.Scatter(ray, hit, rng)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+	result, scattered := glass.Scatter(ray, hit, sampler)
 
 	// Basic checks
 	if !scattered {
@@ -49,8 +49,8 @@ func TestDielectricBasicBehavior(t *testing.T) {
 	hasRefraction := false
 
 	for seed := int64(0); seed < 1000 && (!hasReflection || !hasRefraction); seed++ {
-		testRng := rand.New(rand.NewSource(seed))
-		result, _ := glass.Scatter(ray, hit, testRng)
+		sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
+		result, _ := glass.Scatter(ray, hit, sampler)
 
 		// Determine if this was reflection or refraction
 		scatteredDirection := result.Scattered.Direction.Normalize()
@@ -103,8 +103,8 @@ func TestDielectricTotalInternalReflection(t *testing.T) {
 
 	// Test multiple scatters - all should be reflections due to total internal reflection
 	for i := 0; i < 10; i++ {
-		rng := rand.New(rand.NewSource(int64(i))) // Different seed each time
-		result, scattered := glass.Scatter(ray, hit, rng)
+		sampler := core.NewRandomSampler(rand.New(rand.NewSource(int64(i)))) // Different seed each time
+		result, scattered := glass.Scatter(ray, hit, sampler)
 
 		if !scattered {
 			t.Error("Dielectric should always scatter")

@@ -2,7 +2,6 @@ package geometry
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -31,14 +30,9 @@ func (ql *QuadLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the quad for direct lighting
-func (ql *QuadLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
+func (ql *QuadLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
 	// Sample uniformly on the quad surface
-	// Generate random barycentric coordinates
-	alpha := random.Float64()
-	beta := random.Float64()
-
-	// Calculate sample point: corner + alpha * u + beta * v
-	samplePoint := ql.Corner.Add(ql.U.Multiply(alpha)).Add(ql.V.Multiply(beta))
+	samplePoint := ql.Corner.Add(ql.U.Multiply(sample.X)).Add(ql.V.Multiply(sample.Y))
 
 	// Calculate direction from shading point to light sample
 	toLight := samplePoint.Subtract(point)
@@ -113,14 +107,12 @@ func (ql *QuadLight) PDF(point core.Vec3, direction core.Vec3) float64 {
 
 // SampleEmission implements the Light interface - samples emission from the quad surface
 // Used for BDPT light path generation
-func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
 	// Sample point uniformly on quad surface
-	alpha := random.Float64()
-	beta := random.Float64()
-	samplePoint := ql.Corner.Add(ql.U.Multiply(alpha)).Add(ql.V.Multiply(beta))
+	point := ql.Corner.Add(ql.U.Multiply(samplePoint.X)).Add(ql.V.Multiply(samplePoint.Y))
 
 	// Sample emission direction (cosine-weighted hemisphere)
-	emissionDir := core.RandomCosineDirection(ql.Normal, random)
+	emissionDir := core.RandomCosineDirection(ql.Normal, sampleDirection)
 
 	// Calculate PDFs separately for BDPT
 	// areaPDF: probability per unit area on the light surface
@@ -136,13 +128,13 @@ func (ql *QuadLight) SampleEmission(random *rand.Rand) core.EmissionSample {
 	// Get emission from material
 	var emission core.Vec3
 	if emitter, ok := ql.Material.(core.Emitter); ok {
-		dummyRay := core.NewRay(samplePoint, emissionDir)
-		dummyHit := core.HitRecord{Point: samplePoint, Normal: ql.Normal, Material: ql.Material}
+		dummyRay := core.NewRay(point, emissionDir)
+		dummyHit := core.HitRecord{Point: point, Normal: ql.Normal, Material: ql.Material}
 		emission = emitter.Emit(dummyRay, dummyHit)
 	}
 
 	return core.EmissionSample{
-		Point:        samplePoint,
+		Point:        point,
 		Normal:       ql.Normal,
 		Direction:    emissionDir,
 		Emission:     emission,

@@ -112,11 +112,11 @@ func TestDiscSpotLightSample(t *testing.T) {
 		},
 	}
 
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sample := spotLight.Sample(tt.testPoint, random)
+			sample := spotLight.Sample(tt.testPoint, sampler.Get2D())
 
 			// Check that sample point is on the disc
 			distanceFromCenter := sample.Point.Subtract(from).Length()

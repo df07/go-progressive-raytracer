@@ -2,7 +2,6 @@ package geometry
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -43,7 +42,7 @@ func (sl *PointSpotLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the light for direct lighting
-func (sl *PointSpotLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
+func (sl *PointSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
 	// For a point light, the sample point is always the light position
 	samplePoint := sl.position
 
@@ -159,12 +158,12 @@ func (sl *PointSpotLight) GetIntensityAt(point core.Vec3) core.Vec3 {
 }
 
 // SampleEmission implements the Light interface - samples emission from the point spot light
-func (sl *PointSpotLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+func (sl *PointSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
 	// For point lights, there's only one surface point (the light position)
-	samplePoint := sl.position
+	point := sl.position
 
 	// Sample direction within the spot cone using shared function
-	emissionDir := core.SampleUniformCone(sl.direction, sl.cosTotalWidth, random)
+	emissionDir := core.SampleUniformCone(sl.direction, sl.cosTotalWidth, sampleDirection)
 
 	// Calculate spot light falloff
 	cosTheta := emissionDir.Dot(sl.direction)
@@ -180,7 +179,7 @@ func (sl *PointSpotLight) SampleEmission(random *rand.Rand) core.EmissionSample 
 	normal := emissionDir
 
 	return core.EmissionSample{
-		Point:        samplePoint,
+		Point:        point,
 		Normal:       normal,
 		Direction:    emissionDir,
 		Emission:     emission,

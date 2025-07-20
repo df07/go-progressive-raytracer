@@ -2,7 +2,6 @@ package geometry
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -24,9 +23,9 @@ func (dl *DiscLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the disc for direct lighting
-func (dl *DiscLight) Sample(point core.Vec3, random *rand.Rand) core.LightSample {
+func (dl *DiscLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
 	// Sample a point on the disc
-	samplePoint, normal := dl.Disc.SampleUniform(random)
+	samplePoint, normal := dl.Disc.SampleUniform(sample)
 
 	// Calculate direction and distance
 	direction := samplePoint.Subtract(point)
@@ -107,13 +106,13 @@ func (dl *DiscLight) PDF(point core.Vec3, direction core.Vec3) float64 {
 }
 
 // SampleEmission implements the Light interface - samples emission from the disc surface
-func (dl *DiscLight) SampleEmission(random *rand.Rand) core.EmissionSample {
+func (dl *DiscLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
 	// Sample point uniformly on disc surface
-	samplePoint, normal := dl.Disc.SampleUniform(random)
+	point, normal := dl.Disc.SampleUniform(samplePoint)
 
 	// Use shared emission sampling function
 	areaPDF := 1.0 / (math.Pi * dl.Radius * dl.Radius)
-	return core.SampleEmissionDirection(samplePoint, normal, areaPDF, dl.Material, random)
+	return core.SampleEmissionDirection(point, normal, areaPDF, dl.Material, sampleDirection)
 }
 
 // EmissionPDF implements the Light interface - calculates PDF for emission sampling

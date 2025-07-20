@@ -14,7 +14,7 @@ import (
 // MockIntegratorWithSplats creates splat rays to test the splat system
 type MockIntegratorWithSplats struct{}
 
-func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj core.Scene, random *rand.Rand) (core.Vec3, []core.SplatRay) {
+func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
 	// Regular pixel color (simple test pattern)
 	pixelColor := core.Vec3{X: 0.2, Y: 0.4, Z: 0.6}
 
@@ -76,10 +76,10 @@ func TestTileRendererWithSplats(t *testing.T) {
 	splatQueue := NewSplatQueue()
 
 	// Create random generator
-	random := rand.New(rand.NewSource(42))
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Render the tile
-	stats := tileRenderer.RenderTileBounds(bounds, pixelStats, splatQueue, random, 2)
+	stats := tileRenderer.RenderTileBounds(bounds, pixelStats, splatQueue, sampler, 2)
 
 	// Verify render stats
 	if stats.TotalPixels != width*height {

@@ -2,7 +2,6 @@ package material
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
@@ -18,7 +17,7 @@ func NewDielectric(refractiveIndex float64) *Dielectric {
 }
 
 // Scatter implements the Material interface for dielectric scattering
-func (d *Dielectric) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (core.ScatterResult, bool) {
+func (d *Dielectric) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
 	// Dielectrics always attenuate by 1.0 (no color absorption for clear glass)
 	attenuation := core.NewVec3(1.0, 1.0, 1.0)
 
@@ -41,7 +40,7 @@ func (d *Dielectric) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Ra
 	cannotRefract := refractionRatio*sinTheta > 1.0
 
 	var direction core.Vec3
-	if cannotRefract || Reflectance(cosTheta, refractionRatio) > random.Float64() {
+	if cannotRefract || Reflectance(cosTheta, refractionRatio) > sampler.Get1D() {
 		// Reflect
 		direction = reflectVector(unitDirection, hit.Normal)
 	} else {

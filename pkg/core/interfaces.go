@@ -1,9 +1,5 @@
 package core
 
-import (
-	"math/rand"
-)
-
 // SplatRay represents a ray-based color contribution that needs to be mapped to pixels
 type SplatRay struct {
 	Ray   Ray  // Ray that should contribute to some pixel
@@ -14,7 +10,7 @@ type SplatRay struct {
 type Integrator interface {
 	// RayColor computes color for a ray, with support for ray-based splatting
 	// Returns (pixel color, splat rays)
-	RayColor(ray Ray, scene Scene, random *rand.Rand) (Vec3, []SplatRay)
+	RayColor(ray Ray, scene Scene, sampler Sampler) (Vec3, []SplatRay)
 }
 
 // Shape interface for objects that can be hit by rays
@@ -26,7 +22,7 @@ type Shape interface {
 // Material interface for objects that can scatter rays
 type Material interface {
 	// Existing method - generates random scattered direction
-	Scatter(rayIn Ray, hit HitRecord, random *rand.Rand) (ScatterResult, bool)
+	Scatter(rayIn Ray, hit HitRecord, sampler Sampler) (ScatterResult, bool)
 
 	// NEW: Evaluate BRDF for specific incoming/outgoing directions
 	EvaluateBRDF(incomingDir, outgoingDir, normal Vec3) Vec3
@@ -54,14 +50,14 @@ type Light interface {
 
 	// Sample samples light toward a specific point for direct lighting
 	// Returns LightSample with direction FROM shading point TO light
-	Sample(point Vec3, random *rand.Rand) LightSample
+	Sample(point Vec3, sample Vec2) LightSample
 
 	// PDF calculates the probability density for sampling a given direction toward the light
 	PDF(point Vec3, direction Vec3) float64
 
 	// SampleEmission samples emission from the light surface for BDPT light path generation
 	// Returns EmissionSample with direction FROM light surface (for light transport)
-	SampleEmission(random *rand.Rand) EmissionSample
+	SampleEmission(samplePoint Vec2, sampleDirection Vec2) EmissionSample
 
 	// EmissionPDF calculates PDF for emission sampling - needed for BDPT MIS calculations
 	EmissionPDF(point Vec3, direction Vec3) float64
@@ -96,7 +92,7 @@ type CameraSample struct {
 
 // Camera interface for cameras to avoid circular imports
 type Camera interface {
-	GetRay(i, j int, random *rand.Rand) Ray
+	GetRay(i, j int, samplePoint Vec2, sampleJitter Vec2) Ray
 
 	// BDPT support: calculate area and direction PDFs for a camera ray
 	CalculateRayPDFs(ray Ray) (areaPDF, directionPDF float64)
@@ -106,7 +102,7 @@ type Camera interface {
 
 	// Sample camera from a reference point for t=1 strategies
 	// Camera handles lens sampling internally, returns complete sample
-	SampleCameraFromPoint(refPoint Vec3, random *rand.Rand) *CameraSample
+	SampleCameraFromPoint(refPoint Vec3, samplePoint Vec2) *CameraSample
 
 	// Map ray back to pixel coordinates (for splat placement)
 	MapRayToPixel(ray Ray) (x, y int, ok bool)
