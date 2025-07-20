@@ -11,6 +11,65 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
+// TestSampler provides predetermined values for testing
+type TestSampler struct {
+	values1D []float64
+	values2D []core.Vec2
+	values3D []core.Vec3
+	index1D  int
+	index2D  int
+	index3D  int
+}
+
+// NewTestSampler creates a sampler with predetermined values for each dimension
+func NewTestSampler(values1D []float64, values2D []core.Vec2, values3D []core.Vec3) *TestSampler {
+	return &TestSampler{
+		values1D: values1D,
+		values2D: values2D,
+		values3D: values3D,
+		index1D:  0,
+		index2D:  0,
+		index3D:  0,
+	}
+}
+
+// Get1D returns the next predetermined 1D value
+func (t *TestSampler) Get1D() float64 {
+	if t.index1D >= len(t.values1D) {
+		panic("TestSampler ran out of 1D values")
+	}
+	val := t.values1D[t.index1D]
+	t.index1D++
+	return val
+}
+
+// Get2D returns the next predetermined 2D value
+func (t *TestSampler) Get2D() core.Vec2 {
+	if t.index2D >= len(t.values2D) {
+		panic("TestSampler ran out of 2D values")
+	}
+	val := t.values2D[t.index2D]
+	t.index2D++
+	return val
+}
+
+// Get3D returns the next predetermined 3D value
+func (t *TestSampler) Get3D() core.Vec3 {
+	if t.index3D >= len(t.values3D) {
+		panic("TestSampler ran out of 3D values")
+	}
+	val := t.values3D[t.index3D]
+	t.index3D++
+	return val
+}
+
+// Reset resets the sampler to the beginning of all value sequences
+func (t *TestSampler) Reset() {
+	t.index1D = 0
+	t.index2D = 0
+	t.index3D = 0
+}
+
 // ============================================================================
 // 1. BASIC PATH GENERATION TESTS
 // Test ray bouncing physics, path shapes, intersections
@@ -85,8 +144,8 @@ func TestExtendPath(t *testing.T) {
 				Length:   1,
 			}
 
-			random := rand.New(rand.NewSource(42))
-			integrator.extendPath(path, tt.initialRay, tt.initialBeta, tt.initialPdfFwd, tt.scene, random, tt.maxBounces, true)
+			sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+			integrator.extendPath(path, tt.initialRay, tt.initialBeta, tt.initialPdfFwd, tt.scene, sampler, tt.maxBounces, true)
 
 			// Test path length
 			if path.Length < tt.expectedMinVertices {
@@ -144,8 +203,8 @@ func TestGenerateCameraSubpath(t *testing.T) {
 	scene := createSimpleTestScene()
 	ray := core.NewRay(core.NewVec3(1, 2, 3), core.NewVec3(0, 0, -1))
 
-	random := rand.New(rand.NewSource(42))
-	path := integrator.generateCameraSubpath(ray, scene, random, 2)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+	path := integrator.generateCameraSubpath(ray, scene, sampler, 2)
 
 	// Should have at least the camera vertex
 	if path.Length == 0 {
@@ -171,8 +230,8 @@ func TestGenerateLightSubpath(t *testing.T) {
 	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
 	scene := createSimpleTestScene()
 
-	random := rand.New(rand.NewSource(42))
-	path := integrator.generateLightSubpath(scene, random, 2)
+	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
+	path := integrator.generateLightSubpath(scene, sampler, 2)
 
 	// Should have at least the light vertex
 	if path.Length == 0 {
@@ -199,16 +258,381 @@ func TestGenerateLightSubpath(t *testing.T) {
 
 // TestEvaluatePathTracingStrategy tests s=0 strategies
 func TestEvaluatePathTracingStrategy(t *testing.T) {
-	// TODO: Test camera-only paths hitting lights
-	// TODO: Test contribution calculation (emitted light * beta)
-	t.Skip("TODO: Implement path tracing strategy tests")
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+
+	tests := []struct {
+		name                   string
+		pathVertices           []Vertex
+		pathLength             int
+		t                      int // strategy parameter
+		expectedContribution   core.Vec3
+		expectZeroContribution bool
+	}{
+		{
+			name: "PathHittingEmissiveVertex",
+			pathVertices: []Vertex{
+				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
+				{
+					Point:        core.NewVec3(0, 0, -1),
+					Normal:       core.NewVec3(0, 0, 1),
+					Material:     nil,
+					IsLight:      true,
+					Beta:         core.Vec3{X: 0.8, Y: 0.6, Z: 0.4}, // throughput from camera
+					EmittedLight: core.Vec3{X: 2.0, Y: 1.5, Z: 1.0}, // emissive surface
+				},
+			},
+			pathLength:           2,
+			t:                    2,
+			expectedContribution: core.Vec3{X: 1.6, Y: 0.9, Z: 0.4}, // EmittedLight * Beta
+		},
+		{
+			name: "PathHittingNonEmissiveVertex",
+			pathVertices: []Vertex{
+				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
+				{
+					Point:        core.NewVec3(0, 0, -1),
+					Normal:       core.NewVec3(0, 0, 1),
+					Material:     material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+					IsLight:      false,
+					Beta:         core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
+					EmittedLight: core.Vec3{X: 0, Y: 0, Z: 0}, // no emission
+				},
+			},
+			pathLength:             2,
+			t:                      2,
+			expectZeroContribution: true,
+		},
+		{
+			name: "PathHittingBackground",
+			pathVertices: []Vertex{
+				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
+				{
+					Point:           core.NewVec3(0, 0, -1000),
+					Normal:          core.NewVec3(0, 0, 1),
+					Material:        nil,
+					IsLight:         true,
+					IsInfiniteLight: true,
+					Beta:            core.Vec3{X: 1, Y: 1, Z: 1},       // no attenuation to background
+					EmittedLight:    core.Vec3{X: 0.5, Y: 0.7, Z: 1.0}, // sky color
+				},
+			},
+			pathLength:           2,
+			t:                    2,
+			expectedContribution: core.Vec3{X: 0.5, Y: 0.7, Z: 1.0}, // background emission
+		},
+		{
+			name: "IncompletePathRequest",
+			pathVertices: []Vertex{
+				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
+				createTestVertex(core.NewVec3(0, 0, -1), core.NewVec3(0, 0, 1), false, false, material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))),
+			},
+			pathLength:             2,
+			t:                      2, // asking for incomplete path
+			expectZeroContribution: true,
+		},
+		{
+			name: "ZeroBetaThroughput",
+			pathVertices: []Vertex{
+				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
+				{
+					Point:        core.NewVec3(0, 0, -1),
+					Normal:       core.NewVec3(0, 0, 1),
+					Material:     nil,
+					IsLight:      true,
+					Beta:         core.Vec3{X: 0, Y: 0, Z: 0}, // zero throughput
+					EmittedLight: core.Vec3{X: 2.0, Y: 1.5, Z: 1.0},
+				},
+			},
+			pathLength:             2,
+			t:                      2,
+			expectZeroContribution: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := Path{
+				Vertices: tt.pathVertices,
+				Length:   tt.pathLength,
+			}
+
+			contribution := integrator.evaluatePathTracingStrategy(path, tt.t)
+
+			if tt.expectZeroContribution {
+				if contribution.Luminance() > 1e-6 {
+					t.Errorf("Expected zero contribution, got %v", contribution)
+				}
+			} else {
+				tolerance := 1e-6
+				if math.Abs(contribution.X-tt.expectedContribution.X) > tolerance ||
+					math.Abs(contribution.Y-tt.expectedContribution.Y) > tolerance ||
+					math.Abs(contribution.Z-tt.expectedContribution.Z) > tolerance {
+					t.Errorf("Expected contribution %v, got %v", tt.expectedContribution, contribution)
+				}
+			}
+		})
+	}
 }
 
-// TestEvaluateDirectLightingStrategy tests s=1 strategies
+// Helper function to calculate expected direct lighting contribution
+func calculateExpectedDirectLighting(
+	vertex Vertex,
+	lightPoint core.Vec3,
+	emission core.Vec3,
+) core.Vec3 {
+	// Vector from surface to light
+	lightDirection := lightPoint.Subtract(vertex.Point)
+	distance := lightDirection.Length()
+	normalizedLightDir := lightDirection.Normalize()
+
+	// Cosine term (surface normal dot light direction)
+	cosTheta := math.Max(0, vertex.Normal.Dot(normalizedLightDir))
+	if cosTheta <= 0 {
+		return core.Vec3{} // No contribution from backfacing
+	}
+
+	// BRDF evaluation for Lambertian materials
+	if lambertian, ok := vertex.Material.(*material.Lambertian); ok {
+		brdfValue := lambertian.Albedo.Multiply(1.0 / math.Pi)
+		// Direct lighting: beta * brdf * emission * cosTheta / distance²
+		return vertex.Beta.MultiplyVec(brdfValue.MultiplyVec(emission)).Multiply(cosTheta / (distance * distance))
+	}
+
+	// Other materials (metal, glass) typically don't contribute to direct lighting
+	return core.Vec3{}
+}
+
+// Helper function to create a simple scene with a specific light
+func createSceneWithLight(light core.Light) core.Scene {
+	// Simple diffuse sphere (not used in our tests but needed for complete scene)
+	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
+	sphere := geometry.NewSphere(core.NewVec3(0, 0, -5), 0.5, white)
+
+	var shapes []core.Shape
+	switch l := light.(type) {
+	case *geometry.QuadLight:
+		shapes = []core.Shape{sphere, l.Quad}
+	case *geometry.SphereLight:
+		shapes = []core.Shape{sphere, l.Sphere}
+	case *geometry.PointSpotLight:
+		shapes = []core.Shape{sphere} // Point lights don't have geometry
+	default:
+		shapes = []core.Shape{sphere}
+	}
+
+	// Simple camera
+	cameraConfig := renderer.CameraConfig{
+		Center: core.NewVec3(0, 0, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 1, 0),
+		Width: 100, AspectRatio: 1.0, VFov: 45.0,
+	}
+	camera := renderer.NewCamera(cameraConfig)
+
+	return &MockScene{
+		shapes: shapes, lights: []core.Light{light},
+		topColor: core.NewVec3(0.3, 0.3, 0.3), bottomColor: core.NewVec3(0.1, 0.1, 0.1),
+		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
+	}
+}
+
+// TestEvaluateDirectLightingStrategy tests s=1 strategies with various scenarios
 func TestEvaluateDirectLightingStrategy(t *testing.T) {
-	// TODO: Test direct light sampling from surface
-	// TODO: Test BRDF evaluation and cosine factors
-	t.Skip("TODO: Implement direct lighting strategy tests")
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+
+	tests := []struct {
+		name                   string
+		cameraVertex           Vertex
+		light                  core.Light
+		sampler                *TestSampler
+		expectedLightPoint     core.Vec3
+		expectedContribution   core.Vec3
+		expectZeroContribution bool
+		tolerance              float64
+		testDescription        string
+	}{
+		{
+			name: "DiffuseSurfaceWithQuadLight",
+			cameraVertex: Vertex{
+				Point:             core.NewVec3(0, 0, 0),
+				Normal:            core.NewVec3(0, 1, 0), // pointing up
+				Material:          material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
+				IncomingDirection: core.NewVec3(0, 0, 1),
+			},
+			light: geometry.NewQuadLight(
+				core.NewVec3(-0.5, 2.0, -0.5), // corner
+				core.NewVec3(1.0, 0.0, 0.0),   // u vector
+				core.NewVec3(0.0, 0.0, 1.0),   // v vector
+				material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)),
+			),
+			sampler: NewTestSampler(
+				[]float64{0.0},                      // light selection
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // quad center
+				[]core.Vec3{},
+			),
+			expectedLightPoint:   core.NewVec3(0, 2, 0),
+			expectedContribution: core.NewVec3(0.223, 0.119, 0.0477), // calculated by helper
+			tolerance:            1e-3,
+			testDescription:      "Standard diffuse surface with quad light above",
+		},
+		{
+			name: "DiffuseSurfaceWithPointSpotLightAway",
+			cameraVertex: Vertex{
+				Point:             core.NewVec3(0, 0, 0),
+				Normal:            core.NewVec3(0, 1, 0), // pointing up
+				Material:          material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
+				IncomingDirection: core.NewVec3(0, 0, 1),
+			},
+			light: geometry.NewPointSpotLight(
+				core.NewVec3(0, 2, 0),       // light position above surface
+				core.NewVec3(0, 2, -10),     // pointing away from surface
+				core.NewVec3(5.0, 5.0, 5.0), // emission
+				30.0, 5.0,                   // cone angle, falloff
+			),
+			sampler: NewTestSampler(
+				[]float64{0.0},                      // light selection
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // dummy 2D value (not used by point lights)
+				[]core.Vec3{},
+			),
+			expectedLightPoint:     core.NewVec3(0, 2, 0),
+			expectedContribution:   core.Vec3{}, // zero because light points away
+			expectZeroContribution: true,
+			tolerance:              1e-6,
+			testDescription:        "Point spot light pointing away from surface",
+		},
+		{
+			name: "SurfaceWithNegativeCosine",
+			cameraVertex: Vertex{
+				Point:             core.NewVec3(0, 0, 0),
+				Normal:            core.NewVec3(0, 1, 0), // pointing up
+				Material:          material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
+				IncomingDirection: core.NewVec3(0, 0, 1),
+			},
+			light: geometry.NewQuadLight(
+				core.NewVec3(-0.5, -2.0, -0.5), // corner below surface
+				core.NewVec3(1.0, 0.0, 0.0),    // u vector
+				core.NewVec3(0.0, 0.0, 1.0),    // v vector
+				material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)),
+			),
+			sampler: NewTestSampler(
+				[]float64{0.0},                      // light selection
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // quad center
+				[]core.Vec3{},
+			),
+			expectedLightPoint:     core.NewVec3(0, -2, 0),
+			expectedContribution:   core.Vec3{}, // zero because cosTheta < 0
+			expectZeroContribution: true,
+			tolerance:              1e-6,
+			testDescription:        "Light below surface (negative cosine)",
+		},
+		{
+			name: "SpecularSurface",
+			cameraVertex: Vertex{
+				Point:      core.NewVec3(0, 0, 0),
+				Normal:     core.NewVec3(0, 1, 0),
+				Material:   material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0),
+				Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
+				IsSpecular: true,
+			},
+			light: geometry.NewQuadLight(
+				core.NewVec3(-0.5, 2.0, -0.5),
+				core.NewVec3(1.0, 0.0, 0.0),
+				core.NewVec3(0.0, 0.0, 1.0),
+				material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)),
+			),
+			sampler: NewTestSampler(
+				[]float64{0.0},                      // light selection
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // quad center
+				[]core.Vec3{},
+			),
+			expectedLightPoint:     core.NewVec3(0, 2, 0),
+			expectedContribution:   core.Vec3{}, // zero for specular materials
+			expectZeroContribution: true,
+			tolerance:              1e-6,
+			testDescription:        "Specular surfaces should not use direct lighting strategy",
+		},
+		{
+			name: "ZeroBetaThroughput",
+			cameraVertex: Vertex{
+				Point:    core.NewVec3(0, 0, 0),
+				Normal:   core.NewVec3(0, 1, 0),
+				Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				Beta:     core.Vec3{X: 0, Y: 0, Z: 0}, // zero throughput
+			},
+			light: geometry.NewQuadLight(
+				core.NewVec3(-0.5, 2.0, -0.5),
+				core.NewVec3(1.0, 0.0, 0.0),
+				core.NewVec3(0.0, 0.0, 1.0),
+				material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)),
+			),
+			sampler: NewTestSampler(
+				[]float64{0.0},                      // light selection
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // quad center
+				[]core.Vec3{},
+			),
+			expectedLightPoint:     core.NewVec3(0, 2, 0),
+			expectedContribution:   core.Vec3{}, // zero because beta is zero
+			expectZeroContribution: true,
+			tolerance:              1e-6,
+			testDescription:        "Zero beta should result in zero contribution",
+		},
+	}
+
+	// Run all test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create path with camera and surface vertex
+			path := Path{
+				Vertices: []Vertex{
+					createTestVertex(core.NewVec3(0, 0, 5), core.NewVec3(0, 0, -1), false, true, nil),
+					tt.cameraVertex,
+				},
+				Length: 2,
+			}
+
+			// Create scene with the specific light for this test
+			scene := createSceneWithLight(tt.light)
+
+			// Run the test with deterministic sampler
+			contribution, sampledVertex := integrator.evaluateDirectLightingStrategy(path, 2, scene, tt.sampler)
+
+			// Verify sampled light point (only if we expect a non-zero contribution)
+			if !tt.expectZeroContribution && sampledVertex != nil {
+				if !sampledVertex.Point.Equals(tt.expectedLightPoint) {
+					t.Errorf("Expected sampled light point %v, got %v", tt.expectedLightPoint, sampledVertex.Point)
+				}
+			}
+
+			// Verify contribution
+			if tt.expectZeroContribution {
+				if contribution.Luminance() > tt.tolerance {
+					t.Errorf("Expected zero contribution for %s, got %v (luminance: %v)",
+						tt.testDescription, contribution, contribution.Luminance())
+				}
+			} else {
+				// For non-zero cases, use the helper to calculate expected contribution
+				emission := core.NewVec3(5.0, 5.0, 5.0) // All our test lights use this emission
+				expectedContrib := calculateExpectedDirectLighting(tt.cameraVertex, tt.expectedLightPoint, emission)
+
+				if math.Abs(contribution.X-expectedContrib.X) > tt.tolerance ||
+					math.Abs(contribution.Y-expectedContrib.Y) > tt.tolerance ||
+					math.Abs(contribution.Z-expectedContrib.Z) > tt.tolerance {
+					t.Errorf("Expected contribution %v, got %v (tolerance: %e)",
+						expectedContrib, contribution, tt.tolerance)
+				}
+
+				t.Logf("%s: Expected %v, Got %v", tt.name, expectedContrib, contribution)
+			}
+
+			// Verify sampled vertex properties
+			if sampledVertex != nil && !tt.expectZeroContribution {
+				if !sampledVertex.IsLight {
+					t.Error("Sampled vertex should be marked as light")
+				}
+			}
+		})
+	}
 }
 
 // TestEvaluateConnectionStrategy tests s>1,t>1 connection strategies
@@ -348,10 +772,16 @@ func createSimpleTestScene() core.Scene {
 	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, white)
 
-	// Create a simple area light
+	// Create a simple quad light (easier to predict sampling)
 	emission := core.NewVec3(5.0, 5.0, 5.0)
 	emissive := material.NewEmissive(emission)
-	light := geometry.NewSphereLight(core.NewVec3(0, 2, -1), 0.3, emissive)
+	// Quad light at y=2, centered at (0,2,0), size 1x1 in XZ plane
+	light := geometry.NewQuadLight(
+		core.NewVec3(-0.5, 2.0, -0.5), // corner
+		core.NewVec3(1.0, 0.0, 0.0),   // u vector (X direction)
+		core.NewVec3(0.0, 0.0, 1.0),   // v vector (Z direction)
+		emissive,
+	)
 
 	// Use a real camera from the renderer package
 	cameraConfig := renderer.CameraConfig{
@@ -367,7 +797,7 @@ func createSimpleTestScene() core.Scene {
 	camera := renderer.NewCamera(cameraConfig)
 
 	return &MockScene{
-		shapes:      []core.Shape{sphere, light.Sphere},
+		shapes:      []core.Shape{sphere, light.Quad},
 		lights:      []core.Light{light},
 		topColor:    core.NewVec3(0.3, 0.3, 0.3),
 		bottomColor: core.NewVec3(0.1, 0.1, 0.1),
