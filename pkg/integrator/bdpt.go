@@ -764,7 +764,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	// pbrt pdfFwd: sampled.PdfLightOrigin(scene, pt, lightDistr, lightToIndex)
 	//          => pdfPos * pdfChoice // Return solid angle density for non-infinite light sources
 	//          => pdfDir for light sample not used
-	brdf := cameraVertex.Material.EvaluateBRDF(core.Vec3{}, lightSample.Direction, cameraVertex.Normal)
+	brdf := cameraVertex.Material.EvaluateBRDF(cameraVertex.IncomingDirection, lightSample.Direction, cameraVertex.Normal)
 	lightBeta := lightSample.Emission.Multiply(1 / lightSample.PDF) // light sample pdf contains light selection pdf
 	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosine)
 

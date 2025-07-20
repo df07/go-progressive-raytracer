@@ -41,6 +41,7 @@ func (m *Metal) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand) (
 	scatters := scattered.Direction.Dot(hit.Normal) > 0
 
 	return core.ScatterResult{
+		Incoming:    rayIn,
 		Scattered:   scattered,
 		Attenuation: m.Albedo, // No π factor for specular
 		PDF:         0,        // Specular materials have no PDF

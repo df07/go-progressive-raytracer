@@ -34,6 +34,7 @@ func (l *Lambertian) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Ra
 	attenuation := l.Albedo.Multiply(1.0 / math.Pi)
 
 	return core.ScatterResult{
+		Incoming:    rayIn,
 		Scattered:   scattered,
 		Attenuation: attenuation,
 		PDF:         pdf,

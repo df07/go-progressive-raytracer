@@ -68,6 +68,7 @@ func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Rand)
 	combinedAttenuation := outerResult.Attenuation.MultiplyVec(innerResult.Attenuation)
 
 	return core.ScatterResult{
+		Incoming:    rayIn,
 		Scattered:   innerResult.Scattered,
 		Attenuation: combinedAttenuation,
 		PDF:         innerResult.PDF,

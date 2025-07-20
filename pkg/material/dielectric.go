@@ -52,6 +52,7 @@ func (d *Dielectric) Scatter(rayIn core.Ray, hit core.HitRecord, random *rand.Ra
 	scattered := core.Ray{Origin: hit.Point, Direction: direction}
 
 	return core.ScatterResult{
+		Incoming:    rayIn,
 		Scattered:   scattered,
 		Attenuation: attenuation,
 		PDF:         0, // Specular materials have no PDF

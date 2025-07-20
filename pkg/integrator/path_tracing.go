@@ -130,8 +130,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 
 	// Get material PDF for this direction (for MIS)
 	// Use the material's PDF method, but for direct lighting we evaluate the light direction
-	// The incoming direction doesn't matter much for Lambertian materials since they're isotropic
-	materialPDF, isDelta := hit.Material.PDF(core.Vec3{}, lightSample.Direction, hit.Normal)
+	materialPDF, isDelta := hit.Material.PDF(scatter.Incoming.Direction, lightSample.Direction, hit.Normal)
 
 	// For delta materials, skip direct lighting calculation (they can't be directly lit)
 	if isDelta {
@@ -141,18 +140,14 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 	// Calculate MIS weight
 	misWeight := core.PowerHeuristic(1, lightSample.PDF, 1, materialPDF)
 
-	// Calculate BRDF value using the new interface
-	brdf := hit.Material.EvaluateBRDF(core.Vec3{}, lightSample.Direction, hit.Normal)
+	// Calculate BRDF for the new outgoing direction
+	brdf := hit.Material.EvaluateBRDF(scatter.Incoming.Direction, lightSample.Direction, hit.Normal)
 
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
-	if lightSample.PDF > 0 {
-		contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
-		pt.logf("      pt[%d]   direct: contribution=%v = brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", pt.config.MaxDepth-depth, contribution, brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
+	contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)
+	pt.logf("      pt[%d]   direct: contribution=%v = brdf=%v * emission=%v * (cosine=%f * misWeight=%f / lightPDF=%f)\n", pt.config.MaxDepth-depth, contribution, brdf, lightSample.Emission, cosine, misWeight, lightSample.PDF)
 
-		return contribution
-	}
-
-	return core.Vec3{X: 0, Y: 0, Z: 0}
+	return contribution
 }
 
 // calculateIndirectLighting handles indirect illumination via material sampling with throughput tracking

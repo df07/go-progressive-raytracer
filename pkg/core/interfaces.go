@@ -143,6 +143,7 @@ type SamplingConfig struct {
 
 // ScatterResult contains the result of material scattering
 type ScatterResult struct {
+	Incoming    Ray     // The incoming ray
 	Scattered   Ray     // The scattered ray
 	Attenuation Vec3    // Color attenuation
 	PDF         float64 // Probability density function (0 for specular materials)
