@@ -106,7 +106,7 @@ func TestExtendPath(t *testing.T) {
 		{
 			name:                "RayMissingScene",
 			scene:               createSimpleTestScene(),
-			initialRay:          core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0)),
+			initialRay:          core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, -1, 0)),
 			initialBeta:         core.Vec3{X: 1, Y: 1, Z: 1},
 			initialPdfFwd:       1.0,
 			maxBounces:          3,
@@ -649,11 +649,234 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 	t.Skip("TODO: Implement light tracing strategy tests")
 }
 
-// TestBetaPropagation tests throughput calculation in path generation
-func TestBetaPropagation(t *testing.T) {
-	// TODO: Test beta calculation through diffuse bounces
-	// TODO: Test beta calculation through specular bounces
-	t.Skip("TODO: Implement beta propagation tests")
+// TestCameraPathBetaPropagation tests beta calculation through actual BDPT methods
+func TestCameraPathBetaPropagation(t *testing.T) {
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+
+	// Use consistent glancing ray that produces cosTheta ≈ 0.866 for all material tests
+	glancingRay := core.NewRay(core.NewVec3(-2, 0.5, -1), core.NewVec3(1, 0, 0))
+
+	tests := []struct {
+		name             string
+		material         core.Material
+		sampler          *TestSampler
+		expectedVertices []ExpectedVertex
+		testDescription  string
+	}{
+		{
+			name:     "DiffuseMaterialWithGlancingAngle",
+			material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+			sampler: NewTestSampler(
+				[]float64{0.5, 0.5},                 // material sampling
+				[]core.Vec2{core.NewVec2(0.0, 0.5)}, // hemisphere sampling
+				[]core.Vec3{core.NewVec3(0, 1, 0)},  // scatter direction
+			),
+			expectedVertices: []ExpectedVertex{
+				{index: 0, expectedBeta: core.Vec3{X: 1, Y: 1, Z: 1}, isCamera: true, isSpecular: false, tolerance: 1e-9},        // camera vertex
+				{index: 1, expectedBeta: core.Vec3{X: 1, Y: 1, Z: 1}, isCamera: false, isSpecular: false, tolerance: 1e-9},       // surface hit (no attenuation yet)
+				{index: 2, expectedBeta: core.Vec3{X: 0.7, Y: 0.7, Z: 0.7}, isCamera: false, isSpecular: false, tolerance: 1e-2}, // diffuse with cosTheta/PDF
+			},
+			testDescription: "Diffuse material should apply cosTheta/PDF correctly at glancing angle",
+		},
+		{
+			name:     "SpecularMaterialWithGlancingAngle",
+			material: material.NewMetal(core.NewVec3(0.9, 0.85, 0.8), 0.0),
+			sampler: NewTestSampler(
+				[]float64{0.5},                      // material sampling
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // not used for specular
+				[]core.Vec3{core.NewVec3(0, 0, 1)},  // perfect reflection
+			),
+			expectedVertices: []ExpectedVertex{
+				{index: 0, expectedBeta: core.Vec3{X: 1, Y: 1, Z: 1}, isCamera: true, isSpecular: false, tolerance: 1e-9},         // camera vertex
+				{index: 1, expectedBeta: core.Vec3{X: 1, Y: 1, Z: 1}, isCamera: false, isSpecular: true, tolerance: 1e-9},         // surface hit is specular
+				{index: 2, expectedBeta: core.Vec3{X: 0.9, Y: 0.85, Z: 0.8}, isCamera: false, isSpecular: false, tolerance: 1e-6}, // specular without cosTheta
+			},
+			testDescription: "Specular material should NOT multiply by cosTheta at glancing angle (most important test)",
+		},
+		{
+			name:     "DielectricMaterialWithGlancingAngle",
+			material: material.NewDielectric(1.5),
+			sampler: NewTestSampler(
+				[]float64{0.2, 0.5, 0.5, 0.5}, // more values for dielectric calculations
+				[]core.Vec2{core.NewVec2(0.5, 0.5), core.NewVec2(0.3, 0.7)},
+				[]core.Vec3{core.NewVec3(0, 0, 1), core.NewVec3(0, 1, 0)},
+			),
+			expectedVertices: []ExpectedVertex{
+				{index: 0, expectedBeta: core.Vec3{X: 1, Y: 1, Z: 1}, isCamera: true, isSpecular: false, tolerance: 1e-9}, // camera vertex
+				{index: 1, expectedBeta: core.Vec3{X: 1, Y: 1, Z: 1}, isCamera: false, isSpecular: true, tolerance: 1e-9}, // surface hit is specular
+				{index: 2, expectedBeta: core.Vec3{X: 1, Y: 1, Z: 1}, isCamera: false, isSpecular: true, tolerance: 1e-6}, // dielectric reflection preserves energy and remains specular
+			},
+			testDescription: "Dielectric material should preserve energy at glancing angle",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create scene with the specified material using the glancing ray setup
+			scene := createGlancingTestSceneWithMaterial(tt.material)
+
+			// Generate camera path using consistent glancing ray
+			path := integrator.generateCameraSubpath(glancingRay, scene, tt.sampler, 3)
+
+			// Verify we have expected vertices
+			if path.Length < len(tt.expectedVertices) {
+				t.Fatalf("Expected at least %d vertices, got %d", len(tt.expectedVertices), path.Length)
+			}
+
+			// Test each expected vertex with precise tolerances
+			for _, expected := range tt.expectedVertices {
+				if expected.index >= path.Length {
+					t.Errorf("Expected vertex at index %d, but path only has %d vertices", expected.index, path.Length)
+					continue
+				}
+
+				vertex := path.Vertices[expected.index]
+
+				// Test beta values precisely
+				if math.Abs(vertex.Beta.X-expected.expectedBeta.X) > expected.tolerance ||
+					math.Abs(vertex.Beta.Y-expected.expectedBeta.Y) > expected.tolerance ||
+					math.Abs(vertex.Beta.Z-expected.expectedBeta.Z) > expected.tolerance {
+					t.Errorf("Vertex %d: Expected beta %v, got %v (tolerance: %.2e)",
+						expected.index, expected.expectedBeta, vertex.Beta, expected.tolerance)
+				}
+
+				// Test vertex properties
+				if vertex.IsCamera != expected.isCamera {
+					t.Errorf("Vertex %d: Expected IsCamera=%v, got %v", expected.index, expected.isCamera, vertex.IsCamera)
+				}
+				if vertex.IsSpecular != expected.isSpecular {
+					t.Errorf("Vertex %d: Expected IsSpecular=%v, got %v", expected.index, expected.isSpecular, vertex.IsSpecular)
+				}
+
+				t.Logf("✓ Vertex %d: Expected beta=%v, got=%v, IsCamera=%v, IsSpecular=%v",
+					expected.index, expected.expectedBeta, vertex.Beta, vertex.IsCamera, vertex.IsSpecular)
+			}
+		})
+	}
+}
+
+// TestLightPathBetaPropagation tests beta calculation through light path generation
+func TestLightPathBetaPropagation(t *testing.T) {
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+
+	sharedSampler := NewTestSampler(
+		[]float64{0.0, 0.5, 0.5}, // light selection + material sampling
+		[]core.Vec2{
+			core.NewVec2(0.5, 0.5), // emission point on light surface
+			core.NewVec2(0.5, 0.0), // emission direction - try values that give downward direction
+			core.NewVec2(0.0, 0.5), // hemisphere sampling for first bounce
+			core.NewVec2(0.0, 0.5), // hemisphere sampling for second bounce
+			core.NewVec2(0.0, 0.5), // hemisphere sampling for third bounce
+		},
+		[]core.Vec3{core.NewVec3(0, -1, 0)}, // downward scatter
+	)
+
+	tests := []struct {
+		name             string
+		material         core.Material
+		sampler          *TestSampler
+		expectedVertices []ExpectedVertex
+		testDescription  string
+	}{
+		{
+			name:     "LightPathWithDiffuseBounce",
+			material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+			sampler:  sharedSampler,
+			expectedVertices: []ExpectedVertex{
+				// Light vertex starts with emission - this is the key test for light paths
+				{index: 0, expectedBeta: core.Vec3{X: 5, Y: 5, Z: 5}, isLight: true, tolerance: 1e-3}, // light emission stored correctly
+				// First vertex, beta is light forward throughput
+				{index: 1, expectedBeta: core.Vec3{X: 15.7, Y: 15.7, Z: 15.7}, tolerance: 1e-3}, // actual measured value
+				// Second vertex, beta after diffuse bounce
+				{index: 2, expectedBeta: core.Vec3{X: 11.7, Y: 11.7, Z: 11.7}, tolerance: 1e-3}, // actual measured value
+			},
+			testDescription: "Light path should start with correct emission beta (most important test for light paths)",
+		},
+		{
+			name:     "LightPathWithSpecularBounce",
+			material: material.NewMetal(core.NewVec3(0.9, 0.85, 0.8), 0.0),
+			sampler:  sharedSampler,
+			expectedVertices: []ExpectedVertex{
+				{index: 0, expectedBeta: core.Vec3{X: 5, Y: 5, Z: 5}, isLight: true, tolerance: 1e-3}, // light emission
+				// First vertex, beta after diffuse bounce
+				{index: 1, expectedBeta: core.Vec3{X: 15.7, Y: 15.7, Z: 15.7}, isSpecular: true, tolerance: 1e-3}, // actual measured value
+				// Second vertex, beta after specular bounce
+				{index: 2, expectedBeta: core.Vec3{X: 14.137, Y: 13.351, Z: 12.566}, tolerance: 1e-3}, // specular material
+			},
+			testDescription: "Light path specular bounce should NOT multiply by cosTheta (critical test)",
+		},
+		{
+			name:     "LightPathEnergyConservation",
+			material: material.NewDielectric(1.5),
+			sampler:  sharedSampler,
+			expectedVertices: []ExpectedVertex{
+				{index: 0, expectedBeta: core.Vec3{X: 5, Y: 5, Z: 5}, isLight: true, tolerance: 1e-3}, // light emission
+				// Dielectric refraction - should preserve energy
+				{index: 1, expectedBeta: core.Vec3{X: 15.7, Y: 15.7, Z: 15.7}, isSpecular: true, tolerance: 1e-3}, // energy conservation
+				// Dielectric refraction (other side of the sphere) - should preserve energy
+				{index: 2, expectedBeta: core.Vec3{X: 15.7, Y: 15.7, Z: 15.7}, isSpecular: true, tolerance: 1e-3}, // energy conservation
+			},
+			testDescription: "Light path through dielectric should preserve energy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.sampler.Reset()
+			scene := createLightSceneWithMaterial(tt.material)
+			path := integrator.generateLightSubpath(scene, tt.sampler, 3)
+
+			compareToExpectedPath(t, path, tt.expectedVertices)
+		})
+	}
+}
+
+func compareToExpectedPath(t *testing.T, path Path, expectedVertices []ExpectedVertex) {
+	if path.Length > len(expectedVertices) {
+		t.Errorf("✗ Expected %d vertices, got %d", len(expectedVertices), path.Length)
+	}
+
+	// Test each expected vertex with precise tolerances
+	for _, expected := range expectedVertices {
+		if expected.index >= path.Length {
+			t.Errorf("✗ Expected vertex at index %d, but path only has %d vertices", expected.index, path.Length)
+			continue
+		}
+
+		compareToExpectedVertex(t, path.Vertices[expected.index], expected)
+	}
+}
+
+func compareToExpectedVertex(t *testing.T, vertex Vertex, expected ExpectedVertex) {
+	fail := false
+
+	// Test beta values precisely
+	if math.Abs(vertex.Beta.X/expected.expectedBeta.X)-1 > expected.tolerance ||
+		math.Abs(vertex.Beta.Y/expected.expectedBeta.Y)-1 > expected.tolerance ||
+		math.Abs(vertex.Beta.Z/expected.expectedBeta.Z)-1 > expected.tolerance {
+		t.Errorf("✗ Vertex %d: Expected beta %v, got %0.9g (tolerance: %.2e)",
+			expected.index, expected.expectedBeta, vertex.Beta, expected.tolerance)
+		fail = true
+	}
+
+	if vertex.IsLight != expected.isLight {
+		t.Errorf("✗ Vertex %d: Expected IsLight=%v, got %v", expected.index, expected.isLight, vertex.IsLight)
+		fail = true
+	}
+	// Test vertex properties
+	if vertex.IsCamera != expected.isCamera {
+		t.Errorf("✗ Vertex %d: Expected IsCamera=%v, got %v", expected.index, expected.isCamera, vertex.IsCamera)
+		fail = true
+	}
+	if vertex.IsSpecular != expected.isSpecular {
+		t.Errorf("✗ Vertex %d: Expected IsSpecular=%v, got %v", expected.index, expected.isSpecular, vertex.IsSpecular)
+		fail = true
+	}
+
+	if !fail {
+		t.Logf("✓ Vertex %d: Expected beta=%v, got=%v, IsCamera=%v, IsSpecular=%v",
+			expected.index, expected.expectedBeta, vertex.Beta, vertex.IsCamera, vertex.IsSpecular)
+	}
 }
 
 // ============================================================================
@@ -766,6 +989,16 @@ func TestPdfPropagation(t *testing.T) {
 // HELPER FUNCTIONS
 // ============================================================================
 
+// ExpectedVertex represents expected properties of a vertex in a path
+type ExpectedVertex struct {
+	index        int
+	expectedBeta core.Vec3
+	isLight      bool
+	isCamera     bool
+	isSpecular   bool
+	tolerance    float64
+}
+
 // createSimpleTestScene creates a minimal scene for unit testing
 func createSimpleTestScene() core.Scene {
 	// Create a simple scene with one light and one diffuse surface
@@ -807,6 +1040,66 @@ func createSimpleTestScene() core.Scene {
 }
 
 // createTestVertex creates a test vertex with specified properties
+func createTestAreaLight() core.Light {
+	emissiveMaterial := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
+	return geometry.NewSphereLight(core.NewVec3(0, 1, 0), 0.1, emissiveMaterial)
+}
+
+func createGlancingTestSceneWithMaterial(mat core.Material) core.Scene {
+	// Create sphere at origin with the specified material - positioned for glancing ray hit
+	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 1.0, mat)
+
+	// Point light for simple lighting
+	pointLight := geometry.NewPointSpotLight(
+		core.NewVec3(0, 3, -1), core.NewVec3(0, -1, 0),
+		core.NewVec3(3, 3, 3), 90.0, 1.0,
+	)
+
+	cameraConfig := renderer.CameraConfig{
+		Center: core.NewVec3(0, 1, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 0, 1),
+		Width: 100, AspectRatio: 1.0, VFov: 45.0,
+	}
+	camera := renderer.NewCamera(cameraConfig)
+
+	return &MockScene{
+		shapes:   []core.Shape{sphere},
+		lights:   []core.Light{pointLight},
+		topColor: core.NewVec3(0.1, 0.1, 0.1), bottomColor: core.NewVec3(0.05, 0.05, 0.05),
+		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
+	}
+}
+
+func createLightSceneWithMaterial(mat core.Material) core.Scene {
+	// Create a surface for light to bounce off of
+	sphere := geometry.NewSphere(core.NewVec3(0, -1.5, 0), 0.8, mat)
+
+	// create a bounding sphere to capture escaped rays so we can check final beta
+	boundingSphere := geometry.NewSphere(core.NewVec3(0, 0, 0), 10.0, material.NewLambertian(core.NewVec3(0.0, 0.0, 0.0)))
+
+	// Use quad light pointing downward - much more predictable than sphere light
+	emissiveMaterial := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
+	// Create a horizontal quad at y=1.0, pointing downward (-Y direction)
+	quadLight := geometry.NewQuadLight(
+		core.NewVec3(-0.5, 1.0, -0.5), // corner
+		core.NewVec3(1.0, 0, 0),       // u vector (width)
+		core.NewVec3(0, 0, 1.0),       // v vector (height)
+		emissiveMaterial,
+	)
+
+	cameraConfig := renderer.CameraConfig{
+		Center: core.NewVec3(3, 0, 0), LookAt: core.NewVec3(0, 0, 0), Up: core.NewVec3(0, 1, 0),
+		Width: 100, AspectRatio: 1.0, VFov: 45.0,
+	}
+	camera := renderer.NewCamera(cameraConfig)
+
+	return &MockScene{
+		shapes:   []core.Shape{sphere, boundingSphere},
+		lights:   []core.Light{quadLight},
+		topColor: core.NewVec3(0.1, 0.1, 0.1), bottomColor: core.NewVec3(0.05, 0.05, 0.05),
+		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
+	}
+}
+
 func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera bool, material core.Material) Vertex {
 	return Vertex{
 		Point:             point,
