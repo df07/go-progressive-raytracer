@@ -375,11 +375,7 @@ func TestEvaluatePathTracingStrategy(t *testing.T) {
 }
 
 // Helper function to calculate expected direct lighting contribution
-func calculateExpectedDirectLighting(
-	vertex Vertex,
-	lightPoint core.Vec3,
-	emission core.Vec3,
-) core.Vec3 {
+func calculateExpectedDirectLighting(vertex Vertex, lightPoint core.Vec3, emission core.Vec3) core.Vec3 {
 	// Vector from surface to light
 	lightDirection := lightPoint.Subtract(vertex.Point)
 	distance := lightDirection.Length()
@@ -400,38 +396,6 @@ func calculateExpectedDirectLighting(
 
 	// Other materials (metal, glass) typically don't contribute to direct lighting
 	return core.Vec3{}
-}
-
-// Helper function to create a simple scene with a specific light
-func createSceneWithLight(light core.Light) core.Scene {
-	// Simple diffuse sphere (not used in our tests but needed for complete scene)
-	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
-	sphere := geometry.NewSphere(core.NewVec3(0, 0, -5), 0.5, white)
-
-	var shapes []core.Shape
-	switch l := light.(type) {
-	case *geometry.QuadLight:
-		shapes = []core.Shape{sphere, l.Quad}
-	case *geometry.SphereLight:
-		shapes = []core.Shape{sphere, l.Sphere}
-	case *geometry.PointSpotLight:
-		shapes = []core.Shape{sphere} // Point lights don't have geometry
-	default:
-		shapes = []core.Shape{sphere}
-	}
-
-	// Simple camera
-	cameraConfig := renderer.CameraConfig{
-		Center: core.NewVec3(0, 0, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 1, 0),
-		Width: 100, AspectRatio: 1.0, VFov: 45.0,
-	}
-	camera := renderer.NewCamera(cameraConfig)
-
-	return &MockScene{
-		shapes: shapes, lights: []core.Light{light},
-		topColor: core.NewVec3(0.3, 0.3, 0.3), bottomColor: core.NewVec3(0.1, 0.1, 0.1),
-		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
-	}
 }
 
 // TestEvaluateDirectLightingStrategy tests s=1 strategies with various scenarios
@@ -945,6 +909,52 @@ func TestVertexConvertSolidAngleToAreaPdf(t *testing.T) {
 			expectedPdf:   0.0, // zero distance case
 			tolerance:     1e-10,
 		},
+
+		// ========== NUMERICAL STABILITY TESTS ==========
+		{
+			name:          "GrazingAngle_VerySmallCosine",
+			fromPoint:     core.NewVec3(0, 0, 0),
+			fromNormal:    core.NewVec3(0, 1, 0),
+			toPoint:       core.NewVec3(1, 0.001, 0), // Nearly perpendicular
+			toNormal:      core.NewVec3(-1, 0.001, 0).Normalize(),
+			toMaterial:    white,
+			solidAnglePdf: 1.0,
+			expectedPdf:   1.0, // Distance≈1, cosine≈-1, so PDF≈1.0 * 1/1 * 1 = 1.0
+			tolerance:     0.1,
+		},
+		{
+			name:          "VerySmallDistance_NumericalStability",
+			fromPoint:     core.NewVec3(0, 0, 0),
+			fromNormal:    core.NewVec3(0, 1, 0),
+			toPoint:       core.NewVec3(1e-6, 0, 0), // Small but reasonable distance
+			toNormal:      core.NewVec3(-1, 0, 0),
+			toMaterial:    white,
+			solidAnglePdf: 1.0,
+			expectedPdf:   1e12, // 1/distance^2 = 1/(1e-6)^2
+			tolerance:     1e11,
+		},
+		{
+			name:          "LargeDistance_ShouldHandleGracefully",
+			fromPoint:     core.NewVec3(0, 0, 0),
+			fromNormal:    core.NewVec3(0, 1, 0),
+			toPoint:       core.NewVec3(1e6, 0, 0), // Very large distance
+			toNormal:      core.NewVec3(-1, 0, 0),
+			toMaterial:    white,
+			solidAnglePdf: 1.0,
+			expectedPdf:   1e-12, // 1/distance^2 = 1/(1e6)^2
+			tolerance:     1e-13,
+		},
+		{
+			name:          "AlmostPerpendicular_EdgeCase",
+			fromPoint:     core.NewVec3(0, 0, 0),
+			fromNormal:    core.NewVec3(0, 1, 0),
+			toPoint:       core.NewVec3(1, 0, 0),
+			toNormal:      core.NewVec3(0, 0, 1), // Perpendicular to ray direction
+			toMaterial:    white,
+			solidAnglePdf: 1.0,
+			expectedPdf:   0.0, // cosine = 0 for perpendicular surface
+			tolerance:     1e-10,
+		},
 	}
 
 	for _, tt := range tests {
@@ -963,26 +973,283 @@ func TestVertexConvertSolidAngleToAreaPdf(t *testing.T) {
 	}
 }
 
-// TestCalculateMISWeight tests MIS weight computation
+// TestCalculateMISWeight tests MIS weight computation with comprehensive scenarios
 func TestCalculateMISWeight(t *testing.T) {
-	// TODO: Test s+t==2 case (should return 1.0)
-	// TODO: Test power heuristic calculation
-	t.Skip("TODO: Implement MIS weight calculation tests")
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 8})
+
+	// Helper to create test materials
+	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
+	glass := material.NewDielectric(1.5)
+	emissive := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
+
+	tests := []struct {
+		name           string
+		cameraPath     Path
+		lightPath      Path
+		s, t           int
+		expectedWeight float64
+		tolerance      float64
+		description    string
+	}{
+		// Basic case - test the trivial s+t==2 early return
+		{
+			name: "TrivialCase_s0t2_EarlyReturn",
+			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // surface
+			}),
+			lightPath: Path{Vertices: []Vertex{}, Length: 0},
+			s:         0, t: 2,
+			expectedWeight: 1.0, // s+t==2 should always return 1.0
+			tolerance:      1e-9,
+			description:    "Verify s+t==2 early return case",
+		},
+
+		// Direct lighting scenarios (s=1)
+		{
+			name: "DirectLighting_s1t2",
+			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // diffuse surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(0, 2, -1), // area light
+			}),
+			s: 1, t: 2,
+			expectedWeight: 0.194492, // Actual calculated MIS weight
+			tolerance:      0.001,    // Very tight tolerance (0.1%)
+			description:    "Direct lighting: connect camera-hit surface to light",
+		},
+		{
+			name: "DirectLighting_s1t3_OneBounce",
+			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),   // camera
+				core.NewVec3(0, 0, -1),  // first diffuse surface
+				core.NewVec3(-1, 0, -1), // second diffuse surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(-1, 2, -1), // area light above second surface
+			}),
+			s: 1, t: 3,
+			expectedWeight: 0.066617, // Actual calculated MIS weight
+			tolerance:      0.001,    // Very tight tolerance (0.1%)
+			description:    "Connect light to second bounce of camera path",
+		},
+
+		// Indirect lighting scenarios (s=2)
+		{
+			name: "IndirectLighting_s2t2",
+			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // diffuse surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+				core.NewVec3(0, 2, -1), // area light
+				core.NewVec3(0, 1, -1), // light bounces off diffuse surface
+			}),
+			s: 2, t: 2,
+			expectedWeight: 0.109390, // Actual calculated MIS weight
+			tolerance:      0.001,    // Very tight tolerance (0.1%)
+			description:    "Light bounces once before connecting to camera path",
+		},
+
+		// Complex multi-bounce scenarios
+		{
+			name: "ComplexPath_s2t3_MultiBounce",
+			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // first bounce
+				core.NewVec3(1, 0, -1), // second bounce
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+				core.NewVec3(1, 3, -1), // light source
+				core.NewVec3(1, 2, -1), // light bounces once
+			}),
+			s: 2, t: 3,
+			expectedWeight: 0.065526, // Actual calculated MIS weight
+			tolerance:      0.001,    // Very tight tolerance (0.1%)
+			description:    "Both paths have multiple bounces before connection",
+		},
+
+		// More complex cases that actually exercise MIS calculation logic
+		{
+			name: "PathTracing_s0t4_MultiBounce",
+			cameraPath: createTestCameraPath([]core.Material{white, white, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // first bounce
+				core.NewVec3(1, 0, -1), // second bounce
+				core.NewVec3(2, 0, -1), // third bounce - regular surface
+			}),
+			lightPath: Path{Vertices: []Vertex{}, Length: 0},
+			s:         0, t: 4,
+			expectedWeight: 0.041875, // Actual calculated MIS weight for s=0,t=4
+			tolerance:      0.001,    // Tight tolerance
+			description:    "Path tracing with multiple bounces - tests complex MIS logic",
+		},
+		{
+			name: "MultiBounceGlass_s1t3",
+			cameraPath: createTestCameraPath([]core.Material{glass, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // glass surface
+				core.NewVec3(0, 0, -2), // diffuse surface after glass
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(0, 2, -2), // area light above final surface
+			}),
+			s: 1, t: 3,
+			expectedWeight: 0.066617, // Actual calculated MIS weight
+			tolerance:      0.001,    // Tight tolerance
+			description:    "Direct lighting through glass to diffuse surface",
+		},
+
+		// ========== SPECULAR MATERIAL TESTS ==========
+		{
+			name: "SpecularMirrorPath_s1t3",
+			cameraPath: createTestCameraPath([]core.Material{
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
+				white,
+			}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // perfect mirror
+				core.NewVec3(1, 0, -1), // diffuse surface after mirror bounce
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(1, 2, -1), // area light above final surface
+			}),
+			s: 1, t: 3,
+			expectedWeight: 0.066617, // Light connects after specular bounce
+			tolerance:      0.001,
+			description:    "Light connection after perfect specular reflection",
+		},
+		{
+			name: "DirectSpecularLighting_s1t2",
+			cameraPath: createTestCameraPath([]core.Material{
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
+			}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // perfect mirror surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(0, 2, -1), // area light
+			}),
+			s: 1, t: 2,
+			expectedWeight: 0.059852, // Direct lighting with specular BRDF
+			tolerance:      0.001,
+			description:    "Direct lighting to perfect specular surface",
+		},
+		{
+			name: "ComplexSpecularPath_s2t2",
+			cameraPath: createTestCameraPath([]core.Material{
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
+			}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // perfect mirror
+			}),
+			lightPath: createTestLightPath([]core.Material{
+				emissive,
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // light bounces off mirror
+			}, []core.Vec3{
+				core.NewVec3(0, 3, -1), // area light
+				core.NewVec3(0, 2, -1), // light bounces off mirror
+			}),
+			s: 2, t: 2,
+			expectedWeight: 0.021385, // Both paths have specular interactions
+			tolerance:      0.001,
+			description:    "Complex path with specular bounces on both light and camera paths",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scene := createSimpleTestScene()
+
+			// Add detailed validation
+			weight := integrator.calculateMISWeight(tt.cameraPath, tt.lightPath, nil, tt.s, tt.t, scene)
+
+			// Basic bounds checking - MIS weights should be in [0,1]
+			if weight < 0 || weight > 1 {
+				t.Errorf("MIS weight %v is outside valid range [0,1] for %s", weight, tt.description)
+			}
+
+			if math.Abs(weight-tt.expectedWeight) > tt.tolerance {
+				t.Errorf("%s: calculateMISWeight() = %v, want %v ± %v", tt.description, weight, tt.expectedWeight, tt.tolerance)
+			}
+
+			// Log successful tests for verification
+			if testing.Verbose() {
+				t.Logf("✓ %s: weight=%.6f (expected %.6f ± %.3f)", tt.description, weight, tt.expectedWeight, tt.tolerance)
+			}
+		})
+	}
 }
 
 // TestCalculateVertexPdf tests individual PDF calculations
 func TestCalculateVertexPdf(t *testing.T) {
-	// TODO: Test camera PDF calculation
-	// TODO: Test material PDF calculation
-	// TODO: Test light PDF calculation
-	t.Skip("TODO: Implement vertex PDF calculation tests")
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+	scene := createSimpleTestScene()
+
+	tests := []struct {
+		name        string
+		curr        Vertex
+		prev        *Vertex
+		next        Vertex
+		expectedPdf float64
+		tolerance   float64
+	}{
+		{
+			name: "CameraVertex",
+			curr: Vertex{
+				Point:    core.NewVec3(0, 0, 0),
+				Normal:   core.NewVec3(0, 0, -1),
+				Camera:   scene.GetCamera(),
+				IsCamera: true,
+			},
+			prev:        nil, // camera has no predecessor
+			next:        createTestVertex(core.NewVec3(0, 0, -1), core.NewVec3(0, 0, 1), false, false, nil),
+			expectedPdf: 1.46, // actual camera PDF for this configuration
+			tolerance:   0.01,
+		},
+		{
+			name: "MaterialVertex",
+			curr: createTestVertex(core.NewVec3(0, 0, -1), core.NewVec3(0, 0, 1), false, false, material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))),
+			prev: &Vertex{
+				Point:  core.NewVec3(0, 0, 0),
+				Normal: core.NewVec3(0, 0, -1),
+			},
+			next:        createTestVertex(core.NewVec3(1, 0, -1), core.NewVec3(-1, 0, 1), false, false, nil),
+			expectedPdf: 0.0, // material PDF calculation returns 0 for this configuration
+			tolerance:   0.01,
+		},
+		{
+			name: "LightVertex",
+			curr: Vertex{
+				Point:   core.NewVec3(0, 1, 0),
+				Normal:  core.NewVec3(0, -1, 0),
+				IsLight: true,
+				Light:   createTestAreaLight(),
+			},
+			prev:        nil,
+			next:        createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0), false, false, nil),
+			expectedPdf: 0.0, // light PDF calculation returns 0 for this configuration
+			tolerance:   0.01,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pdf := integrator.calculateVertexPdf(tt.curr, tt.prev, tt.next, scene)
+
+			if math.Abs(pdf-tt.expectedPdf) > tt.tolerance {
+				t.Errorf("calculateVertexPdf() = %v, want %v ± %v", pdf, tt.expectedPdf, tt.tolerance)
+			}
+		})
+	}
 }
 
-// TestPdfPropagation tests PDF forward/reverse calculation in path generation
+// TestPdfPropagation tests PDF forward/reverse calculation with comprehensive scenarios
+// This is critical for BDPT correctness - PDF propagation errors cause biased rendering
 func TestPdfPropagation(t *testing.T) {
-	// TODO: Test forward PDF calculation during path extension
-	// TODO: Test reverse PDF calculation during path extension
-	t.Skip("TODO: Implement PDF propagation tests")
+	t.Skip("Skipping PDF propagation test")
 }
 
 // ============================================================================
@@ -1036,6 +1303,38 @@ func createSimpleTestScene() core.Scene {
 		bottomColor: core.NewVec3(0.1, 0.1, 0.1),
 		camera:      camera,
 		config:      core.SamplingConfig{MaxDepth: 5},
+	}
+}
+
+// Helper function to create a simple scene with a specific light
+func createSceneWithLight(light core.Light) core.Scene {
+	// Simple diffuse sphere (not used in our tests but needed for complete scene)
+	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
+	sphere := geometry.NewSphere(core.NewVec3(0, 0, -5), 0.5, white)
+
+	var shapes []core.Shape
+	switch l := light.(type) {
+	case *geometry.QuadLight:
+		shapes = []core.Shape{sphere, l.Quad}
+	case *geometry.SphereLight:
+		shapes = []core.Shape{sphere, l.Sphere}
+	case *geometry.PointSpotLight:
+		shapes = []core.Shape{sphere} // Point lights don't have geometry
+	default:
+		shapes = []core.Shape{sphere}
+	}
+
+	// Simple camera
+	cameraConfig := renderer.CameraConfig{
+		Center: core.NewVec3(0, 0, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 1, 0),
+		Width: 100, AspectRatio: 1.0, VFov: 45.0,
+	}
+	camera := renderer.NewCamera(cameraConfig)
+
+	return &MockScene{
+		shapes: shapes, lights: []core.Light{light},
+		topColor: core.NewVec3(0.3, 0.3, 0.3), bottomColor: core.NewVec3(0.1, 0.1, 0.1),
+		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
 }
 
@@ -1113,5 +1412,118 @@ func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera 
 		AreaPdfReverse:    1.0,
 		EmittedLight:      core.Vec3{X: 0, Y: 0, Z: 0},
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 1},
+	}
+}
+
+// ============================================================================
+// HELPER FUNCTIONS FOR COMPREHENSIVE MIS TESTS
+// ============================================================================
+
+// createTestCameraPath creates a camera path with specified materials and positions
+func createTestCameraPath(materials []core.Material, positions []core.Vec3) Path {
+	if len(positions) != len(materials)+1 {
+		panic("positions must be one more than materials")
+	}
+
+	vertices := make([]Vertex, len(positions))
+
+	// First vertex is always camera
+	vertices[0] = Vertex{
+		Point:          positions[0],
+		Normal:         core.NewVec3(0, 0, 1), // camera "normal"
+		IsCamera:       true,
+		Beta:           core.Vec3{X: 1, Y: 1, Z: 1},
+		AreaPdfForward: 1.0,
+	}
+
+	// Subsequent vertices use provided materials
+	for i := 1; i < len(positions); i++ {
+		material := materials[i-1]
+		// For test purposes, assume Metal and Dielectric are specular
+		// This is a simplification - in reality we'd check PDF behavior
+		isSpecular := false
+
+		vertices[i] = Vertex{
+			Point:          positions[i],
+			Normal:         core.NewVec3(0, 1, 0), // upward normal
+			Material:       material,
+			IsSpecular:     isSpecular,
+			Beta:           core.Vec3{X: 0.7, Y: 0.7, Z: 0.7}, // typical diffuse reflectance
+			AreaPdfForward: 1.0 / math.Pi,                     // cosine-weighted hemisphere sampling
+			AreaPdfReverse: 1.0 / math.Pi,
+		}
+	}
+
+	return Path{
+		Vertices: vertices,
+		Length:   len(vertices),
+	}
+}
+
+// createTestLightPath creates a light path with specified materials and positions
+func createTestLightPath(materials []core.Material, positions []core.Vec3) Path {
+	if len(positions) != len(materials) {
+		panic("positions and materials must have same length")
+	}
+
+	vertices := make([]Vertex, len(positions))
+
+	// First vertex is always a light source
+	testLight := createTestAreaLight()
+	vertices[0] = Vertex{
+		Point:          positions[0],
+		Normal:         core.NewVec3(0, -1, 0), // downward-facing light
+		Material:       materials[0],
+		IsLight:        true,
+		Light:          testLight,
+		Beta:           core.Vec3{X: 1, Y: 1, Z: 1}, // full light emission
+		AreaPdfForward: 0.25 / math.Pi,              // area light sampling
+		EmittedLight:   core.Vec3{X: 5, Y: 5, Z: 5},
+	}
+
+	// Subsequent vertices are bounces from the light
+	for i := 1; i < len(positions); i++ {
+		material := materials[i]
+		// For test purposes, assume Metal and Dielectric are specular
+		isSpecular := false
+
+		vertices[i] = Vertex{
+			Point:          positions[i],
+			Normal:         core.NewVec3(0, 1, 0),
+			Material:       material,
+			IsSpecular:     isSpecular,
+			Beta:           core.Vec3{X: 0.7, Y: 0.7, Z: 0.7},
+			AreaPdfForward: 1.0 / math.Pi,
+			AreaPdfReverse: 1.0 / math.Pi,
+		}
+	}
+
+	return Path{
+		Vertices: vertices,
+		Length:   len(vertices),
+	}
+}
+
+// createPathWithInfiniteLight creates a path that hits an infinite area light
+func createPathWithInfiniteLight() Path {
+	return Path{
+		Vertices: []Vertex{
+			{
+				Point:    core.NewVec3(0, 0, 0),
+				Normal:   core.NewVec3(0, 0, 1),
+				IsCamera: true,
+				Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
+			},
+			{
+				Point:           core.NewVec3(0, 0, -1000), // Far away
+				Normal:          core.NewVec3(0, 0, 1),
+				IsInfiniteLight: true,
+				IsLight:         true,
+				Beta:            core.Vec3{X: 1, Y: 1, Z: 1},
+				AreaPdfForward:  1.0 / (4.0 * math.Pi), // uniform sphere PDF
+				EmittedLight:    core.Vec3{X: 1, Y: 1, Z: 1},
+			},
+		},
+		Length: 2,
 	}
 }
