@@ -617,8 +617,12 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 func TestCameraPathBetaPropagation(t *testing.T) {
 	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
 
-	// Use consistent glancing ray that produces cosTheta ≈ 0.866 for all material tests
-	glancingRay := core.NewRay(core.NewVec3(-2, 0.5, -1), core.NewVec3(1, 0, 0))
+	// Create a glancing ray that comes from the camera and hits the sphere at an angle
+	// Camera is at origin, sphere is at (0,0,-2) with radius 1
+	// To get a glancing hit, aim toward a point on the sphere's surface at an angle
+	cameraOrigin := core.NewVec3(0, 0, 0)
+	sphereGlancingPoint := core.NewVec3(0.5, 0, -1.5) // Point on sphere surface for glancing hit
+	glancingRay := core.NewRayTo(cameraOrigin, sphereGlancingPoint)
 
 	tests := []struct {
 		name             string
@@ -1249,7 +1253,219 @@ func TestCalculateVertexPdf(t *testing.T) {
 // TestPdfPropagation tests PDF forward/reverse calculation with comprehensive scenarios
 // This is critical for BDPT correctness - PDF propagation errors cause biased rendering
 func TestPdfPropagation(t *testing.T) {
-	t.Skip("Skipping PDF propagation test")
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+
+	// Comprehensive table-driven test for PDF propagation in both camera and light paths
+	tests := []struct {
+		name               string
+		pathType           string // "camera" or "light"
+		material           core.Material
+		sampler            *TestSampler
+		expectedVertexPdfs []ExpectedPdfVertex
+		sceneName          string // "default" or "cornell"
+		testDescription    string
+	}{
+		// ========== CAMERA PATH TESTS ==========
+		{
+			name:     "CameraPath_Diffuse_MultipleSurfaceBounces",
+			pathType: "camera",
+			material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+			sampler: NewTestSampler(
+				[]float64{0.5, 0.5, 0.5, 0.5, 0.5}, // more values for multiple bounces
+				[]core.Vec2{
+					core.NewVec2(0.8, 0.5), // scatter toward other surface
+					core.NewVec2(0.3, 0.7), // additional scatter
+					core.NewVec2(0.1, 0.9), // additional scatter
+				},
+				[]core.Vec3{
+					core.NewVec3(-0.5, 0.5, 0.3), // scatter toward other surface
+					core.NewVec3(0.2, -0.8, 0.1), // additional scatter
+				},
+			),
+			expectedVertexPdfs: []ExpectedPdfVertex{
+				{index: 0, expectedForwardPdf: 0.0, expectedReversePdf: 1.424e-6, tolerance: 1e-6, description: "Camera vertex with correct reverse PDF"},
+				{index: 1, expectedForwardPdf: 0.0, expectedReversePdf: 0.886e-6, tolerance: 1e-6, description: "First surface hit with correct reverse PDF"},
+				{index: 2, expectedForwardPdf: 1.000e-6, expectedReversePdf: 1.263e-6, tolerance: 1e-6, description: "Second surface hit with correct reverse PDF"}, // Measured: 0.000001
+				{index: 3, expectedForwardPdf: 1.263e-6, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Third surface hit - correctly has no reverse PDF"}, // Measured: 0.000001263
+			},
+			sceneName:       "cornell",
+			testDescription: "Camera path with multiple surface bounces - tests reverse PDF propagation",
+		},
+		{
+			name:     "CameraPath_Diffuse_BasicPropagation",
+			pathType: "camera",
+			material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+			sampler: NewTestSampler(
+				[]float64{0.5, 0.5},
+				[]core.Vec2{core.NewVec2(0.0, 0.5)},
+				[]core.Vec3{core.NewVec3(0, 1, 0)},
+			),
+			expectedVertexPdfs: []ExpectedPdfVertex{
+				{index: 0, expectedForwardPdf: 0.0, expectedReversePdf: 0.195589, tolerance: 1e-6, description: "Camera vertex with reverse PDF from surface scatter"},
+				{index: 1, expectedForwardPdf: 1.048629, expectedReversePdf: 0.0, tolerance: 1e-6, description: "First surface hit - no reverse PDF because next vertex is background"},
+				{index: 2, expectedForwardPdf: 0.225079, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Background vertex"},
+			},
+			sceneName:       "default",
+			testDescription: "Camera path with diffuse material - tests basic PDF propagation to background",
+		},
+		{
+			name:     "CameraPath_Specular_DeltaFunctions",
+			pathType: "camera",
+			material: material.NewMetal(core.NewVec3(0.9, 0.85, 0.8), 0.0),
+			sampler: NewTestSampler(
+				[]float64{0.5},
+				[]core.Vec2{core.NewVec2(0.5, 0.5)},
+				[]core.Vec3{core.NewVec3(0, 0, 1)},
+			),
+			expectedVertexPdfs: []ExpectedPdfVertex{
+				{index: 0, expectedForwardPdf: 0.0, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Camera vertex"},
+				{index: 1, expectedForwardPdf: 1.048629, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Specular surface hit"},
+				{index: 2, expectedForwardPdf: 0.0, expectedReversePdf: 0.0, tolerance: 1e-6, description: "After specular bounce (delta PDF)"},
+			},
+			sceneName:       "default",
+			testDescription: "Camera path with specular material - tests delta function handling",
+		},
+		{
+			name:     "CameraPath_Dielectric_EnergyConservation",
+			pathType: "camera",
+			material: material.NewDielectric(1.5),
+			sampler: NewTestSampler(
+				[]float64{0.2, 0.5, 0.5, 0.5},
+				[]core.Vec2{core.NewVec2(0.5, 0.5), core.NewVec2(0.3, 0.7)},
+				[]core.Vec3{core.NewVec3(0, 0, 1), core.NewVec3(0, 1, 0)},
+			),
+			expectedVertexPdfs: []ExpectedPdfVertex{
+				{index: 0, expectedForwardPdf: 0.0, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Camera vertex"},
+				{index: 1, expectedForwardPdf: 1.048629, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Dielectric surface hit"},
+				{index: 2, expectedForwardPdf: 0.0, expectedReversePdf: 0.0, tolerance: 1e-6, description: "After dielectric interaction (delta PDF)"},
+			},
+			sceneName:       "default",
+			testDescription: "Camera path with dielectric material - tests refraction PDF handling",
+		},
+
+		// ========== LIGHT PATH TESTS ==========
+		{
+			name:     "LightPath_Diffuse_EmissionPropagation",
+			pathType: "light",
+			material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+			sampler: NewTestSampler(
+				[]float64{0.0, 0.5, 0.5, 0.5, 0.5, 0.5}, // more values for multiple bounces
+				[]core.Vec2{
+					core.NewVec2(0.5, 0.5), // emission point
+					core.NewVec2(0.5, 0.0), // emission direction
+					core.NewVec2(0.0, 0.5), // hemisphere sampling for first bounce
+					core.NewVec2(0.0, 0.5), // hemisphere sampling for second bounce
+					core.NewVec2(0.0, 0.5), // hemisphere sampling for third bounce
+				},
+				[]core.Vec3{core.NewVec3(0, -1, 0)},
+			),
+			expectedVertexPdfs: []ExpectedPdfVertex{
+				{index: 0, expectedForwardPdf: 1.000000, expectedReversePdf: 0.110142, tolerance: 1e-6, description: "Light vertex with reverse PDF from first bounce"},
+				{index: 1, expectedForwardPdf: 0.110142, expectedReversePdf: 0.002046, tolerance: 1e-6, description: "First bounce from light with reverse PDF"},
+				{index: 2, expectedForwardPdf: 0.002046, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Second bounce in light path"},
+			},
+			sceneName:       "default",
+			testDescription: "Light path with diffuse bounces - tests emission PDF propagation",
+		},
+		{
+			name:     "LightPath_Specular_DeltaHandling",
+			pathType: "light",
+			material: material.NewMetal(core.NewVec3(0.9, 0.85, 0.8), 0.0),
+			sampler: NewTestSampler(
+				[]float64{0.0, 0.5, 0.5, 0.5, 0.5, 0.5}, // more values for multiple bounces
+				[]core.Vec2{
+					core.NewVec2(0.5, 0.5), // emission point
+					core.NewVec2(0.5, 0.0), // emission direction
+					core.NewVec2(0.0, 0.5), // not used for specular but needed for other path logic
+					core.NewVec2(0.0, 0.5), // additional values
+					core.NewVec2(0.0, 0.5), // additional values
+				},
+				[]core.Vec3{core.NewVec3(0, -1, 0)},
+			),
+			expectedVertexPdfs: []ExpectedPdfVertex{
+				{index: 0, expectedForwardPdf: 1.000000, expectedReversePdf: 0.0, tolerance: 1e-6, description: "Light vertex - no reverse PDF for specular next vertex"},
+				{index: 1, expectedForwardPdf: 0.110142, expectedReversePdf: 0.002780, tolerance: 1e-6, description: "Specular surface in light path with reverse PDF"},
+				{index: 2, expectedForwardPdf: 0.0, expectedReversePdf: 0.0, tolerance: 1e-9, description: "After specular bounce in light path"},
+			},
+			sceneName:       "default",
+			testDescription: "Light path with specular material - tests delta function in light transport",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var path Path
+
+			if tt.pathType == "camera" {
+				var scene core.Scene
+				var ray core.Ray
+
+				if tt.sceneName == "cornell" {
+					// Use Cornell scene for multiple surface bounces
+					scene = createMinimalCornellScene(false)
+					// Ray from camera toward floor center for reliable surface bounces
+					ray = core.NewRay(
+						core.NewVec3(278, 400, -200),         // Camera position
+						core.NewVec3(0, -1, 0.5).Normalize(), // Ray toward floor center
+					)
+				} else {
+					// Use sphere scene for other tests
+					scene = createGlancingTestSceneWithMaterial(tt.material)
+					cameraOrigin := core.NewVec3(0, 0, 0)
+					sphereGlancingPoint := core.NewVec3(0.5, 0, -1.5)
+					ray = core.NewRayTo(cameraOrigin, sphereGlancingPoint)
+				}
+
+				path = integrator.generateCameraSubpath(ray, scene, tt.sampler, 3)
+			} else {
+				// Generate light path
+				tt.sampler.Reset()
+				scene := createLightSceneWithMaterial(tt.material)
+				path = integrator.generateLightSubpath(scene, tt.sampler, 3)
+			}
+
+			// Debug: log actual path length and all PDF values
+			t.Logf("Path type: %s, Length: %d", tt.pathType, path.Length)
+			for i, vertex := range path.Vertices {
+				t.Logf("Vertex %d: Forward=%f, Reverse=%.9f, IsSpecular=%v, Material=%v",
+					i, vertex.AreaPdfForward, vertex.AreaPdfReverse, vertex.IsSpecular, vertex.Material != nil)
+			}
+
+			// Verify we have expected vertices
+			if path.Length < len(tt.expectedVertexPdfs) {
+				t.Fatalf("Expected at least %d vertices, got %d", len(tt.expectedVertexPdfs), path.Length)
+			}
+
+			// Test each vertex's PDF values
+			for _, expectedPdf := range tt.expectedVertexPdfs {
+				if expectedPdf.index >= path.Length {
+					t.Errorf("Expected vertex at index %d, but path only has %d vertices", expectedPdf.index, path.Length)
+					continue
+				}
+
+				vertex := path.Vertices[expectedPdf.index]
+
+				// Test forward PDF
+				if math.Abs(vertex.AreaPdfForward-expectedPdf.expectedForwardPdf) > expectedPdf.tolerance {
+					t.Errorf("Vertex %d (%s): Expected AreaPdfForward=%f, got %f (diff: %e)",
+						expectedPdf.index, expectedPdf.description,
+						expectedPdf.expectedForwardPdf, vertex.AreaPdfForward,
+						math.Abs(vertex.AreaPdfForward-expectedPdf.expectedForwardPdf))
+				}
+
+				// Test reverse PDF
+				if math.Abs(vertex.AreaPdfReverse-expectedPdf.expectedReversePdf) > expectedPdf.tolerance {
+					t.Errorf("Vertex %d (%s): Expected AreaPdfReverse=%f, got %f (diff: %e)",
+						expectedPdf.index, expectedPdf.description,
+						expectedPdf.expectedReversePdf, vertex.AreaPdfReverse,
+						math.Abs(vertex.AreaPdfReverse-expectedPdf.expectedReversePdf))
+				}
+
+				t.Logf("✓ Vertex %d (%s): Forward=%f, Reverse=%f",
+					expectedPdf.index, expectedPdf.description, vertex.AreaPdfForward, vertex.AreaPdfReverse)
+			}
+		})
+	}
 }
 
 // ============================================================================
@@ -1264,6 +1480,15 @@ type ExpectedVertex struct {
 	isCamera     bool
 	isSpecular   bool
 	tolerance    float64
+}
+
+// ExpectedPdfVertex represents expected PDF values for a vertex in a path
+type ExpectedPdfVertex struct {
+	index              int
+	expectedForwardPdf float64
+	expectedReversePdf float64
+	tolerance          float64
+	description        string
 }
 
 // createSimpleTestScene creates a minimal scene for unit testing
@@ -1345,17 +1570,19 @@ func createTestAreaLight() core.Light {
 }
 
 func createGlancingTestSceneWithMaterial(mat core.Material) core.Scene {
-	// Create sphere at origin with the specified material - positioned for glancing ray hit
-	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 1.0, mat)
+	// Create sphere with the specified material - positioned for camera ray hit
+	// Sphere is centered at (0, 0, -2) so camera at origin can hit it
+	sphere := geometry.NewSphere(core.NewVec3(0, 0, -2), 1.0, mat)
 
 	// Point light for simple lighting
 	pointLight := geometry.NewPointSpotLight(
-		core.NewVec3(0, 3, -1), core.NewVec3(0, -1, 0),
+		core.NewVec3(0, 3, -2), core.NewVec3(0, -1, 0),
 		core.NewVec3(3, 3, 3), 90.0, 1.0,
 	)
 
+	// Camera setup that matches createSimpleTestScene - at origin looking toward -Z
 	cameraConfig := renderer.CameraConfig{
-		Center: core.NewVec3(0, 1, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 0, 1),
+		Center: core.NewVec3(0, 0, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 1, 0),
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
 	camera := renderer.NewCamera(cameraConfig)
@@ -1526,4 +1753,148 @@ func createPathWithInfiniteLight() Path {
 		},
 		Length: 2,
 	}
+}
+
+// createMinimalCornellScene creates a Cornell scene with walls, floor and quad light
+func createMinimalCornellScene(includeBoxes bool) core.Scene {
+	// Create a basic scene
+	scene := &TestScene{
+		shapes: make([]core.Shape, 0),
+		lights: make([]core.Light, 0),
+	}
+
+	// Create materials (same as real Cornell scene)
+	white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+	red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+	green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+
+	// Add Cornell walls (same as pkg/scene/cornell.go)
+	// Floor
+	floor := geometry.NewQuad(
+		core.NewVec3(0.0, 0.0, 0.0),
+		core.NewVec3(556, 0.0, 0.0),
+		core.NewVec3(0.0, 0.0, 556),
+		white,
+	)
+
+	// Ceiling
+	ceiling := geometry.NewQuad(
+		core.NewVec3(0.0, 556, 0.0),
+		core.NewVec3(556, 0.0, 0.0),
+		core.NewVec3(0.0, 0.0, 556),
+		white,
+	)
+
+	// Back wall
+	backWall := geometry.NewQuad(
+		core.NewVec3(0.0, 0.0, 556),
+		core.NewVec3(556.0, 0.0, 0.0),
+		core.NewVec3(0.0, 556, 0.0),
+		white,
+	)
+
+	// Left wall (red)
+	leftWall := geometry.NewQuad(
+		core.NewVec3(0.0, 0.0, 0.0),
+		core.NewVec3(0.0, 0.0, 556),
+		core.NewVec3(0.0, 556, 0.0),
+		red,
+	)
+
+	// Right wall (green)
+	rightWall := geometry.NewQuad(
+		core.NewVec3(556, 0.0, 0.0),
+		core.NewVec3(0.0, 0.0, 556),
+		core.NewVec3(0.0, 556, 0.0),
+		green,
+	)
+
+	scene.shapes = append(scene.shapes, floor, ceiling, backWall, leftWall, rightWall)
+
+	// Quad light - same as Cornell scene
+	lightCorner := core.NewVec3(213.0, 556-0.001, 227.0)         // Slightly below ceiling
+	lightU := core.NewVec3(130.0, 0, 0)                          // U vector (X direction)
+	lightV := core.NewVec3(0, 0, 105.0)                          // V vector (Z direction)
+	lightEmission := core.NewVec3(18.0, 15.0, 8.0).Multiply(2.5) // Warm yellowish white
+
+	// Create emissive material and quad light
+	emissiveMat := material.NewEmissive(lightEmission)
+	quadLight := geometry.NewQuadLight(lightCorner, lightU, lightV, emissiveMat)
+	scene.lights = append(scene.lights, quadLight)
+	scene.shapes = append(scene.shapes, quadLight.Quad)
+
+	// directly copied from pkg/scene/cornell.go
+	if includeBoxes {
+		white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+		// Mirror material for the tall block - highly reflective surface
+		mirror := material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0) // Very shiny mirror
+
+		// Custom configuration: tall mirrored box on left, short white box on right
+		// This should show the red wall reflection in the mirrored surface
+
+		// Short box (white, diffuse) - positioned on the RIGHT side
+		shortBoxCenter := core.NewVec3(370.0, 82.5, 169.0) // Right side, front
+		shortBox := geometry.NewBox(
+			shortBoxCenter,                     // center position
+			core.NewVec3(82.5, 82.5, 82.5),     // size (half-extents: 165/2 for each dimension)
+			core.NewVec3(0, 18*math.Pi/180, 0), // rotation (18 degrees around Y axis)
+			white,                              // white lambertian material
+		)
+
+		// Tall box (mirrored) - positioned on the LEFT side
+		tallBoxCenter := core.NewVec3(185.0, 165.0, 351.0) // Left side, back
+		tallBox := geometry.NewBox(
+			tallBoxCenter,                       // center position
+			core.NewVec3(82.5, 165.0, 82.5),     // size (half-extents: 165/2, 330/2, 165/2)
+			core.NewVec3(0, -20*math.Pi/180, 0), // rotation (-15 degrees) - angled to catch red wall reflection
+			mirror,                              // mirror material
+		)
+
+		// Add boxes to scene
+		scene.shapes = append(scene.shapes, shortBox, tallBox)
+	}
+
+	return scene
+}
+
+// TestScene is a minimal scene implementation for testing
+type TestScene struct {
+	shapes []core.Shape
+	lights []core.Light
+	bvh    *core.BVH
+	camera *renderer.Camera
+}
+
+func (s *TestScene) GetShapes() []core.Shape { return s.shapes }
+func (s *TestScene) GetLights() []core.Light { return s.lights }
+func (s *TestScene) GetBVH() *core.BVH {
+	if s.bvh == nil {
+		s.bvh = core.NewBVH(s.shapes)
+	}
+	return s.bvh
+}
+func (s *TestScene) GetBackgroundColors() (core.Vec3, core.Vec3) {
+	// Black background for simplicity
+	return core.NewVec3(0, 0, 0), core.NewVec3(0, 0, 0)
+}
+func (s *TestScene) GetSamplingConfig() core.SamplingConfig {
+	return core.SamplingConfig{MaxDepth: 5, SamplesPerPixel: 1}
+}
+func (s *TestScene) GetCamera() core.Camera {
+	if s.camera == nil {
+		// Create a realistic camera for PDF testing - matches Cornell box setup exactly
+		config := renderer.CameraConfig{
+			Center:        core.NewVec3(278, 278, -800), // Cornell box camera position
+			LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
+			Up:            core.NewVec3(0, 1, 0),        // Standard up direction
+			Width:         400,
+			AspectRatio:   1.0,  // Square aspect ratio for Cornell box
+			VFov:          40.0, // Official Cornell field of view
+			Aperture:      0.0,  // No depth of field for Cornell box
+			FocusDistance: 0.0,  // Auto-calculate focus distance
+		}
+		s.camera = renderer.NewCamera(config)
+	}
+
+	return s.camera
 }

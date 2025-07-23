@@ -185,7 +185,8 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, sampler core.
 // This is the common logic shared between camera and light path generation after the initial vertex
 func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta core.Vec3, pdfFwd float64, scene core.Scene, sampler core.Sampler, maxBounces int, isCameraPath bool) {
 	for bounces := 0; bounces < maxBounces; bounces++ {
-		vertexPrev := path.Vertices[path.Length-1]
+		vertexPrevIndex := path.Length - 1
+		vertexPrev := &path.Vertices[vertexPrevIndex] // Still need copy for calculations
 
 		// Check for intersections
 		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, math.Inf(1))
@@ -275,7 +276,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 
 		// Set reverse PDF into the previous vertex, from the pdf of the current vertex
 		// pbrt: prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
-		vertexPrev.AreaPdfReverse = vertex.convertSolidAngleToAreaPdf(vertexPrev, pdfRev)
+		vertexPrev.AreaPdfReverse = vertex.convertSolidAngleToAreaPdf(*vertexPrev, pdfRev)
 
 		path.Vertices = append(path.Vertices, vertex)
 		path.Length++
