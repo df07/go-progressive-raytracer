@@ -29,7 +29,7 @@ func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]
 	// Initialize statistics tracking for this specific bounds
 	stats := tr.initRenderStatsForBounds(bounds, targetSamples)
 
-	// Step 1: Regular tile processing with splat generation
+	// Regular tile processing with splat generation
 	for j := bounds.Min.Y; j < bounds.Max.Y; j++ {
 		for i := bounds.Min.X; i < bounds.Max.X; i++ {
 			samplesUsed := tr.adaptiveSamplePixelWithSplats(camera, i, j, &pixelStats[j][i], splatQueue, sampler, targetSamples, samplingConfig)
@@ -37,12 +37,7 @@ func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]
 		}
 	}
 
-	// Step 2: Extract and apply splats affecting this tile
-	tileSplats := splatQueue.ExtractSplatsForTile(bounds)
-	for _, splat := range tileSplats {
-		// Apply splat to pixel (coordinates already computed)
-		pixelStats[splat.Y][splat.X].AddSplat(splat.Color)
-	}
+	// Note: Splat processing now happens after all tiles complete in post-processing phase
 
 	// Finalize statistics
 	tr.finalizeStats(&stats)

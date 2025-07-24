@@ -185,8 +185,33 @@ func (pr *ProgressiveRaytracer) RenderPass(passNumber int, tileCallback func(Til
 		}
 	}
 
+	// Process all accumulated splats in a single deterministic phase
+	pr.processSplats()
+
 	// Assemble image and calculate final stats from actual pixel data
 	img, stats := pr.assembleCurrentImage(targetSamples)
+
+	// Send all tiles again with splats applied
+	if tileCallback != nil {
+		for i, tile := range pr.tiles {
+			// Extract tile image from pixel stats (now includes splats)
+			tileImage := pr.extractTileImage(tile)
+			tileX := tile.Bounds.Min.X / pr.config.TileSize
+			tileY := tile.Bounds.Min.Y / pr.config.TileSize
+
+			tileCallback(TileCompletionResult{
+				TileX:      tileX,
+				TileY:      tileY,
+				TileImage:  tileImage,
+				PassNumber: passNumber,
+
+				// Progress information - send as additional tiles
+				TileNumber:  len(pr.tiles) + i + 1,
+				TotalTiles:  len(pr.tiles),
+				TotalPasses: pr.config.MaxPasses,
+			})
+		}
+	}
 
 	return img, stats, nil
 }
@@ -334,6 +359,29 @@ func (pr *ProgressiveRaytracer) RenderProgressive(ctx context.Context, options R
 	}()
 
 	return passChan, tileChan, errChan
+}
+
+// processSplats applies all pending splats to the pixel stats in a single deterministic phase
+func (pr *ProgressiveRaytracer) processSplats() {
+	startTime := time.Now()
+	splats := pr.splatQueue.GetAllSplats()
+
+	// Apply all splats to their target pixels
+	for _, splat := range splats {
+		// Bounds check to ensure we don't write outside the image
+		if splat.Y >= 0 && splat.Y < len(pr.pixelStats) &&
+			splat.X >= 0 && splat.X < len(pr.pixelStats[splat.Y]) {
+			pr.pixelStats[splat.Y][splat.X].AddSplat(splat.Color)
+		}
+	}
+
+	// Clear the splat queue for the next pass
+	pr.splatQueue.Clear()
+
+	duration := time.Since(startTime)
+	if len(splats) > 0 {
+		pr.logger.Printf("Processed %d splats in %v\n", len(splats), duration)
+	}
 }
 
 // assembleCurrentImage creates an image from the current state of the shared pixel stats
