@@ -967,7 +967,7 @@ func TestVertexConvertSolidAngleToAreaPdf(t *testing.T) {
 			toVertex := createTestVertex(tt.toPoint, tt.toNormal, false, false, tt.toMaterial)
 			toVertex.IsInfiniteLight = tt.isInfiniteLight
 
-			result := fromVertex.convertSolidAngleToAreaPdf(toVertex, tt.solidAnglePdf)
+			result := fromVertex.convertSolidAngleToAreaPdf(&toVertex, tt.solidAnglePdf)
 
 			if math.Abs(result-tt.expectedPdf) > tt.tolerance {
 				t.Errorf("Expected PDF %.10f, got %.10f (diff: %.2e)",
@@ -1241,7 +1241,7 @@ func TestCalculateVertexPdf(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pdf := integrator.calculateVertexPdf(tt.curr, tt.prev, tt.next, scene)
+			pdf := integrator.calculateVertexPdf(&tt.curr, tt.prev, &tt.next, scene)
 
 			if math.Abs(pdf-tt.expectedPdf) > tt.tolerance {
 				t.Errorf("calculateVertexPdf() = %v, want %v ± %v", pdf, tt.expectedPdf, tt.tolerance)
