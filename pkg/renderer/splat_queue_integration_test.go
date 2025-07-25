@@ -110,9 +110,27 @@ func TestTileRendererWithSplats(t *testing.T) {
 		t.Error("No samples found in pixel stats")
 	}
 
-	// The splat queue should be empty after tile processing (splats extracted and applied)
-	if count := splatQueue.GetSplatCount(); count != 0 {
-		t.Errorf("Expected empty splat queue after tile processing, got %d splats", count)
+	// With the new post-processing approach, splats should remain in queue after tile processing
+	// They are only processed/cleared in the post-processing phase
+	count := splatQueue.GetSplatCount()
+	if count == 0 {
+		t.Error("Expected splats to remain in queue after tile processing (new post-processing workflow)")
+	}
+
+	// Test that we can retrieve all splats for post-processing
+	allSplats := splatQueue.GetAllSplats()
+	if len(allSplats) != count {
+		t.Errorf("GetAllSplats returned %d splats, expected %d", len(allSplats), count)
+	}
+
+	// Verify splat data integrity
+	for i, splat := range allSplats {
+		if splat.X < 0 || splat.Y < 0 {
+			t.Errorf("Splat %d has invalid coordinates: (%d, %d)", i, splat.X, splat.Y)
+		}
+		if splat.Color.X == 0 && splat.Color.Y == 0 && splat.Color.Z == 0 {
+			t.Errorf("Splat %d has zero color", i)
+		}
 	}
 }
 

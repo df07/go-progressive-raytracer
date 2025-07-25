@@ -1,7 +1,6 @@
 package renderer
 
 import (
-	"image"
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -25,32 +24,42 @@ func TestSplatQueue(t *testing.T) {
 		t.Errorf("Expected 3 splats, got %d", count)
 	}
 
-	// Test tile extraction
-	bounds := image.Rect(0, 0, 100, 100)
-	tileSplats := queue.ExtractSplatsForTile(bounds)
+	// Test getting all splats (new post-processing workflow)
+	allSplats := queue.GetAllSplats()
 
-	// Should extract 2 splats that fall within bounds (10,20) and (50,60)
-	// (100,150) is outside bounds
-	if len(tileSplats) != 2 {
-		t.Errorf("Expected 2 splats in tile, got %d", len(tileSplats))
+	// Should get all 3 splats
+	if len(allSplats) != 3 {
+		t.Errorf("Expected 3 splats from GetAllSplats, got %d", len(allSplats))
 	}
 
-	// Check remaining splats
-	if count := queue.GetSplatCount(); count != 1 {
-		t.Errorf("Expected 1 remaining splat, got %d", count)
+	// Verify splat data
+	expectedSplats := []SplatXY{
+		{X: 10, Y: 20, Color: core.Vec3{X: 0.5, Y: 0.3, Z: 0.1}},
+		{X: 50, Y: 60, Color: core.Vec3{X: 0.8, Y: 0.2, Z: 0.4}},
+		{X: 100, Y: 150, Color: core.Vec3{X: 0.1, Y: 0.9, Z: 0.6}},
 	}
 
-	// Extract remaining splats
-	largeBounds := image.Rect(0, 0, 200, 200)
-	remainingSplats := queue.ExtractSplatsForTile(largeBounds)
-
-	if len(remainingSplats) != 1 {
-		t.Errorf("Expected 1 remaining splat, got %d", len(remainingSplats))
+	for i, expected := range expectedSplats {
+		if i >= len(allSplats) {
+			t.Errorf("Missing expected splat at index %d", i)
+			continue
+		}
+		actual := allSplats[i]
+		if actual.X != expected.X || actual.Y != expected.Y ||
+			actual.Color.X != expected.Color.X || actual.Color.Y != expected.Color.Y || actual.Color.Z != expected.Color.Z {
+			t.Errorf("Splat %d mismatch: expected %+v, got %+v", i, expected, actual)
+		}
 	}
 
-	// Queue should be empty
+	// GetAllSplats should not modify the queue
+	if count := queue.GetSplatCount(); count != 3 {
+		t.Errorf("Expected 3 splats after GetAllSplats, got %d", count)
+	}
+
+	// Clear should empty the queue
+	queue.Clear()
 	if count := queue.GetSplatCount(); count != 0 {
-		t.Errorf("Expected empty queue after extraction, got %d", count)
+		t.Errorf("Expected empty queue after clear, got %d", count)
 	}
 }
 
