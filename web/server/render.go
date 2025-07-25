@@ -250,23 +250,22 @@ renderLoop:
 				return
 			}
 			// errChan closed, rendering completed successfully
+			s.drainRemainingChannels(ctx, sseEventChan, passChan, tileChan, req, scene, startTime)
 			break renderLoop
 
 		case <-ctx.Done():
 			// Client disconnected
 			return
 		}
-
-		// If all channels are closed, we're done
-		if passChan == nil && tileChan == nil {
-			break renderLoop
-		}
 	}
 
 	// Send completion event
 	select {
 	case sseEventChan <- SSEEvent{Type: "complete", Data: "Rendering completed"}:
+		// Give the SSE writer time to send the event before the handler returns
+		time.Sleep(50 * time.Millisecond)
 	case <-ctx.Done():
+		// Client disconnected
 	}
 }
 
@@ -411,5 +410,35 @@ func (s *Server) handleError(ctx context.Context, sseEventChan chan SSEEvent, me
 	case sseEventChan <- SSEEvent{Type: "error", Data: message}:
 	case <-ctx.Done():
 		// Client disconnected, don't block
+	}
+}
+
+// drainRemainingChannels processes any remaining data from passChan and tileChan
+func (s *Server) drainRemainingChannels(ctx context.Context, sseEventChan chan SSEEvent,
+	passChan <-chan renderer.PassResult, tileChan <-chan renderer.TileCompletionResult,
+	req *RenderRequest, scene *scene.Scene, startTime time.Time) {
+
+	timeout := time.After(100 * time.Millisecond)
+
+	for passChan != nil || tileChan != nil {
+		select {
+		case passResult, ok := <-passChan:
+			if !ok {
+				passChan = nil
+				continue
+			}
+			s.handlePassComplete(ctx, sseEventChan, passResult, req, scene, startTime)
+		case tileResult, ok := <-tileChan:
+			if !ok {
+				tileChan = nil
+				continue
+			}
+			s.handleTileUpdate(ctx, sseEventChan, tileResult)
+		case <-timeout:
+			// Timeout waiting for channels to close - this is normal for fast renders
+			return
+		case <-ctx.Done():
+			return
+		}
 	}
 }

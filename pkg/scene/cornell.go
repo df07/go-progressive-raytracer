@@ -72,7 +72,7 @@ func setupCornellCamera(cameraOverrides ...renderer.CameraConfig) renderer.Camer
 func createCornellSamplingConfig() core.SamplingConfig {
 	return core.SamplingConfig{
 		SamplesPerPixel:           150,
-		MaxDepth:                  40,
+		MaxDepth:                  5,
 		RussianRouletteMinBounces: 16,    // Need a lot of bounces for indirect lighting
 		AdaptiveMinSamples:        0.20,  // 20% of max samples minimum to avoid black pixels on front box
 		AdaptiveThreshold:         0.005, // Lower threshold (0.5%)

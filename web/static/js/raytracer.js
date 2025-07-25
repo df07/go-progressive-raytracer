@@ -2,6 +2,7 @@ class ProgressiveRaytracer {
   constructor() {
       this.eventSource = null;
       this.isRendering = false;
+      this.renderCompleted = false; // Track completion state
       this.limits = null; // Store server-provided limits
       
       this.initializeTheme();
@@ -258,6 +259,7 @@ class ProgressiveRaytracer {
 
       this.setStatus('rendering', 'Starting render...');
       this.isRendering = true;
+      this.renderCompleted = false;
       this.updateButtons();
       this.resetStats();
       
@@ -290,25 +292,44 @@ class ProgressiveRaytracer {
       });
 
       this.eventSource.addEventListener('complete', (event) => {
-          console.log('Rendering completed');
+          // Mark as completed FIRST to prevent error handlers from firing
+          this.renderCompleted = true;
+          this.isRendering = false;
+          
+          // Ensure progress bar shows 100% completion
+          const progressFill = document.getElementById('progressFill');
+          progressFill.style.width = '100%';
           this.setStatus('complete', 'Rendering completed!');
-          this.stopRendering();
+          
+          // Don't stop animations immediately - let them finish naturally
+          // Close the event source but keep animations running
+          if (this.eventSource) {
+              this.eventSource.close();
+              this.eventSource = null;
+          }
+          this.updateButtons();
       });
 
       this.eventSource.addEventListener('error', (event) => {
           console.error('SSE error:', event.data);
-          this.setStatus('error', `Error: ${event.data}`);
-          this.stopRendering();
+          // Don't show error if rendering completed successfully
+          if (!this.renderCompleted) {
+              const errorMsg = event.data || 'Unknown error';
+              this.setStatus('error', `Error: ${errorMsg}`);
+              this.stopRendering();
+          }
       });
 
       this.eventSource.onerror = (event) => {
           console.error('SSE connection error:', event);
-          // Only show generic connection error if we haven't already shown a specific error
-          const statusElement = document.getElementById('status');
-          if (!statusElement.classList.contains('error')) {
-              this.setStatus('error', 'Connection lost - please check your parameters and try again');
+          // Only show generic connection error if we haven't completed
+          if (!this.renderCompleted) {
+              const statusElement = document.getElementById('status');
+              if (!statusElement.classList.contains('error')) {
+                  this.setStatus('error', 'Connection lost - please check your parameters and try again');
+                  this.stopRendering();
+              }
           }
-          this.stopRendering();
       };
   }
 
@@ -666,8 +687,8 @@ class ProgressiveRaytracer {
           this.renderCanvas.updateTile(data.tileX, data.tileY, `data:image/png;base64,${data.imageData}`);
       }
       
-      // Update progress bar using server-provided progress information
-      if (data.totalPasses && data.totalTiles) {
+      // Only update progress/status if still actively rendering
+      if (this.isRendering && data.totalPasses && data.totalTiles) {
           // Calculate progress based on completed passes + current pass progress
           const completedPasses = Math.max(0, data.passNumber - 1);
           const currentPassProgress = data.tileNumber / data.totalTiles;
