@@ -606,11 +606,201 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 	t.Skip("TODO: Implement connection strategy tests")
 }
 
+// Helper function for vector tolerance checks
+func isClose(a, b core.Vec3, tolerance float64) bool {
+	return math.Abs(a.X-b.X) <= tolerance &&
+		math.Abs(a.Y-b.Y) <= tolerance &&
+		math.Abs(a.Z-b.Z) <= tolerance
+}
+
 // TestEvaluateLightTracingStrategy tests t=1 strategies
 func TestEvaluateLightTracingStrategy(t *testing.T) {
-	// TODO: Test light-to-camera connections
-	// TODO: Test splat ray generation
-	t.Skip("TODO: Implement light tracing strategy tests")
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+
+	// Use existing scene creation helper
+	scene, glancingRay := createGlancingTestSceneAndRay(material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)))
+	_ = glancingRay // We'll use this when we add valid connection tests
+
+	// Helper to create light path with specified vertices
+	createLightPath := func(vertices []Vertex) Path {
+		path := Path{Vertices: vertices, Length: len(vertices)}
+		return path
+	}
+
+	tests := []struct {
+		name               string
+		lightPath          Path
+		s                  int
+		sampler            *TestSampler
+		expectedSplats     int
+		expectedSplatColor core.Vec3
+		expectNilVertex    bool
+		tolerance          float64
+		testDescription    string
+	}{
+		{
+			name: "InvalidPathLength_TooShort",
+			lightPath: createLightPath([]Vertex{
+				{Point: core.NewVec3(0, 2, 0), IsLight: true},
+			}),
+			s:               1, // s <= 1 should fail
+			sampler:         NewTestSampler([]float64{}, []core.Vec2{core.NewVec2(0.5, 0.5)}, []core.Vec3{}),
+			expectedSplats:  0,
+			expectNilVertex: true,
+			testDescription: "Path length s=1 should return nil",
+		},
+		{
+			name: "InvalidPathLength_TooLong",
+			lightPath: createLightPath([]Vertex{
+				{Point: core.NewVec3(0, 2, 0), IsLight: true},
+				{Point: core.NewVec3(0, 1, 0), Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))},
+			}),
+			s:               3, // s > lightPath.Length should fail
+			sampler:         NewTestSampler([]float64{}, []core.Vec2{core.NewVec2(0.5, 0.5)}, []core.Vec3{}),
+			expectedSplats:  0,
+			expectNilVertex: true,
+			testDescription: "Path length s > lightPath.Length should return nil",
+		},
+		{
+			name: "SpecularVertex_ShouldSkip",
+			lightPath: createLightPath([]Vertex{
+				{Point: core.NewVec3(0, 2, 0), IsLight: true},
+				{
+					Point:      core.NewVec3(0, 1, 0),
+					Normal:     core.NewVec3(0, 1, 0),
+					Material:   material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0),
+					IsSpecular: true, // Cannot connect through delta functions
+					Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+			}),
+			s:               2,
+			sampler:         NewTestSampler([]float64{}, []core.Vec2{core.NewVec2(0.5, 0.5)}, []core.Vec3{}),
+			expectedSplats:  0,
+			expectNilVertex: true,
+			testDescription: "Specular vertices should be skipped",
+		},
+		{
+			name: "ValidDiffuseConnection_SlightOffset",
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:        core.NewVec3(0, 0, -4), // same as working test
+					IsLight:      true,
+					EmittedLight: core.NewVec3(2, 2, 2),
+					Beta:         core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+				{
+					Point:             core.NewVec3(0.1, 0, -1.005),            // slight offset from center
+					Normal:            core.NewVec3(0.1, 0, 0.995).Normalize(), // normal pointing toward camera
+					Material:          material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)),
+					Beta:              core.Vec3{X: 0.9, Y: 0.7, Z: 0.5},
+					IncomingDirection: core.NewVec3(0, 0, 1), // same as working test
+					IsSpecular:        false,
+				},
+			}),
+			s: 2,
+			sampler: NewTestSampler(
+				[]float64{},
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // camera sampling
+				[]core.Vec3{},
+			),
+			expectedSplats:     1,
+			expectedSplatColor: core.NewVec3(0.326, 0.19, 0.0905), // measured from actual output
+			tolerance:          1e-3,
+			testDescription:    "Valid diffuse surface connection with slight offset",
+		},
+		{
+			name: "ValidDiffuseConnection_CenterHit",
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:        core.NewVec3(0, 0, -4), // light behind sphere
+					IsLight:      true,
+					EmittedLight: core.NewVec3(2, 2, 2),
+					Beta:         core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+				{
+					Point:             core.NewVec3(0, 0, -1), // front of sphere toward camera
+					Normal:            core.NewVec3(0, 0, 1),  // pointing toward camera
+					Material:          material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)),
+					Beta:              core.Vec3{X: 0.9, Y: 0.7, Z: 0.5},
+					IncomingDirection: core.NewVec3(0, 0, 1), // from light behind
+					IsSpecular:        false,
+				},
+			}),
+			s: 2,
+			sampler: NewTestSampler(
+				[]float64{},
+				[]core.Vec2{core.NewVec2(0.5, 0.5)}, // camera sampling
+				[]core.Vec3{},
+			),
+			expectedSplats:     1,
+			expectedSplatColor: core.NewVec3(0.334, 0.195, 0.0928), // measured from actual output
+			tolerance:          1e-3,
+			testDescription:    "Valid diffuse surface connection at sphere center",
+		},
+		{
+			name: "MetalSurface_NonSpecular",
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:        core.NewVec3(0, 0, -4), // same as working tests
+					IsLight:      true,
+					EmittedLight: core.NewVec3(2, 2, 2),
+					Beta:         core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+				{
+					Point:             core.NewVec3(0, 0, -1), // front of sphere
+					Normal:            core.NewVec3(0, 0, 1),
+					Material:          material.NewMetal(core.NewVec3(0.9, 0.8, 0.7), 0.1), // rough metal
+					Beta:              core.Vec3{X: 0.85, Y: 0.75, Z: 0.65},
+					IncomingDirection: core.NewVec3(0, 0, 1), // same as working tests
+					IsSpecular:        false,                 // roughened metal can be connected
+				},
+			}),
+			s: 2,
+			sampler: NewTestSampler(
+				[]float64{},
+				[]core.Vec2{core.NewVec2(0.5, 0.5)},
+				[]core.Vec3{},
+			),
+			expectedSplats:     1,
+			expectedSplatColor: core.NewVec3(1.11, 0.874, 0.663), // measured from actual output
+			tolerance:          1e-2,
+			testDescription:    "Roughened metal surface can be connected",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			splats, vertex := integrator.evaluateLightTracingStrategy(tt.lightPath, tt.s, scene, tt.sampler)
+
+			// Check splat count
+			if len(splats) != tt.expectedSplats {
+				t.Errorf("%s: Expected %d splats, got %d", tt.testDescription, tt.expectedSplats, len(splats))
+			}
+
+			// Check vertex return
+			if tt.expectNilVertex {
+				if vertex != nil {
+					t.Errorf("%s: Expected nil vertex, got %v", tt.testDescription, vertex)
+				}
+			} else {
+				if vertex == nil {
+					t.Errorf("%s: Expected non-nil vertex, got nil", tt.testDescription)
+				}
+			}
+
+			// Check splat color for valid cases
+			if tt.expectedSplats > 0 && len(splats) > 0 {
+				splatColor := splats[0].Color
+				if !isClose(splatColor, tt.expectedSplatColor, tt.tolerance) {
+					t.Errorf("%s:\nExpected splat color: %v\nActual: %v\nDifference: %v",
+						tt.testDescription,
+						tt.expectedSplatColor,
+						splatColor,
+						splatColor.Subtract(tt.expectedSplatColor))
+				}
+			}
+		})
+	}
 }
 
 // TestCameraPathBetaPropagation tests beta calculation through actual BDPT methods
@@ -1410,10 +1600,7 @@ func TestPdfPropagation(t *testing.T) {
 					)
 				} else {
 					// Use sphere scene for other tests
-					scene = createGlancingTestSceneWithMaterial(tt.material)
-					cameraOrigin := core.NewVec3(0, 0, 0)
-					sphereGlancingPoint := core.NewVec3(0.5, 0, -1.5)
-					ray = core.NewRayTo(cameraOrigin, sphereGlancingPoint)
+					scene, ray = createGlancingTestSceneAndRay(tt.material)
 				}
 
 				path = integrator.generateCameraSubpath(ray, scene, tt.sampler, 3)
@@ -1593,6 +1780,17 @@ func createGlancingTestSceneWithMaterial(mat core.Material) core.Scene {
 		topColor: core.NewVec3(0.1, 0.1, 0.1), bottomColor: core.NewVec3(0.05, 0.05, 0.05),
 		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
+}
+
+func createGlancingTestSceneAndRay(mat core.Material) (core.Scene, core.Ray) {
+	scene := createGlancingTestSceneWithMaterial(mat)
+
+	// Create the standard glancing ray that hits the sphere at an angle
+	cameraOrigin := core.NewVec3(0, 0, 0)
+	sphereGlancingPoint := core.NewVec3(0.5, 0, -1.5)
+	ray := core.NewRayTo(cameraOrigin, sphereGlancingPoint)
+
+	return scene, ray
 }
 
 func createLightSceneWithMaterial(mat core.Material) core.Scene {
