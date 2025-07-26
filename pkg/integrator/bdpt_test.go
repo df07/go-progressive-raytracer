@@ -601,9 +601,248 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 
 // TestEvaluateConnectionStrategy tests s>1,t>1 connection strategies
 func TestEvaluateConnectionStrategy(t *testing.T) {
-	// TODO: Test geometric term calculation
-	// TODO: Test BRDF evaluation at both vertices
-	t.Skip("TODO: Implement connection strategy tests")
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+
+	// Use existing scene creation helper
+	scene, _ := createGlancingTestSceneAndRay(material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)))
+
+	// Helper to create camera path with specified vertices
+	createCameraPath := func(vertices []Vertex) Path {
+		path := Path{Vertices: vertices, Length: len(vertices)}
+		return path
+	}
+
+	// Helper to create light path with specified vertices
+	createLightPath := func(vertices []Vertex) Path {
+		path := Path{Vertices: vertices, Length: len(vertices)}
+		return path
+	}
+
+	tests := []struct {
+		name                 string
+		cameraPath           Path
+		lightPath            Path
+		s                    int // light path index (1-based)
+		t                    int // camera path index (1-based)
+		expectedContribution core.Vec3
+		expectZero           bool
+		tolerance            float64
+		testDescription      string
+	}{
+		{
+			name: "InvalidIndices_s_TooSmall",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+				{Point: core.NewVec3(0, 0, -1), Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{Point: core.NewVec3(0, 1, -1), IsLight: true},
+			}),
+			s:               0, // s < 1 should return zero
+			t:               1,
+			expectZero:      true,
+			testDescription: "s < 1 should return zero contribution",
+		},
+		{
+			name: "InvalidIndices_t_TooSmall",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{Point: core.NewVec3(0, 1, -1), IsLight: true},
+			}),
+			s:               1,
+			t:               0, // t < 1 should return zero
+			expectZero:      true,
+			testDescription: "t < 1 should return zero contribution",
+		},
+		{
+			name: "InvalidIndices_s_TooLarge",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+				{Point: core.NewVec3(0, 0, -1), Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{Point: core.NewVec3(0, 1, -1), IsLight: true},
+			}),
+			s:               2, // s > lightPath.Length should return zero
+			t:               1,
+			expectZero:      true,
+			testDescription: "s > lightPath.Length should return zero contribution",
+		},
+		{
+			name: "SpecularVertex_Camera",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+				{
+					Point:      core.NewVec3(0, 0, -1),
+					Normal:     core.NewVec3(0, 0, 1),
+					Material:   material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0),
+					IsSpecular: true, // Can't connect through delta functions
+					Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:   core.NewVec3(0, 1, -1),
+					Normal:  core.NewVec3(0, -1, 0),
+					IsLight: true,
+					Beta:    core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+			}),
+			s:               1,
+			t:               2,
+			expectZero:      true,
+			testDescription: "Specular camera vertex should be skipped",
+		},
+		{
+			name: "SpecularVertex_Light",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+				{
+					Point:    core.NewVec3(0, 0, -1),
+					Normal:   core.NewVec3(0, 0, 1),
+					Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+					Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:      core.NewVec3(0, 1, -1),
+					Normal:     core.NewVec3(0, -1, 0),
+					Material:   material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0),
+					IsSpecular: true, // Can't connect through delta functions
+					Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+			}),
+			s:               1,
+			t:               2,
+			expectZero:      true,
+			testDescription: "Specular light vertex should be skipped",
+		},
+		{
+			name: "ValidConnection_SurfaceToSurface",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{
+					Point:    core.NewVec3(5, 5, 5),                               // far from scene geometry
+					Normal:   core.NewVec3(0, 1, 0),                               // pointing up toward light (different direction)
+					Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)), // different reflectance
+					Beta:     core.Vec3{X: 0.9, Y: 0.7, Z: 0.5},                   // different throughput
+				},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:   core.NewVec3(5, 7, 5),  // directly above camera vertex, distance=2
+					Normal:  core.NewVec3(0, -1, 0), // pointing down toward camera vertex
+					IsLight: true,
+					Beta:    core.Vec3{X: 2, Y: 2, Z: 2}, // different light intensity
+				},
+			}),
+			s:                    1,
+			t:                    2,
+			expectedContribution: core.NewVec3(0.115, 0.0668, 0.0318), // measured with Y-axis geometry
+			tolerance:            1e-3,
+			testDescription:      "Valid surface-to-surface connection",
+		},
+		{
+			name: "ValidConnection_LightToSurface",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{
+					Point:    core.NewVec3(7, 7, 7),                               // far from scene geometry
+					Normal:   core.NewVec3(0, 0, 1),                               // pointing toward light in Z direction
+					Material: material.NewLambertian(core.NewVec3(0.5, 0.9, 0.3)), // green-ish reflectance
+					Beta:     core.Vec3{X: 0.6, Y: 1.2, Z: 0.4},                   // different throughput pattern
+				},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:   core.NewVec3(7, 7, 9),  // 2 units away in Z direction
+					Normal:  core.NewVec3(0, 0, -1), // pointing back toward camera vertex
+					IsLight: true,
+					Beta:    core.Vec3{X: 1.5, Y: 1.5, Z: 1.5}, // different light intensity
+				},
+			}),
+			s:                    1,
+			t:                    2,
+			expectedContribution: core.NewVec3(0.0358, 0.129, 0.0143), // measured with Z-axis geometry
+			tolerance:            1e-3,
+			testDescription:      "Valid light-to-surface connection with Z-axis geometry",
+		},
+		{
+			name: "ValidConnection_LargeDistance",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{
+					Point:    core.NewVec3(20, 20, 20),                            // far from scene geometry
+					Normal:   core.NewVec3(-1, -1, 0).Normalize(),                 // pointing toward light
+					Material: material.NewLambertian(core.NewVec3(0.9, 0.5, 0.1)), // orange reflectance
+					Beta:     core.Vec3{X: 2, Y: 1, Z: 0.5},                       // asymmetric throughput
+				},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:   core.NewVec3(15, 15, 20),          // distance=√50≈7.07 units away
+					Normal:  core.NewVec3(1, 1, 0).Normalize(), // pointing toward camera vertex
+					IsLight: true,
+					Beta:    core.Vec3{X: 10, Y: 10, Z: 10}, // bright light
+				},
+			}),
+			s:                    1,
+			t:                    2,
+			expectedContribution: core.NewVec3(0.115, 0.0318, 0.00318), // measured with large distance
+			tolerance:            1e-3,
+			testDescription:      "Valid connection with large distance and asymmetric materials",
+		},
+		{
+			name: "DebugConnection_ClearPath",
+			cameraPath: createCameraPath([]Vertex{
+				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{
+					Point:    core.NewVec3(10, 10, 10), // far from scene geometry
+					Normal:   core.NewVec3(1, 0, 0),    // pointing toward light (positive cosine)
+					Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+					Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+			}),
+			lightPath: createLightPath([]Vertex{
+				{
+					Point:   core.NewVec3(11, 10, 10), // close to camera vertex, clear line of sight
+					Normal:  core.NewVec3(-1, 0, 0),   // pointing toward camera vertex (positive cosine)
+					IsLight: true,
+					Beta:    core.Vec3{X: 1, Y: 1, Z: 1},
+				},
+			}),
+			s:                    1,
+			t:                    2,
+			expectedContribution: core.NewVec3(0.223, 0.223, 0.223), // measured from actual output
+			tolerance:            1e-3,
+			testDescription:      "Debug connection with clear path away from scene geometry",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			contribution := integrator.evaluateConnectionStrategy(tt.cameraPath, tt.lightPath, tt.s, tt.t, scene)
+
+			if tt.expectZero {
+				if contribution.Luminance() > 1e-10 {
+					t.Errorf("%s: Expected zero contribution, got %v", tt.testDescription, contribution)
+				}
+			} else {
+				if contribution.Luminance() <= 1e-10 {
+					t.Errorf("%s: Expected non-zero contribution, got %v", tt.testDescription, contribution)
+				} else if !isClose(contribution, tt.expectedContribution, tt.tolerance) {
+					t.Errorf("%s:\nExpected: %v\nActual: %v\nDifference: %v",
+						tt.testDescription,
+						tt.expectedContribution,
+						contribution,
+						contribution.Subtract(tt.expectedContribution))
+				}
+			}
+		})
+	}
 }
 
 // Helper function for vector tolerance checks
