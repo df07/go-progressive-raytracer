@@ -49,7 +49,8 @@ pkg/material/      # Physically-based materials (lambertian, metal, glass, emiss
 pkg/renderer/      # Progressive raytracing engine with worker pools
 pkg/scene/         # Scene management and presets
 pkg/loaders/       # File format loaders (PLY mesh support)
-web/              # Real-time web interface with Server-Sent Events
+pkg/integrators/   # BDPT and path tracing integrators
+web/               # Real-time web interface with Server-Sent Events
 ```
 
 ### Key Architectural Components
@@ -68,86 +69,55 @@ web/              # Real-time web interface with Server-Sent Events
 - Optimized median-split algorithm with up to 39x speedup for complex meshes
 - Thread-safe: each worker creates its own BVH instance
 
-## Available Scenes
+**BDPT Splat System**: 
+- Lock-free splat queue for cross-tile light contributions
+- Post-pass deterministic splat processing eliminates race conditions
+- Progressive tile animation + final splat update for real-time feedback
 
+## Integrators and Scenes
+
+**Integrators**:
+- `path-tracing` - Standard unidirectional path tracing (default, no splats)
+- `bdpt` - Bidirectional Path Tracing (produces splats for cross-tile light contributions)
+
+**Available Scenes**:
 - `default` - Mixed materials showcase
 - `cornell` - Classic Cornell box with area lighting  
 - `cornell-boxes` - Cornell box with rotated boxes
-- `spheregrid` - BVH performance testing (perfect for benchmarks)
+- `caustic-glass` - Glass caustic geometry (excellent for BDPT testing)
+- `spheregrid` - BVH performance testing
 - `trianglemesh` - Complex procedural triangle geometry
 - `dragon` - High-poly mesh (1.8M triangles, requires separate PLY download)
 
 ## CLI Usage Examples
 
 ```bash
-# Quick progressive preview
-./raytracer --scene=cornell --mode=progressive --max-passes=3 --max-samples=25
+# Progressive rendering with path tracing
+./raytracer --scene=cornell --max-passes=3 --max-samples=25
+
+# BDPT with caustic-glass scene (excellent for complex lighting)
+./raytracer --scene=caustic-glass --integrator=bdpt --max-samples=100
 
 # High quality render
-./raytracer --scene=default --mode=progressive --max-passes=10 --max-samples=200
+./raytracer --scene=default --max-passes=10 --max-samples=200 --workers=4
 
-# Specify worker count
-./raytracer --scene=spheregrid --mode=progressive --workers=4
-
-# Single-pass traditional rendering
-./raytracer --scene=cornell --mode=normal --samples=100
-
-# Web interface
-cd web && go run main.go -port 8080
+# Web interface (usually running at localhost:8080 via air in background)
 ```
 
-## Real-Time Tile Streaming
+## Real-Time Web Interface
 
-The web interface uses **real-time tile streaming** for immediate visual feedback:
+- **Comprehensive options**: Web interface exposes a variety of options to the user to customize the render
+- **Render Endpoint**: `/api/render` uses SSE to stream tiles as they complete, as well as debug log output
+- **Inspect endpoint**: `/api/inspect` allows clicking the image and getting back information about the objects hit
 
-### Architecture
-- **SSE Endpoint**: `/api/render` streams individual tiles as they complete (~100+ updates per render)
-- **Tile Completion Callbacks**: Workers call `onTileComplete` for each finished 64x64 tile
-- **Canvas Compositor**: Client-side tile assembly with batched rendering
-- **Thread-Safe Streaming**: Channel-based communication prevents SSE stream corruption
+## Testing
 
-### Benefits
-- **Immediate Feedback**: Tiles appear within milliseconds of completion
-- **Efficient Bandwidth**: ~2-4KB per tile vs ~500KB for full images
-- **Smooth Progress**: 100+ visual updates instead of 7-10 complete image updates
-
-## Testing Strategy
-
-Comprehensive test coverage includes:
-- Unit tests for all materials, geometries, and core math functions
-- Integration tests for progressive rendering and tile boundary handling
-- Performance benchmarks for BVH construction and rendering speeds
-- Visual verification tests comparing expected vs actual render outputs
-
-## Output Structure
-
-- CLI renders: `output/<scene_name>/render_<timestamp>.png`
-- Progressive passes: `render_<timestamp>_pass_<N>.png` 
-- Web renders: Real-time streaming via Server-Sent Events
-
-## Performance Characteristics
-
-- **Progressive Preview**: First pass in ~25-70ms
-- **Multi-Core Scaling**: ~2x speedup with 4+ workers
-- **BVH Acceleration**: Essential for complex meshes (dragon scene)
-- **Memory Efficient**: Tile-based approach with adaptive sampling
-
-## Key Implementation Details
-
-**Deterministic Parallelism**: Each 64x64 tile uses `hash(tileX, tileY, pass)` as random seed, ensuring reproducible results regardless of worker count or timing.
-
-**Progressive Quality**: Linear sample progression (1→2→4→8...) with adaptive final pass using perceptual luminance variance for quality assessment.
-
-**Resource Management**: Proper lifecycle management with graceful shutdown, comprehensive error handling, and memory cleanup throughout the rendering pipeline.
+- **Sensitive**: All tests should be sensitive to small errors, particularly in rendering.
+- **Verify**: Verify tests by temporarily introducing small errors and confirming the test fails, then revert the error.
 
 ## Critical Development Notes
 
 ⚠️ **TWO main.go files**: `/main.go` (CLI) vs `/web/main.go` (web server) - check directory before building
-
-**Web dev**: Use `cd web && air > web-server.log 2>&1 &` for auto-reload
-
-**PLY gotcha**: TriangleMesh needs per-triangle normals, PLY files have per-vertex normals - skip normals and let mesh auto-calculate
-
 **New scenes**: Update `pkg/scene/`, `main.go`, `web/server/server.go`, `web/static/index.html`
 
 ## Git Commit Message Format
