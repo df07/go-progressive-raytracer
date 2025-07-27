@@ -109,8 +109,8 @@ func (dsl *DiscSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSa
 	lightSample := dsl.discLight.Sample(point, sample)
 
 	// Apply spot light directional falloff
-	// Calculate direction from light position to shading point
-	lightToPoint := point.Subtract(dsl.position).Normalize()
+	// Calculate direction from actual sampled point on disc to shading point
+	lightToPoint := point.Subtract(lightSample.Point).Normalize()
 	cosAngle := dsl.direction.Dot(lightToPoint)
 	spotAttenuation := dsl.falloff(cosAngle)
 

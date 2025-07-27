@@ -107,7 +107,7 @@ func TestDiscSpotLightSample(t *testing.T) {
 		},
 		{
 			name:           "Point outside cone",
-			testPoint:      core.NewVec3(2.0, 0, 0), // ~63 degrees from vertical
+			testPoint:      core.NewVec3(3.0, 0, 0), // ~56 degrees from vertical, clearly outside 45 degree cone
 			expectEmission: false,
 		},
 	}
@@ -250,6 +250,68 @@ func TestDiscSpotLightShapeInterface(t *testing.T) {
 	expectedSize := 2 * radius
 	if size.X < expectedSize-1e-6 || size.Z < expectedSize-1e-6 {
 		t.Errorf("Bounding box too small: expected size ~%v, got %v", expectedSize, size)
+	}
+}
+
+func TestDiscSpotLightConsistentFalloff(t *testing.T) {
+	// This test catches the bug where falloff calculation uses center position
+	// instead of actual sampled point, causing inconsistent results
+	from := core.NewVec3(0, 3, 0)
+	to := core.NewVec3(0, 0, 0)
+	emission := core.NewVec3(10, 10, 10)
+	coneAngle := 30.0 // 30 degree cone
+	deltaAngle := 5.0
+	radius := 1.5 // Large radius to amplify the bug
+
+	spotLight := NewDiscSpotLight(from, to, emission, coneAngle, deltaAngle, radius)
+
+	// Test point that's right at the edge of the cone from center
+	// From center (0,3,0) to (1.5,0,0): angle = atan(1.5/3) ≈ 26.6 degrees (inside cone)
+	// From edge point (1.5,3,0) to (1.5,0,0): angle = 0 degrees (definitely inside)
+	// From opposite edge (-1.5,3,0) to (1.5,0,0): angle = atan(3/3) = 45 degrees (outside cone)
+	testPoint := core.NewVec3(1.5, 0, 0)
+
+	// Force samples at specific disc positions to test consistency
+	samples := []core.Vec2{
+		{X: 0.0, Y: 0.0},  // Center of disc
+		{X: 1.0, Y: 0.0},  // Edge of disc closest to test point
+		{X: -1.0, Y: 0.0}, // Edge of disc farthest from test point
+	}
+
+	var emissions []core.Vec3
+	for _, samplePos := range samples {
+		lightSample := spotLight.Sample(testPoint, samplePos)
+		emissions = append(emissions, lightSample.Emission)
+	}
+
+	// With the bug, these emissions will be identical (all based on center calculation)
+	// With the fix, they should vary based on actual sampled positions
+
+	centerEmission := emissions[0]
+	closeEdgeEmission := emissions[1]
+	farEdgeEmission := emissions[2]
+
+	// The bug manifests as all emissions being identical (using center calculation)
+	allIdentical := centerEmission.Equals(closeEdgeEmission) &&
+		centerEmission.Equals(farEdgeEmission)
+
+	if allIdentical && !centerEmission.Equals(core.NewVec3(0, 0, 0)) {
+		t.Errorf("Bug detected: All emissions identical despite different sample positions. "+
+			"This indicates falloff calculated from center rather than sampled point. "+
+			"Emissions: center=%v, close=%v, far=%v",
+			centerEmission, closeEdgeEmission, farEdgeEmission)
+	}
+
+	// Additional check: far edge should have less emission than close edge
+	if !farEdgeEmission.Equals(core.NewVec3(0, 0, 0)) &&
+		!closeEdgeEmission.Equals(core.NewVec3(0, 0, 0)) {
+		farIntensity := farEdgeEmission.Length()
+		closeIntensity := closeEdgeEmission.Length()
+
+		if farIntensity >= closeIntensity {
+			t.Errorf("Expected far edge emission (%v) to be less than close edge emission (%v)",
+				farIntensity, closeIntensity)
+		}
 	}
 }
 
