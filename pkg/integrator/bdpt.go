@@ -337,14 +337,6 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 		}
 	}
 
-	// Helper function equivalent to PBRT's remap0 - deals with delta functions
-	remap0 := func(f float64) float64 {
-		if f != 0 {
-			return f
-		}
-		return 1.0
-	}
-
 	sumRi := 0.0
 
 	// Look up connection vertices and their predecessors
@@ -1001,6 +993,15 @@ func (bdpt *BDPTIntegrator) getWorldRadius(scene core.Scene) float64 {
 	}
 
 	return radius
+}
+
+// remap0 is equivalent to PBRT's remap0 - deals with delta functions
+// Returns 1.0 for zero values to avoid division by zero in MIS weight calculations
+func remap0(f float64) float64 {
+	if f != 0 {
+		return f
+	}
+	return 1.0
 }
 
 func (bdpt *BDPTIntegrator) logf(format string, a ...interface{}) {
