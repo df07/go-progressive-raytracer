@@ -234,7 +234,7 @@ func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *co
 	// This is a solid angle PDF - probability per unit solid angle as seen from the reference point
 	cosine := c.cameraForward.AbsDot(ray.Direction)
 	pdf := (distance * distance) / (cosine * c.lensArea)
-	c.logf("SampleCameraFromPoint: lensPoint=%v, direction=%v, distance=%f, cosine=%f, pdf=%f\n", lensPoint, direction, distance, cosine, pdf)
+	//c.logf("SampleCameraFromPoint: lensPoint=%v, direction=%v, distance=%f, cosine=%f, pdf=%f\n", lensPoint, direction, distance, cosine, pdf)
 
 	// Calculate camera importance weight
 	// 	importance = 1.0 / (c.imagePlaneArea * c.lensArea * cos^4
