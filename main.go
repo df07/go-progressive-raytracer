@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"time"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -24,6 +25,7 @@ type Config struct {
 	NumWorkers     int
 	IntegratorType string
 	Help           bool
+	CPUProfile     string
 }
 
 // RenderResult holds the final image and statistics
@@ -38,6 +40,21 @@ func main() {
 	if config.Help {
 		showHelp()
 		return
+	}
+
+	// Start CPU profiling if requested
+	if config.CPUProfile != "" {
+		f, err := os.Create(config.CPUProfile)
+		if err != nil {
+			fmt.Printf("Could not create CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Printf("Could not start CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
 	}
 
 	fmt.Println("Starting Progressive Raytracer...")
@@ -63,6 +80,7 @@ func parseFlags() Config {
 	flag.IntVar(&config.NumWorkers, "workers", 0, "Number of parallel workers (0 = auto-detect CPU count)")
 	flag.StringVar(&config.IntegratorType, "integrator", "path-tracing", "Integrator type: 'path-tracing' or 'bdpt'")
 	flag.BoolVar(&config.Help, "help", false, "Show help information")
+	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.Parse()
 	return config
 }
