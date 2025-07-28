@@ -29,6 +29,9 @@ go test -bench=. ./pkg/geometry/
 
 # Analyze profile
 go tool pprof cpu.prof
+
+# Automated performance benchmarking
+./benchmark.sh  # Compares performance before/after uncommitted changes
 ```
 
 ## Architecture Overview
