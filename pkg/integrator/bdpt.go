@@ -13,7 +13,6 @@ type Vertex struct {
 	Normal   core.Vec3     // Surface normal
 	Light    core.Light    // Light at this vertex
 	Material core.Material // Material at this vertex
-	Camera   core.Camera   // Camera at this vertex
 
 	// Path tracing information
 	IncomingDirection core.Vec3 // Direction ray arrived from
@@ -112,7 +111,6 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 		Normal:            ray.Direction.Multiply(-1),  // Camera "normal" points back along ray
 		Material:          nil,                         // Cameras don't have materials
 		Light:             nil,                         // Cameras are not lights
-		Camera:            camera,                      // Store camera reference for PDF calculations
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Camera is the starting point
 		AreaPdfForward:    0.0,                         // Initial camera PDF is always 0.0
 		AreaPdfReverse:    0.0,                         // Cannot generate reverse direction to camera
@@ -509,9 +507,7 @@ func (bdpt *BDPTIntegrator) calculateVertexPdf(curr *Vertex, prev *Vertex, next 
 		// ei.camera->Pdf_We(ei.SpawnRay(wn), &unused, &pdf);
 		// Use our camera PDF implementation
 		ray := core.NewRay(curr.Point, wn)
-		if curr.Camera != nil {
-			_, pdf = curr.Camera.CalculateRayPDFs(ray)
-		}
+		_, pdf = scene.GetCamera().CalculateRayPDFs(ray)
 		if pdf == 0 {
 			return 0
 		}
@@ -545,6 +541,7 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 			// PBRT: Compute planar sampling density for infinite light sources
 			worldRadius := bdpt.getWorldRadius(scene)
 			pdf = 1.0 / (math.Pi * worldRadius * worldRadius)
+			//fmt.Printf("infinite light pdf: %f\n", pdf)
 		} else if curr.Light != nil {
 			// Use the light's EmissionPDF which gives area PDF
 			areaPdf := curr.Light.EmissionPDF(curr.Point, w)
@@ -767,7 +764,6 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		Normal:            lightSample.Normal,
 		Light:             sampledLight,
 		Material:          nil, // Lights don't have materials
-		Camera:            nil,
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
 		AreaPdfForward:    lightSample.PDF, // Light sampling PDF
 		AreaPdfReverse:    0.0,
@@ -854,7 +850,6 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 		Normal:            cameraSample.Ray.Direction.Multiply(-1), // Camera "normal" points back along ray
 		Material:          nil,                                     // Cameras don't have materials
 		Light:             nil,                                     // Cameras are not lights
-		Camera:            camera,                                  // Store camera reference
 		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0},             // Camera is the starting point
 		AreaPdfForward:    0.0,                                     // Will be computed by MIS weight calculation
 		AreaPdfReverse:    0.0,                                     // Will be computed by MIS weight calculation
@@ -913,8 +908,8 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	}
 
 	// Get the vertices to connect. s and t are 0-based indices, so we need to subtract 1
-	lightVertex := lightPath.Vertices[s-1]   // s-1 vertex in light path
-	cameraVertex := cameraPath.Vertices[t-1] // t-1 vertex in camera path
+	lightVertex := &lightPath.Vertices[s-1]   // s-1 vertex in light path
+	cameraVertex := &cameraPath.Vertices[t-1] // t-1 vertex in camera path
 
 	// Skip connections involving specular vertices (can't connect through delta functions)
 	if lightVertex.IsSpecular || cameraVertex.IsSpecular {
@@ -946,7 +941,7 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	geometricTerm := (cosAtCamera * cosAtLight) / (distance * distance)
 
 	// Evaluate BRDF at camera vertex
-	cameraBRDF := bdpt.evaluateBRDF(&cameraVertex, direction)
+	cameraBRDF := bdpt.evaluateBRDF(cameraVertex, direction)
 
 	// Calculate path throughputs up to the connection vertices (not including them)
 	// For connection, we need throughput up to but not including the connection vertex
@@ -954,14 +949,7 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	lightPathThroughput := lightPath.Vertices[s-1].Beta
 
 	// Calculate light vertex BRDF for connection (PBRT: qs.f(pt, TransportMode::Importance))
-	var lightBRDF core.Vec3
-	if lightVertex.IsLight {
-		// Light sources have identity BRDF (emission is already in throughput)
-		lightBRDF = core.NewVec3(1, 1, 1)
-	} else {
-		// Surface vertex BRDF toward camera vertex
-		lightBRDF = bdpt.evaluateBRDF(&lightVertex, direction.Multiply(-1))
-	}
+	lightBRDF := bdpt.evaluateBRDF(lightVertex, direction.Multiply(-1))
 
 	// PBRT formula: L = qs.beta * qs.f(pt, TransportMode::Importance) * pt.f(qs, TransportMode::Radiance) * pt.beta * G
 	// Which translates to: lightThroughput * lightBRDF * cameraBRDF * cameraThroughput * G
@@ -978,6 +966,7 @@ func (bdpt *BDPTIntegrator) getWorldRadius(scene core.Scene) float64 {
 
 	// For now, use a simple heuristic based on scene shapes
 	// In a full implementation, this would use the actual scene bounds
+	// TODO: Implement this properly
 	shapes := scene.GetShapes()
 	if len(shapes) == 0 {
 		return 1000.0 // Default radius for empty scenes

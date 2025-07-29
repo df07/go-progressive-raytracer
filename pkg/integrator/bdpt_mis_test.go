@@ -366,7 +366,6 @@ func TestCalculateVertexPdf(t *testing.T) {
 			curr: Vertex{
 				Point:    core.NewVec3(0, 0, 0),
 				Normal:   core.NewVec3(0, 0, -1),
-				Camera:   scene.GetCamera(),
 				IsCamera: true,
 			},
 			prev:        nil, // camera has no predecessor
