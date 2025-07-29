@@ -5,6 +5,29 @@
 
 set -e
 
+# Cleanup function to restore stashed changes on exit
+CLEANUP_DONE=false
+cleanup() {
+    local exit_code=$?
+    if [ "$CLEANUP_DONE" = true ]; then
+        exit $exit_code
+    fi
+    CLEANUP_DONE=true
+    
+    if [ "$STASHED" = true ]; then
+        echo ""
+        echo "Script interrupted - restoring stashed changes..."
+        git stash pop > /dev/null 2>&1 || {
+            echo "Warning: Could not restore stashed changes automatically."
+            echo "Run 'git stash pop' manually to restore your changes."
+        }
+    fi
+    exit $exit_code
+}
+
+# Set up signal traps to ensure cleanup on Ctrl-C or other signals
+trap cleanup EXIT INT TERM
+
 SCENE="cornell-boxes"
 INTEGRATOR="bdpt"
 SAMPLES=10
@@ -47,11 +70,12 @@ for i in $(seq 1 $RUNS); do
     printf "%6.3fs\n" $RUNTIME
 done
 
-# Restore changes if we stashed them
+# Restore changes if we stashed them (cleanup function will handle this automatically)
 if [ "$STASHED" = true ]; then
     echo ""
     echo "=== RESTORING CHANGES ==="
     git stash pop
+    STASHED=false  # Mark as restored so cleanup doesn't try again
 fi
 
 # Cooling period between baseline and changes
