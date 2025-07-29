@@ -735,14 +735,6 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
 
-	// Check if light is visible (shadow ray)
-	shadowRay := core.NewRay(cameraVertex.Point, lightSample.Direction)
-	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, lightSample.Distance-0.001)
-	if blocked {
-		// Light is blocked, no direct contribution
-		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
-	}
-
 	// Calculate the cosine factor
 	cosine := lightSample.Direction.Dot(cameraVertex.Normal)
 	if cosine <= 0 {
@@ -757,6 +749,18 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	brdf := cameraVertex.Material.EvaluateBRDF(cameraVertex.IncomingDirection, lightSample.Direction, cameraVertex.Normal)
 	lightBeta := lightSample.Emission.Multiply(1 / lightSample.PDF) // light sample pdf contains light selection pdf
 	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosine)
+
+	if lightContribution.Luminance() <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
+	}
+
+	// Check if light is visible (shadow ray)
+	shadowRay := core.NewRay(cameraVertex.Point, lightSample.Direction)
+	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, lightSample.Distance-0.001)
+	if blocked {
+		// Light is blocked, no direct contribution
+		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
+	}
 
 	// Create sampled light vertex for PBRT MIS calculation
 	sampledVertex := &Vertex{
@@ -803,14 +807,6 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 
 	// bdpt.logf(" (s=%d,t=1) SampleCameraFromPoint: Weight=%v, PDF=%f\n", s, cameraSample.Weight, cameraSample.PDF)
 
-	// Visibility test
-	shadowRay := core.NewRay(lightVertex.Point, cameraSample.Ray.Direction.Multiply(-1))
-	distance := lightVertex.Point.Subtract(cameraSample.Ray.Origin).Length()
-	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, distance-0.001)
-	if blocked {
-		return nil, nil
-	}
-
 	// PBRT formula: L = qs.beta * qs.f(sampled, TransportMode::Importance) * sampled.beta;
 	// where sampled.beta = Wi / pdf
 
@@ -837,6 +833,14 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 
 	if lightContribution.Luminance() <= 0 {
 		// bdpt.logf(" Light contribution is <= 0: %v\n", lightContribution)
+		return nil, nil
+	}
+
+	// Visibility test
+	shadowRay := core.NewRay(lightVertex.Point, cameraSample.Ray.Direction.Multiply(-1))
+	distance := lightVertex.Point.Subtract(cameraSample.Ray.Origin).Length()
+	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, distance-0.001)
+	if blocked {
 		return nil, nil
 	}
 
@@ -924,14 +928,6 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	}
 	direction = direction.Multiply(1.0 / distance)
 
-	// Visibility test
-	shadowRay := core.NewRay(cameraVertex.Point, direction)
-	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, distance-0.001)
-	if blocked {
-		// bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: blocked hit=%v\n", s, t, hit)
-		return core.Vec3{X: 0, Y: 0, Z: 0}
-	}
-
 	// Geometric term: G(x,y) = cos(theta_x) * cos(theta_y) / distance^2
 	cosAtCamera := direction.Dot(cameraVertex.Normal)
 	cosAtLight := direction.Multiply(-1).Dot(lightVertex.Normal)
@@ -955,6 +951,18 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	// Which translates to: lightThroughput * lightBRDF * cameraBRDF * cameraThroughput * G
 	contribution := lightPathThroughput.MultiplyVec(lightBRDF).MultiplyVec(cameraBRDF).MultiplyVec(cameraPathThroughput).Multiply(geometricTerm)
 	// bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: L=%v => cameraBRDF=%v * lightBRDF=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", s, t, contribution, cameraBRDF, lightBRDF, geometricTerm, cameraPathThroughput, lightPathThroughput)
+
+	if contribution.Luminance() <= 0 {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Visibility test
+	shadowRay := core.NewRay(cameraVertex.Point, direction)
+	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, distance-0.001)
+	if blocked {
+		// bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: blocked hit=%v\n", s, t, hit)
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
 
 	return contribution
 }
