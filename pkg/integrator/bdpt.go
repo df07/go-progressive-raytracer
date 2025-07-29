@@ -328,7 +328,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 	// For path tracing strategies that hit infinite lights (background),
 	// return MIS weight 1.0 since we can't actually sample infinite lights directly
 	if s == 0 && t > 1 {
-		lastVertex := cameraPath.Vertices[t-1]
+		lastVertex := &cameraPath.Vertices[t-1]
 		if lastVertex.IsInfiniteLight {
 			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight: infinite light hit, weight=1.0\n", s, t)
 			return 1.0
@@ -713,7 +713,7 @@ func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path, t int) 
 
 	// For s=0,t=n strategy, we evaluate the camera path's accumulated radiance
 	// The last vertex in the camera path determines the final contribution
-	lastVertex := cameraPath.Vertices[t-1]
+	lastVertex := &cameraPath.Vertices[t-1]
 
 	// The contribution is the emitted light at the last vertex weighted by path throughput
 	// pbrt: L = pt.Le(scene, cameraVertices[t - 2]) * pt.beta
@@ -723,7 +723,7 @@ func (bdpt *BDPTIntegrator) evaluatePathTracingStrategy(cameraPath Path, t int) 
 }
 
 func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t int, scene core.Scene, sampler core.Sampler) (core.Vec3, *Vertex) {
-	cameraVertex := cameraPath.Vertices[t-1]
+	cameraVertex := &cameraPath.Vertices[t-1]
 
 	if cameraVertex.IsSpecular || cameraVertex.Material == nil {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
@@ -791,7 +791,7 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	}
 
 	// Get the light path vertex we're connecting to the camera
-	lightVertex := lightPath.Vertices[s-1]
+	lightVertex := &lightPath.Vertices[s-1]
 
 	// Skip specular vertices (can't connect through delta functions)
 	if lightVertex.IsSpecular {
@@ -817,7 +817,7 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	// Since we use symmetric materials with geometry normals, we can ignore the transport mode distinction.
 	// TODO: We do have dielectric materials with refraction - need to implement proper transport mode handling for those.
 
-	brdf := bdpt.evaluateBRDF(&lightVertex, cameraSample.Ray.Direction.Multiply(-1))
+	brdf := bdpt.evaluateBRDF(lightVertex, cameraSample.Ray.Direction.Multiply(-1))
 	cameraBeta := cameraSample.Weight.Multiply(1 / cameraSample.PDF)
 
 	cosine := cameraSample.Ray.Direction.Multiply(-1).Dot(lightVertex.Normal)
