@@ -125,6 +125,11 @@ func (v Vec3) Luminance() float64 {
 	return 0.299*v.X + 0.587*v.Y + 0.114*v.Z
 }
 
+// IsZero returns true if the vector is zero
+func (v Vec3) IsZero() bool {
+	return v.X == 0 && v.Y == 0 && v.Z == 0
+}
+
 // Negate returns the negative of the vector
 func (v Vec3) Negate() Vec3 {
 	return Vec3{

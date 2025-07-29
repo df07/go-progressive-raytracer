@@ -202,10 +202,10 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
 				Material:          nil,
 				IncomingDirection: currentRay.Direction.Multiply(-1),
-				AreaPdfForward:    pdfFwd,                  // Keep as solid angle PDF for infinite area light
-				AreaPdfReverse:    0.0,                     // Cannot generate rays towards background
-				IsLight:           bgColor.Luminance() > 0, // Only mark as light if background actually emits
-				IsCamera:          false,                   // No camera vertices in path extension
+				AreaPdfForward:    pdfFwd,            // Keep as solid angle PDF for infinite area light
+				AreaPdfReverse:    0.0,               // Cannot generate rays towards background
+				IsLight:           !bgColor.IsZero(), // Only mark as light if background actually emits
+				IsCamera:          false,             // No camera vertices in path extension
 				IsSpecular:        false,
 				IsInfiniteLight:   true, // Mark as infinite area light
 				Beta:              beta,
@@ -228,7 +228,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			IncomingDirection: currentRay.Direction.Multiply(-1),
 			AreaPdfForward:    1.0, // Will be updated by setVertexPDFs if material scatters
 			AreaPdfReverse:    0.0, // Will be updated by setVertexPDFs if material scatters
-			IsLight:           emittedLight.Luminance() > 0,
+			IsLight:           !emittedLight.IsZero(),
 			IsCamera:          false, // No camera vertices in path extension
 			IsSpecular:        false, // Will be set below if material scatters
 			Beta:              beta,
@@ -666,7 +666,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 			} else if s == 0 {
 				// s=0: Pure camera path
 				contribution = bdpt.evaluatePathTracingStrategy(cameraPath, t)
-				if contribution.Luminance() > 0 {
+				if !contribution.IsZero() {
 					// bdpt.logf(" (s=%d,t=%d) evaluatePathTracingStrategy returned contribution=%0.3g\n", s, t, contribution)
 				}
 			} else if t == 1 {
@@ -686,7 +686,7 @@ func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, s
 				// bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy returned contribution=%0.3g\n", s, t, contribution)
 			}
 
-			if contribution.Luminance() > 0 || len(splatRays) > 0 {
+			if !contribution.IsZero() || len(splatRays) > 0 {
 				misWeight := bdpt.calculateMISWeight(cameraPath, lightPath, sampledVertex, s, t, scene)
 
 				strategies = append(strategies, bdptStrategy{
@@ -731,7 +731,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 	lights := scene.GetLights()
 	lightSample, sampledLight, hasLight := core.SampleLight(lights, cameraVertex.Point, sampler)
-	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
+	if !hasLight || lightSample.Emission.IsZero() || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
 
@@ -750,7 +750,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	lightBeta := lightSample.Emission.Multiply(1 / lightSample.PDF) // light sample pdf contains light selection pdf
 	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosine)
 
-	if lightContribution.Luminance() <= 0 {
+	if lightContribution.IsZero() {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
 
@@ -831,7 +831,7 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 		lightContribution = lightContribution.Multiply(cosine)
 	}
 
-	if lightContribution.Luminance() <= 0 {
+	if lightContribution.IsZero() {
 		// bdpt.logf(" Light contribution is <= 0: %v\n", lightContribution)
 		return nil, nil
 	}
@@ -952,7 +952,7 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	contribution := lightPathThroughput.MultiplyVec(lightBRDF).MultiplyVec(cameraBRDF).MultiplyVec(cameraPathThroughput).Multiply(geometricTerm)
 	// bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: L=%v => cameraBRDF=%v * lightBRDF=%v * G=%v * cameraThroughput=%v * lightThroughput=%v\n", s, t, contribution, cameraBRDF, lightBRDF, geometricTerm, cameraPathThroughput, lightPathThroughput)
 
-	if contribution.Luminance() <= 0 {
+	if contribution.IsZero() {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
