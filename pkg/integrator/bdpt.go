@@ -57,14 +57,6 @@ type BDPTIntegrator struct {
 	Verbose bool
 }
 
-// bdptStrategy represents a single BDPT path construction strategy
-type bdptStrategy struct {
-	s, t         int             // Light path length, camera path length
-	contribution core.Vec3       // Radiance contribution
-	misWeight    float64         // MIS weight
-	splatRays    []core.SplatRay // Splat rays for t=1 strategies
-}
-
 // NewBDPTIntegrator creates a new BDPT integrator
 func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 	return &BDPTIntegrator{
@@ -76,21 +68,56 @@ func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 // RayColor computes color with support for ray-based splatting
 // Returns (pixel color, splat rays)
 func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
-	// for now, both paths have the same max depth
-	cameraMaxDepth := bdpt.config.MaxDepth
-	lightMaxDepth := bdpt.config.MaxDepth
 
-	// Generate camera path with vertices
-	cameraPath := bdpt.generateCameraSubpath(ray, scene, sampler, cameraMaxDepth)
+	// Generate random camera and light paths
+	cameraPath := bdpt.generateCameraSubpath(ray, scene, sampler, bdpt.config.MaxDepth)
+	lightPath := bdpt.generateLightSubpath(scene, sampler, bdpt.config.MaxDepth)
 
-	// Generate a light path
-	lightPath := bdpt.generateLightSubpath(scene, sampler, lightMaxDepth)
+	// Evaluate all combinations of camera and light paths with MIS weighting
+	var totalLight core.Vec3
+	var totalSplats []core.SplatRay
 
-	// Evaluate all BDPT strategies with proper MIS weighting
-	strategies := bdpt.generateBDPTStrategies(cameraPath, lightPath, scene, sampler)
+	for s := 0; s <= lightPath.Length; s++ { // s is the number of vertices from the light path
+		for t := 1; t <= cameraPath.Length; t++ { // t is the number of vertices from the camera path
 
-	// evaluateBDPTStrategies now returns both color and splats
-	return bdpt.evaluateBDPTStrategies(strategies)
+			// evaluate BDPT strategy for s vertexes from light path and t vertexes from camera path
+			light, splats, sample := bdpt.evaluateBDPTStrategy(cameraPath, lightPath, s, t, scene, sampler)
+
+			// apply MIS weight to contribution and splat rays
+			if !light.IsZero() || len(splats) > 0 {
+				misWeight := bdpt.calculateMISWeight(cameraPath, lightPath, sample, s, t, scene)
+				totalLight = totalLight.Add(light.Multiply(misWeight))
+				for i := range splats {
+					splats[i].Color = splats[i].Color.Multiply(misWeight)
+				}
+				totalSplats = append(totalSplats, splats...)
+			}
+		}
+	}
+
+	return totalLight, totalSplats
+}
+
+// evaluateBDPTStrategy evaluates a single BDPT strategy
+func (bdpt *BDPTIntegrator) evaluateBDPTStrategy(cameraPath, lightPath Path, s, t int, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay, *Vertex) {
+	var light core.Vec3
+	var sample *Vertex         // needed for MIS weight calculation for strategies that sample a new vertex
+	var splats []core.SplatRay // returned by light tracing strategy
+
+	switch {
+	case s == 1 && t == 1:
+		return core.Vec3{}, nil, nil // pbrt does not implement s=1,t=1 strategy. These paths are captured by s=0,t=1
+	case s == 0:
+		light = bdpt.evaluatePathTracingStrategy(cameraPath, t) // s=0: Pure camera path
+	case t == 1:
+		splats, sample = bdpt.evaluateLightTracingStrategy(lightPath, s, scene, sampler) // t=1: Light path direct to camera (light tracing)
+	case s == 1:
+		light, sample = bdpt.evaluateDirectLightingStrategy(cameraPath, t, scene, sampler) // s=1: Direct lighting
+	default:
+		light = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene) // All other cases: Connection strategies (including s=0, t<last)
+	}
+
+	return light, splats, sample
 }
 
 // generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
@@ -607,100 +634,6 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Ver
 	pdfPos := lightVertex.Light.EmissionPDF(lightVertex.Point, w)
 
 	return pdfPos * pdfChoice
-}
-
-// evaluateBDPTStrategies evaluates all BDPT path construction strategies with MIS weighting.
-//
-// BDPT works by generating two subpaths:
-// - Camera subpath: starts from camera, bounces through scene
-// - Light subpath: starts from light sources, bounces through scene
-//
-// These can be connected in multiple ways to form complete light transport paths:
-// - (s=0, t=n): Pure path tracing - camera path only
-// - (s=1, t=n-1): Direct lighting - connect camera path to light
-// - (s=2, t=n-2): One-bounce indirect - light bounces once before connecting
-// - etc.
-//
-// Multiple Importance Sampling (MIS) optimally combines all strategies using
-// the power heuristic to minimize variance.
-func (bdpt *BDPTIntegrator) evaluateBDPTStrategies(strategies []bdptStrategy) (core.Vec3, []core.SplatRay) {
-	// Apply MIS weighting to all strategies
-	totalContribution := core.Vec3{X: 0, Y: 0, Z: 0}
-	var allSplatRays []core.SplatRay
-
-	for _, strategy := range strategies {
-		if strategy.t > 1 { // t=1 strategies hit the camera directly, not necessarily at the point we're calculating
-			// Use PBRT MIS weight calculation
-			// bdpt.logf(" (s=%d,t=%d) evaluateBDPTStrategies: contribution=%v, PBRT weight=%0.3g\n", strategy.s, strategy.t, strategy.contribution, strategy.misWeight)
-			totalContribution = totalContribution.Add(strategy.contribution.Multiply(strategy.misWeight))
-		} else if strategy.t == 1 && len(strategy.splatRays) > 0 {
-			// t=1 strategies contribute via splats
-			for _, splatRay := range strategy.splatRays {
-				// Apply MIS weighting to splat contribution
-				weightedSplat := core.SplatRay{
-					Ray:   splatRay.Ray,
-					Color: splatRay.Color.Multiply(strategy.misWeight),
-				}
-				// bdpt.logf(" (s=%d,t=%d) evaluateBDPTStrategies: splat contribution=%v, PBRT weight=%0.3g\n", strategy.s, strategy.t, splatRay.Color, strategy.misWeight)
-				allSplatRays = append(allSplatRays, weightedSplat)
-			}
-		}
-	}
-
-	return totalContribution, allSplatRays
-}
-
-// generateBDPTStrategies generates all valid BDPT strategies for the given camera and light paths
-func (bdpt *BDPTIntegrator) generateBDPTStrategies(cameraPath, lightPath Path, scene core.Scene, sampler core.Sampler) []bdptStrategy {
-	strategies := make([]bdptStrategy, 0)
-
-	for s := 0; s <= lightPath.Length; s++ {
-		for t := 1; t <= cameraPath.Length; t++ {
-			var contribution core.Vec3
-			var sampledVertex *Vertex
-			var splatRays []core.SplatRay
-
-			if s == 1 && t == 1 {
-				// pbrt does not implement s=1,t=1 strategy. These paths are captured by s=0,t=1
-				continue
-			} else if s == 0 {
-				// s=0: Pure camera path
-				contribution = bdpt.evaluatePathTracingStrategy(cameraPath, t)
-				if !contribution.IsZero() {
-					// bdpt.logf(" (s=%d,t=%d) evaluatePathTracingStrategy returned contribution=%0.3g\n", s, t, contribution)
-				}
-			} else if t == 1 {
-				// t=1: Light path direct to camera (light tracing)
-				splatRays, sampledVertex = bdpt.evaluateLightTracingStrategy(lightPath, s, scene, sampler)
-				if len(splatRays) > 0 {
-					// bdpt.logf(" (s=%d,t=%d) evaluateLightTracingStrategy returned splat contribution=%v\n", s, t, splatRays[0].Color)
-				}
-			} else if s == 1 {
-				// s=1: Direct lighting
-				// Use direct light sampling to avoid challenges with choosing a light point on the wrong side of the light
-				contribution, sampledVertex = bdpt.evaluateDirectLightingStrategy(cameraPath, t, scene, sampler)
-				// bdpt.logf(" (s=%d,t=%d) evaluateDirectLightingStrategy returned contribution=%0.3g\n", s, t, contribution)
-			} else {
-				// All other cases: Connection strategies (including s=0, t<last)
-				contribution = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene)
-				// bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy returned contribution=%0.3g\n", s, t, contribution)
-			}
-
-			if !contribution.IsZero() || len(splatRays) > 0 {
-				misWeight := bdpt.calculateMISWeight(cameraPath, lightPath, sampledVertex, s, t, scene)
-
-				strategies = append(strategies, bdptStrategy{
-					s:            s,
-					t:            t,
-					contribution: contribution,
-					misWeight:    misWeight,
-					splatRays:    splatRays,
-				})
-			}
-		}
-	}
-
-	return strategies
 }
 
 // evaluatePathTracingStrategy evaluates the BDPT path tracing strategy
