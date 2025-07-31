@@ -149,7 +149,7 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, sampler core.
 	sampledLight := lights[int(sampler.Get1D()*float64(len(lights)))]
 	emissionSample := sampledLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
 	lightSelectionPdf := 1.0 / float64(len(lights))
-	cosTheta := emissionSample.Direction.Dot(emissionSample.Normal)
+	cosTheta := emissionSample.Direction.AbsDot(emissionSample.Normal)
 
 	lightVertex := Vertex{
 		Point:             emissionSample.Point,
@@ -172,8 +172,8 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, sampler core.
 	// Use the common path extension logic (maxDepth-1 because light counts as a vertex in pt)
 	// PBRT formula: beta = Le * |cos(theta)| / (lightSelectionPdf * areaPdf * pdfDir)
 	ray := core.NewRay(emissionSample.Point, emissionSample.Direction)
-	beta := emissionSample.Emission.Multiply(math.Abs(cosTheta) / (lightSelectionPdf * emissionSample.AreaPDF * emissionSample.DirectionPDF))
-	// bdpt.logf("generateLightSubpath: forwardThroughput=%v, cosTheta=%f, lightSelectionPdf=%f, AreaPDF=%f, DirectionPDF=%f\n", beta, math.Abs(cosTheta), lightSelectionPdf, emissionSample.AreaPDF, emissionSample.DirectionPDF)
+	beta := emissionSample.Emission.Multiply(cosTheta / (lightSelectionPdf * emissionSample.AreaPDF * emissionSample.DirectionPDF))
+	// bdpt.logf("generateLightSubpath: forwardThroughput=%v, cosTheta=%f, lightSelectionPdf=%f, AreaPDF=%f, DirectionPDF=%f\n", beta, cosTheta, lightSelectionPdf, emissionSample.AreaPDF, emissionSample.DirectionPDF)
 	bdpt.extendPath(&path, ray, beta, emissionSample.DirectionPDF, scene, sampler, maxDepth-1, false)
 
 	return path
@@ -303,10 +303,10 @@ func (v *Vertex) convertSolidAngleToAreaPdf(next *Vertex, pdf float64) float64 {
 	// Follow PBRT's ConvertDensity exactly
 	// Formula: area_pdf = solid_angle_pdf * distance² / |cos(theta)|
 
-	// Only multiply by cosine if next vertex is on a surface (PBRT's IsOnSurface)
+	// Only multiply by cosTheta if next vertex is on a surface (PBRT's IsOnSurface)
 	if next.IsOnSurface() {
-		cosTheta := direction.Multiply(math.Sqrt(invDist2)).Dot(next.Normal)
-		pdf *= math.Abs(cosTheta) // Use absolute value like PBRT
+		cosTheta := direction.Multiply(math.Sqrt(invDist2)).AbsDot(next.Normal)
+		pdf *= cosTheta
 	}
 
 	return pdf * invDist2
@@ -560,8 +560,8 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 
 	// if (v.IsOnSurface()) pdf *= AbsDot(v.ng(), w);
 	if !to.IsLight && !to.IsCamera {
-		cosine := math.Abs(to.Normal.Dot(w))
-		pdf *= cosine
+		cosTheta := to.Normal.AbsDot(w)
+		pdf *= cosTheta
 	}
 
 	return pdf
@@ -735,9 +735,9 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
 
-	// Calculate the cosine factor
-	cosine := lightSample.Direction.Dot(cameraVertex.Normal)
-	if cosine <= 0 {
+	// Calculate the cosTheta factor
+	cosTheta := lightSample.Direction.AbsDot(cameraVertex.Normal)
+	if cosTheta <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil // Light is behind the surface
 	}
 
@@ -748,7 +748,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	//          => pdfDir for light sample not used
 	brdf := cameraVertex.Material.EvaluateBRDF(cameraVertex.IncomingDirection, lightSample.Direction, cameraVertex.Normal)
 	lightBeta := lightSample.Emission.Multiply(1 / lightSample.PDF) // light sample pdf contains light selection pdf
-	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosine)
+	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosTheta)
 
 	if lightContribution.IsZero() {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
