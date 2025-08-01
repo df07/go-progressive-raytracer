@@ -20,7 +20,7 @@ func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, s
 }
 
 // Emit implements the Emitter interface with directional spot light falloff
-func (dslm *discSpotLightMaterial) Emit(rayIn core.Ray, hit core.HitRecord) core.Vec3 {
+func (dslm *discSpotLightMaterial) Emit(rayIn core.Ray) core.Vec3 {
 	// Calculate directional emission for indirect rays (caustics)
 	// Check if we're hitting the "back" face of the disc (the emitting side)
 

@@ -154,9 +154,7 @@ func SampleEmissionDirection(point Vec3, normal Vec3, areaPDF float64, material 
 	// Get emission from material
 	var emission Vec3
 	if emitter, ok := material.(Emitter); ok {
-		dummyRay := NewRay(point, emissionDir)
-		dummyHit := HitRecord{Point: point, Normal: normal, Material: material}
-		emission = emitter.Emit(dummyRay, dummyHit)
+		emission = emitter.Emit(NewRay(point, emissionDir))
 	}
 
 	return EmissionSample{

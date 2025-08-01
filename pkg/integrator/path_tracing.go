@@ -98,7 +98,7 @@ func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter core.ScatterResul
 // getEmittedLight returns the emitted light from a material if it's emissive
 func (pt *PathTracingIntegrator) GetEmittedLight(ray core.Ray, hit *core.HitRecord) core.Vec3 {
 	if emitter, isEmissive := hit.Material.(core.Emitter); isEmissive {
-		return emitter.Emit(ray, *hit)
+		return emitter.Emit(ray)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

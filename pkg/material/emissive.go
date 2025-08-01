@@ -22,7 +22,7 @@ func (e *Emissive) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Samp
 }
 
 // Emit returns the emitted light for this material
-func (e *Emissive) Emit(rayIn core.Ray, hit core.HitRecord) core.Vec3 {
+func (e *Emissive) Emit(rayIn core.Ray) core.Vec3 {
 	return e.Emission
 }
 

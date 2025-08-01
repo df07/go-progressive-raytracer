@@ -64,14 +64,7 @@ func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) core.Lig
 	// Get emission from material if it's an emitter
 	var emission core.Vec3
 	if emitter, ok := sl.Material.(core.Emitter); ok {
-		// Create dummy ray and hit record for emission calculation
-		dummyRay := core.NewRay(point, dirNormalized)
-		dummyHit := core.HitRecord{
-			Point:    samplePoint,
-			Normal:   normal,
-			Material: sl.Material,
-		}
-		emission = emitter.Emit(dummyRay, dummyHit)
+		emission = emitter.Emit(core.NewRay(point, dirNormalized))
 	}
 
 	return core.LightSample{
@@ -137,14 +130,7 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) core.Lig
 	// Get emission from material if it's an emitter
 	var emission core.Vec3
 	if emitter, ok := sl.Material.(core.Emitter); ok {
-		// Create dummy ray and hit record for emission calculation
-		dummyRay := core.NewRay(point, direction)
-		dummyHit := core.HitRecord{
-			Point:    hitRecord.Point,
-			Normal:   hitRecord.Normal,
-			Material: sl.Material,
-		}
-		emission = emitter.Emit(dummyRay, dummyHit)
+		emission = emitter.Emit(ray)
 	}
 
 	return core.LightSample{

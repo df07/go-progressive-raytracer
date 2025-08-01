@@ -61,14 +61,7 @@ func (dl *DiscLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample 
 	// Get emission from material if it's an emitter
 	var emission core.Vec3
 	if emitter, ok := dl.Material.(core.Emitter); ok {
-		// Create dummy ray and hit record for emission calculation
-		dummyRay := core.NewRay(point, dirNormalized)
-		dummyHit := core.HitRecord{
-			Point:    samplePoint,
-			Normal:   normal,
-			Material: dl.Material,
-		}
-		emission = emitter.Emit(dummyRay, dummyHit)
+		emission = emitter.Emit(core.NewRay(point, dirNormalized))
 	}
 
 	return core.LightSample{

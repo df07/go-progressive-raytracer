@@ -63,14 +63,7 @@ func (ql *QuadLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample 
 	// Get emission from material if it's an emitter
 	var emission core.Vec3
 	if emitter, ok := ql.Material.(core.Emitter); ok {
-		// Create dummy ray and hit record for emission calculation
-		dummyRay := core.NewRay(point, direction)
-		dummyHit := core.HitRecord{
-			Point:    samplePoint,
-			Normal:   ql.Normal,
-			Material: ql.Material,
-		}
-		emission = emitter.Emit(dummyRay, dummyHit)
+		emission = emitter.Emit(core.NewRay(point, direction))
 	}
 
 	return core.LightSample{
@@ -128,9 +121,7 @@ func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	// Get emission from material
 	var emission core.Vec3
 	if emitter, ok := ql.Material.(core.Emitter); ok {
-		dummyRay := core.NewRay(point, emissionDir)
-		dummyHit := core.HitRecord{Point: point, Normal: ql.Normal, Material: ql.Material}
-		emission = emitter.Emit(dummyRay, dummyHit)
+		emission = emitter.Emit(core.NewRay(point, emissionDir))
 	}
 
 	return core.EmissionSample{

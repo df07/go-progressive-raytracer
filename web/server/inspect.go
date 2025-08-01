@@ -90,14 +90,7 @@ func (s *Server) extractMaterialInfo(mat core.Material) (string, map[string]inte
 	default:
 		// Check if it's emissive using interface
 		if emitter, ok := mat.(core.Emitter); ok {
-			// Create dummy ray and hit record for inspection
-			dummyRay := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0))
-			dummyHit := core.HitRecord{
-				Point:    core.NewVec3(0, 0, 0),
-				Normal:   core.NewVec3(0, 1, 0),
-				Material: mat,
-			}
-			emission := emitter.Emit(dummyRay, dummyHit)
+			emission := emitter.Emit(core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0)))
 			properties["emission"] = [3]float64{emission.X, emission.Y, emission.Z}
 			properties["color"] = fmt.Sprintf("#%02x%02x%02x",
 				int(emission.X*255), int(emission.Y*255), int(emission.Z*255))

@@ -34,7 +34,7 @@ type Material interface {
 
 // Emitter interface for materials that emit light
 type Emitter interface {
-	Emit(rayIn Ray, hit HitRecord) Vec3
+	Emit(rayIn Ray) Vec3
 }
 
 type LightType string
