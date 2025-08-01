@@ -134,18 +134,10 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 
 	// Create the initial camera vertex (like light path does for light sources)
 	cameraVertex := Vertex{
-		Point:             ray.Origin,
-		Normal:            ray.Direction.Multiply(-1),  // Camera "normal" points back along ray
-		Material:          nil,                         // Cameras don't have materials
-		Light:             nil,                         // Cameras are not lights
-		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Camera is the starting point
-		AreaPdfForward:    0.0,                         // Initial camera PDF is always 0.0
-		AreaPdfReverse:    0.0,                         // Cannot generate reverse direction to camera
-		IsLight:           false,
-		IsCamera:          true,
-		IsSpecular:        false,
-		Beta:              core.Vec3{X: 1, Y: 1, Z: 1},
-		EmittedLight:      core.Vec3{X: 0, Y: 0, Z: 0}, // Cameras don't emit light
+		Point:    ray.Origin,
+		Normal:   ray.Direction.Multiply(-1), // Camera "normal" points back along ray
+		IsCamera: true,
+		Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
 	}
 
 	path.Vertices = append(path.Vertices, cameraVertex)
@@ -179,18 +171,14 @@ func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, sampler core.
 	cosTheta := emissionSample.Direction.AbsDot(emissionSample.Normal)
 
 	lightVertex := Vertex{
-		Point:             emissionSample.Point,
-		Normal:            emissionSample.Normal,
-		Material:          nil, // Lights don't have materials in our current system
-		Light:             sampledLight,
-		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0}, // Light is the starting point
-		AreaPdfForward:    emissionSample.AreaPDF * lightSelectionPdf,
-		AreaPdfReverse:    0.0, // Cannot generate reverse direction to light
-		IsLight:           true,
-		IsCamera:          false,
-		IsSpecular:        false,
-		Beta:              emissionSample.Emission, // PBRT: light vertex stores raw emission, transport beta used for path continuation
-		EmittedLight:      emissionSample.Emission, // Already properly scaled
+		Point:          emissionSample.Point,
+		Normal:         emissionSample.Normal,
+		Light:          sampledLight,
+		AreaPdfForward: emissionSample.AreaPDF * lightSelectionPdf, // probability of generating this point is the light sampling pdf
+		AreaPdfReverse: 0.0,                                        // probability of generating this point in reverse is set by MIS weight calculation
+		IsLight:        true,
+		Beta:           emissionSample.Emission, // PBRT: light vertex stores raw emission, transport beta used for path continuation
+		EmittedLight:   emissionSample.Emission, // Already properly scaled
 	}
 
 	path.Vertices = append(path.Vertices, lightVertex)
@@ -227,14 +215,11 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			vertex := Vertex{
 				Point:             currentRay.Origin.Add(currentRay.Direction.Multiply(1000.0)), // Far background
 				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
-				Material:          nil,
 				IncomingDirection: currentRay.Direction.Multiply(-1),
 				AreaPdfForward:    pdfFwd,            // Keep as solid angle PDF for infinite area light
 				AreaPdfReverse:    0.0,               // Cannot generate rays towards background
 				IsLight:           !bgColor.IsZero(), // Only mark as light if background actually emits
-				IsCamera:          false,             // No camera vertices in path extension
-				IsSpecular:        false,
-				IsInfiniteLight:   true, // Mark as infinite area light
+				IsInfiniteLight:   true,              // Mark as infinite area light
 				Beta:              beta,
 				EmittedLight:      bgColor, // Capture background light
 			}
@@ -244,23 +229,18 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			break
 		}
 
-		// Capture emitted light from this vertex
-		emittedLight := bdpt.GetEmittedLight(currentRay, hit)
-
 		// Create vertex for the intersection
 		vertex := Vertex{
 			Point:             hit.Point,
 			Normal:            hit.Normal,
 			Material:          hit.Material,
 			IncomingDirection: currentRay.Direction.Multiply(-1),
-			AreaPdfForward:    1.0, // Will be updated by setVertexPDFs if material scatters
-			AreaPdfReverse:    0.0, // Will be updated by setVertexPDFs if material scatters
-			IsLight:           !emittedLight.IsZero(),
-			IsCamera:          false, // No camera vertices in path extension
-			IsSpecular:        false, // Will be set below if material scatters
 			Beta:              beta,
-			EmittedLight:      emittedLight, // Captured during path generation
 		}
+
+		// Capture emitted light from this vertex
+		vertex.EmittedLight = bdpt.GetEmittedLight(currentRay, hit)
+		vertex.IsLight = !vertex.EmittedLight.IsZero()
 
 		// Set forward PDF into this vertex, from the pdf of the previous vertex
 		// pbrt: prev.ConvertDensity(pdf, v)
@@ -697,18 +677,14 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 	// Create sampled light vertex for PBRT MIS calculation
 	sampledVertex := &Vertex{
-		Point:             lightSample.Point,
-		Normal:            lightSample.Normal,
-		Light:             sampledLight,
-		Material:          nil, // Lights don't have materials
-		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0},
-		AreaPdfForward:    lightSample.PDF, // Light sampling PDF
-		AreaPdfReverse:    0.0,
-		IsLight:           true,
-		IsCamera:          false,
-		IsSpecular:        false,
-		Beta:              lightBeta,
-		EmittedLight:      lightSample.Emission,
+		Point:          lightSample.Point,
+		Normal:         lightSample.Normal,
+		Light:          sampledLight,
+		AreaPdfForward: lightSample.PDF, // probability of generating this point is the light sampling pdf
+		AreaPdfReverse: 0.0,             // probability of generating this point in reverse is set by MIS weight calculation
+		IsLight:        true,
+		Beta:           lightBeta,
+		EmittedLight:   lightSample.Emission,
 	}
 
 	// bdpt.logf(" (s=1,t=%d) evaluateDirectLightingStrategy: L=%v => brdf=%v * beta=%v * emission=%v * (cosine=%f / pdf=%f)\n", t, lightContribution, brdf, cameraVertex.Beta, lightSample.Emission, cosine, lightSample.PDF)
@@ -783,18 +759,10 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	// Create the sampled camera vertex for MIS weight calculation
 	// This represents the dynamically sampled camera vertex
 	sampledCameraVertex := &Vertex{
-		Point:             cameraSample.Ray.Origin,
-		Normal:            cameraSample.Ray.Direction.Multiply(-1), // Camera "normal" points back along ray
-		Material:          nil,                                     // Cameras don't have materials
-		Light:             nil,                                     // Cameras are not lights
-		IncomingDirection: core.Vec3{X: 0, Y: 0, Z: 0},             // Camera is the starting point
-		AreaPdfForward:    0.0,                                     // Will be computed by MIS weight calculation
-		AreaPdfReverse:    0.0,                                     // Will be computed by MIS weight calculation
-		IsLight:           false,
-		IsCamera:          true,
-		IsSpecular:        false,
-		Beta:              cameraBeta,                  // Wi / pdf from camera sampling
-		EmittedLight:      core.Vec3{X: 0, Y: 0, Z: 0}, // Cameras don't emit light
+		Point:    cameraSample.Ray.Origin,
+		Normal:   cameraSample.Ray.Direction.Multiply(-1), // Camera "normal" points back along ray
+		IsCamera: true,
+		Beta:     cameraBeta, // Wi / pdf from camera sampling
 	}
 
 	// Create splat ray for this contribution
