@@ -582,18 +582,18 @@ func (bdpt *BDPTIntegrator) buildAlternativeStrategyPathForIndex(cameraPath, lig
 		}
 
 	case t == 1:
-		// Light tracing strategy
+		// Light tracing strategy: camera path has only camera vertex
 		if i == 0 {
 			// Camera vertex gets sampled vertex PDFs
 			forwardPdf = sampledVertex.AreaPdfForward
 			reversePdf = sampledVertex.AreaPdfReverse
 			isConnectible = true
 		} else if i == t+s-1 && s > 1 {
-			// Light connection vertex
+			// Reverse PDF: from camera (sampledVertex) to this light vertex
 			reversePdf = bdpt.calculateVertexPdf(sampledVertex, nil, &lightPath.Vertices[s-1], scene)
 			isConnectible = true
-		} else if i == t+s-2 && s > 2 {
-			// Light predecessor
+		} else if i == t+s-2 && s > 1 {
+			// Reverse PDF: from light connection vertex to this predecessor
 			reversePdf = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], sampledVertex, &lightPath.Vertices[s-2], scene)
 		}
 

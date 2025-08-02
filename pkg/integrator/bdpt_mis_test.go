@@ -339,7 +339,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			scene := createSimpleTestScene()
 
 			// Add detailed validation using sampledVertex from test case
-			weight := integrator.calculateMISWeight(tt.cameraPath, tt.lightPath, tt.sampledVertex, tt.s, tt.t, scene)
+			weight := integrator.calculateMISWeightAlt3(tt.cameraPath, tt.lightPath, tt.sampledVertex, tt.s, tt.t, scene)
 
 			// Basic bounds checking - MIS weights should be in [0,1]
 			if weight < 0 || weight > 1 {
@@ -518,6 +518,33 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 			s: 2, t: 2,
 			sampledVertex: nil, // TODO: Set appropriate sampledVertex for this strategy
 			description:   "Complex path with specular bounces on both light and camera paths",
+		},
+		{
+			name: "LightTracing_s2t1",
+			cameraPath: createTestCameraPath([]core.Material{}, []core.Vec3{
+				core.NewVec3(0, 0, 0), // camera only
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+				core.NewVec3(0, 2, -1), // area light
+				core.NewVec3(0, 1, -1), // light bounces once before hitting camera
+			}),
+			s: 2, t: 1,
+			sampledVertex: createSampledCameraVertex(), // Light tracing requires sampled camera vertex
+			description:   "Light tracing: light path hits camera directly (s=2, t=1)",
+		},
+		{
+			name: "LightTracing_s3t1",
+			cameraPath: createTestCameraPath([]core.Material{}, []core.Vec3{
+				core.NewVec3(0, 0, 0), // camera only
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive, white, white}, []core.Vec3{
+				core.NewVec3(0, 3, -1), // area light
+				core.NewVec3(0, 2, -1), // first bounce
+				core.NewVec3(0, 1, -1), // second bounce before hitting camera
+			}),
+			s: 3, t: 1,
+			sampledVertex: createSampledCameraVertex(), // Light tracing requires sampled camera vertex
+			description:   "Light tracing: light bounces twice before hitting camera (s=3, t=1)",
 		},
 	}
 
