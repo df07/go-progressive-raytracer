@@ -509,8 +509,29 @@ func (bdpt *BDPTIntegrator) calculateMISWeightAlt2(cameraPath, lightPath Path, s
 	// Build the alternative strategy path with correct PDFs
 	altPath := bdpt.buildAlternativeStrategyPath(&cameraPath, &lightPath, sampledVertex, s, t, scene)
 
-	// Calculate sumRi using the clean alternative path
-	sumRi := bdpt.calculateSumRi(&altPath)
+	sumRi := 0.0
+
+	// Camera path alternatives: start from connection vertex and work backward
+	ri := 1.0
+	for i := altPath.CameraPathLength - 1; i > 0; i-- { // t-1 down to 1
+		ri *= remap0(altPath.ReversePDFs[i]) / remap0(altPath.ForwardPDFs[i])
+
+		// Only add if both vertices are connectible
+		if altPath.IsConnectible[i] && altPath.IsConnectible[i-1] {
+			sumRi += ri
+		}
+	}
+
+	// Light path alternatives: start from connection vertex and work backward
+	ri = 1.0
+	for i := len(altPath.ForwardPDFs) - 1; i >= altPath.CameraPathLength; i-- { // s-1 down to 0
+		ri *= remap0(altPath.ReversePDFs[i]) / remap0(altPath.ForwardPDFs[i])
+
+		// Check if both current vertex and predecessor are connectible
+		if altPath.IsConnectible[i] && (i <= altPath.CameraPathLength || altPath.IsConnectible[i-1]) {
+			sumRi += ri
+		}
+	}
 
 	return 1.0 / (1.0 + sumRi)
 }
@@ -546,206 +567,82 @@ func (bdpt *BDPTIntegrator) buildAlternativeStrategyPath(cameraPath, lightPath *
 		altPath.IsConnectible[t+i] = !vertex.IsSpecular && !isDeltaLight
 	}
 
-	// Handle sampled vertex substitution for s=1 or t=1 strategies
-	if s == 1 && sampledVertex != nil && t > 0 {
-		// Replace light path vertex at index t
-		altPath.ForwardPDFs[t] = sampledVertex.AreaPdfForward
-		altPath.ReversePDFs[t] = sampledVertex.AreaPdfReverse
-		isDeltaLight := sampledVertex.IsLight && sampledVertex.Light != nil && sampledVertex.Light.Type() == core.LightTypePoint
-		altPath.IsConnectible[t] = !sampledVertex.IsSpecular && !isDeltaLight
-	} else if t == 1 && sampledVertex != nil && s > 0 {
-		// Replace camera path vertex at index 0
-		altPath.ForwardPDFs[0] = sampledVertex.AreaPdfForward
-		altPath.ReversePDFs[0] = sampledVertex.AreaPdfReverse
-		altPath.IsConnectible[0] = !sampledVertex.IsSpecular
-	}
-
 	// Recalculate reverse PDFs for connection vertices using the complex logic from original
-	bdpt.updateConnectionPDFs(&altPath, cameraPath, lightPath, sampledVertex, s, t, scene)
-
-	return altPath
-}
-
-// updateConnectionPDFs handles PDF recalculation by mirroring evaluateBDPTStrategy cases
-// This makes the logic much clearer - each strategy has specific PDF update needs
-func (bdpt *BDPTIntegrator) updateConnectionPDFs(altPath *AlternativeStrategyPath, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) {
 	switch {
-	case s == 1 && t == 1:
-		// This case returns early in evaluateBDPTStrategy, no PDF updates needed
-		return
-
 	case s == 0:
 		// Path tracing strategy: camera path hits background or emissive surface
-		bdpt.updatePathTracingPDFs(altPath, cameraPath, t, scene)
+
+		// Update pt (t-1) reverse PDF for connection to background/emissive
+		if t > 1 {
+			altPath.ReversePDFs[t-1] = bdpt.calculateLightOriginPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], scene)
+			altPath.IsConnectible[t-1] = true
+		}
+
+		// Update ptMinus (t-2) reverse PDF if it exists - original only modifies t-1 and t-2
+		if t > 2 {
+			altPath.ReversePDFs[t-2] = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], nil, &cameraPath.Vertices[t-2], scene)
+		}
 
 	case t == 1:
-		// Light tracing strategy: light path connects directly to camera
-		if sampledVertex == nil {
-			panic("calculateMISWeight: sampledVertex cannot be nil for t=1 (light tracing) strategy")
-		}
-		bdpt.updateLightTracingPDFs(altPath, lightPath, sampledVertex, s, scene)
-
-	case s == 1:
-		// Direct lighting strategy: camera path connects to sampled light
-		if sampledVertex == nil {
-			panic("calculateMISWeight: sampledVertex cannot be nil for s=1 (direct lighting) strategy")
-		}
-		bdpt.updateDirectLightingPDFs(altPath, cameraPath, sampledVertex, t, scene)
-
-	default:
-		// Connection strategy: connect camera path vertex to light path vertex
-		bdpt.updateConnectionStrategyPDFs(altPath, cameraPath, lightPath, s, t, scene)
-	}
-}
-
-// updatePathTracingPDFs handles PDF updates for s=0 strategies (pure camera path)
-func (bdpt *BDPTIntegrator) updatePathTracingPDFs(altPath *AlternativeStrategyPath, cameraPath *Path, t int, scene core.Scene) {
-	// For s=0 path tracing, the original function only modifies pt (t-1) and ptMinus (t-2)
-	// It doesn't modify any vertices further back in the path
-
-	// Update pt (t-1) reverse PDF for connection to background/emissive
-	if t > 1 {
-		cameraVertex := &cameraPath.Vertices[t-1]
-		cameraPredecessor := &cameraPath.Vertices[t-2]
-		altPath.ReversePDFs[t-1] = bdpt.calculateLightOriginPdf(cameraVertex, cameraPredecessor, scene)
-		altPath.IsConnectible[t-1] = true
-	}
-
-	// Update ptMinus (t-2) reverse PDF if it exists - original only modifies t-1 and t-2
-	if t > 2 {
-		ptMinus := &cameraPath.Vertices[t-2]
-		pt := &cameraPath.Vertices[t-1]
-		altPath.ReversePDFs[t-2] = bdpt.calculateVertexPdf(pt, nil, ptMinus, scene)
-	}
-}
-
-// updateLightTracingPDFs handles PDF updates for t=1 strategies (light path to camera)
-func (bdpt *BDPTIntegrator) updateLightTracingPDFs(altPath *AlternativeStrategyPath, lightPath *Path, sampledVertex *Vertex, s int, scene core.Scene) {
-	// The sampled camera vertex needs special handling
-	if sampledVertex != nil {
 		// Update the camera vertex (at index 0) with sampled vertex PDFs
+		altPath.ForwardPDFs[0] = sampledVertex.AreaPdfForward
 		altPath.ReversePDFs[0] = sampledVertex.AreaPdfReverse
 		altPath.IsConnectible[0] = true // Camera is always connectible for light tracing
-	}
 
-	// Light path vertices need reverse PDFs calculated from camera perspective
-	if s > 1 {
-		lightVertex := &lightPath.Vertices[s-1]
-		lightPredecessor := &lightPath.Vertices[s-2]
-		// Light connection vertex reverse PDF from camera
-		altPath.ReversePDFs[1+s-1] = bdpt.calculateVertexPdf(sampledVertex, nil, lightVertex, scene)
-		altPath.IsConnectible[1+s-1] = true
+		// Light path vertices need reverse PDFs calculated from camera perspective
+		if s > 1 {
+			// Light connection vertex reverse PDF from camera
+			altPath.ReversePDFs[t+s-1] = bdpt.calculateVertexPdf(sampledVertex, nil, &lightPath.Vertices[s-1], scene)
+			altPath.IsConnectible[t+s-1] = true
+		}
 
 		// Light predecessor reverse PDF
 		if s > 2 {
-			altPath.ReversePDFs[1+s-2] = bdpt.calculateVertexPdf(lightVertex, sampledVertex, lightPredecessor, scene)
+			altPath.ReversePDFs[t+s-2] = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], sampledVertex, &lightPath.Vertices[s-2], scene)
 		}
-	}
-}
 
-// updateDirectLightingPDFs handles PDF updates for s=1 strategies (direct lighting)
-func (bdpt *BDPTIntegrator) updateDirectLightingPDFs(altPath *AlternativeStrategyPath, cameraPath *Path, sampledVertex *Vertex, t int, scene core.Scene) {
-	// Camera vertex needs reverse PDF from sampled light
-	if t > 0 {
-		cameraVertex := &cameraPath.Vertices[t-1]
-		reversePdf := bdpt.calculateVertexPdf(sampledVertex, nil, cameraVertex, scene)
-		altPath.ReversePDFs[t-1] = reversePdf
-		altPath.IsConnectible[t-1] = true
-	}
+	case s == 1:
+		// Direct lighting strategy: camera path connects to sampled light
 
-	// Camera predecessor needs reverse PDF
-	if t > 1 {
-		cameraVertex := &cameraPath.Vertices[t-1]
-		cameraPredecessor := &cameraPath.Vertices[t-2]
-		reversePdf := bdpt.calculateVertexPdf(cameraVertex, sampledVertex, cameraPredecessor, scene)
-		altPath.ReversePDFs[t-2] = reversePdf
-	}
+		// Camera vertex needs reverse PDF from sampled light
+		if t > 0 {
+			altPath.ReversePDFs[t-1] = bdpt.calculateVertexPdf(sampledVertex, nil, &cameraPath.Vertices[t-1], scene)
+			altPath.IsConnectible[t-1] = true
+		}
 
-	// Sampled light vertex at index t needs reverse PDF from camera vertex
-	// TODO: This probably could be handled when we create the sampled vertex
-	if sampledVertex != nil {
-		cameraVertex := &cameraPath.Vertices[t-1]
-		var cameraPredecessor *Vertex
+		// Camera predecessor needs reverse PDF
 		if t > 1 {
-			cameraPredecessor = &cameraPath.Vertices[t-2]
-		}
-		// This corresponds to: qs.AreaPdfReverse = bdpt.calculateVertexPdf(pt, ptMinus, qs, scene) in original
-		reversePdf := bdpt.calculateVertexPdf(cameraVertex, cameraPredecessor, sampledVertex, scene)
-		altPath.ReversePDFs[t] = reversePdf
-		altPath.IsConnectible[t] = true // Sampled lights are connectible
-	}
-}
-
-// updateConnectionStrategyPDFs handles PDF updates for connection strategies (s>1, t>1)
-func (bdpt *BDPTIntegrator) updateConnectionStrategyPDFs(altPath *AlternativeStrategyPath, cameraPath, lightPath *Path, s, t int, scene core.Scene) {
-	cameraVertex := &cameraPath.Vertices[t-1]
-	lightVertex := &lightPath.Vertices[s-1]
-
-	var cameraPredecessor, lightPredecessor *Vertex
-	if t > 1 {
-		cameraPredecessor = &cameraPath.Vertices[t-2]
-	}
-	if s > 1 {
-		lightPredecessor = &lightPath.Vertices[s-2]
-	}
-
-	// Mark connection vertices as connectible
-	altPath.IsConnectible[t-1] = true   // Camera connection vertex
-	altPath.IsConnectible[t+s-1] = true // Light connection vertex
-
-	// Camera vertex reverse PDF from light vertex
-	altPath.ReversePDFs[t-1] = bdpt.calculateVertexPdf(lightVertex, lightPredecessor, cameraVertex, scene)
-
-	// Camera predecessor reverse PDF
-	if cameraPredecessor != nil {
-		altPath.ReversePDFs[t-2] = bdpt.calculateVertexPdf(cameraVertex, lightVertex, cameraPredecessor, scene)
-	}
-
-	// Light vertex reverse PDF from camera vertex
-	altPath.ReversePDFs[t+s-1] = bdpt.calculateVertexPdf(cameraVertex, cameraPredecessor, lightVertex, scene)
-
-	// Light predecessor reverse PDF
-	if lightPredecessor != nil {
-		altPath.ReversePDFs[t+s-2] = bdpt.calculateVertexPdf(lightVertex, cameraVertex, lightPredecessor, scene)
-	}
-}
-
-// calculateSumRi computes the sum of probability ratios for alternative strategies
-// This is the clean, simple part once we have the alternative path built
-func (bdpt *BDPTIntegrator) calculateSumRi(altPath *AlternativeStrategyPath) float64 {
-	sumRi := 0.0
-
-	// Camera path alternatives: start from connection vertex and work backward
-	ri := 1.0
-	for i := altPath.CameraPathLength - 1; i > 0; i-- { // t-1 down to 1
-		ri *= remap0(altPath.ReversePDFs[i]) / remap0(altPath.ForwardPDFs[i])
-
-		// Only add if both vertices are connectible
-		if altPath.IsConnectible[i] && altPath.IsConnectible[i-1] {
-			sumRi += ri
-		}
-	}
-
-	// Light path alternatives: start from connection vertex and work backward
-	ri = 1.0
-	for i := len(altPath.ForwardPDFs) - 1; i >= altPath.CameraPathLength; i-- { // s-1 down to 0
-		ri *= remap0(altPath.ReversePDFs[i]) / remap0(altPath.ForwardPDFs[i])
-
-		// Check if both current vertex and predecessor are connectible
-		var predecessorConnectible bool
-		if i > altPath.CameraPathLength {
-			predecessorConnectible = altPath.IsConnectible[i-1]
-		} else {
-			// At the light source (i == altPath.CameraPathLength), predecessor connectibility handled by IsConnectible
-			predecessorConnectible = true
+			altPath.ReversePDFs[t-2] = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], sampledVertex, &cameraPath.Vertices[t-2], scene)
 		}
 
-		if altPath.IsConnectible[i] && predecessorConnectible {
-			sumRi += ri
+		// Sampled light vertex at index t needs reverse PDF from camera vertex
+		// TODO: This probably could be handled when we create the sampled vertex
+		if sampledVertex != nil {
+			altPath.ForwardPDFs[t+s-1] = sampledVertex.AreaPdfForward
+			altPath.ReversePDFs[t+s-1] = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], sampledVertex, scene)
+			altPath.IsConnectible[t+s-1] = true // Sampled lights are connectible
+		}
+	default:
+		// Connection strategy: connect camera path vertex to light path vertex
+		// Mark connection vertices as connectible
+		altPath.IsConnectible[t-1] = true   // Camera connection vertex
+		altPath.IsConnectible[t+s-1] = true // Light connection vertex
+
+		altPath.ReversePDFs[t-1] = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], &lightPath.Vertices[s-2], &cameraPath.Vertices[t-1], scene)
+
+		if t > 1 {
+			altPath.ReversePDFs[t-2] = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &lightPath.Vertices[s-1], &cameraPath.Vertices[t-2], scene)
+		}
+
+		if t+s > 1 {
+			altPath.ReversePDFs[t+s-1] = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], &lightPath.Vertices[s-1], scene)
+		}
+
+		if t+s > 2 {
+			altPath.ReversePDFs[t+s-2] = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], &cameraPath.Vertices[t-1], &lightPath.Vertices[s-2], scene)
 		}
 	}
-
-	return sumRi
+	return altPath
 }
 
 // Helper functions for PBRT MIS calculations
