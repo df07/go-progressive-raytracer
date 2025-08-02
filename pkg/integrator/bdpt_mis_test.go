@@ -151,6 +151,7 @@ func TestCalculateMISWeight(t *testing.T) {
 		name           string
 		cameraPath     Path
 		lightPath      Path
+		sampledVertex  *Vertex
 		s, t           int
 		expectedWeight float64
 		tolerance      float64
@@ -163,8 +164,9 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // surface
 			}),
-			lightPath: Path{Vertices: []Vertex{}, Length: 0},
-			s:         0, t: 2,
+			lightPath:     Path{Vertices: []Vertex{}, Length: 0},
+			sampledVertex: nil, // No sampledVertex needed for s=0 strategies
+			s:             0, t: 2,
 			expectedWeight: 1.0, // s+t==2 should always return 1.0
 			tolerance:      1e-9,
 			description:    "Verify s+t==2 early return case",
@@ -180,8 +182,9 @@ func TestCalculateMISWeight(t *testing.T) {
 			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 			}),
-			s: 1, t: 2,
-			expectedWeight: 0.194492, // Actual calculated MIS weight
+			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			s:             1, t: 2,
+			expectedWeight: 0.236901, // Actual calculated MIS weight
 			tolerance:      0.001,    // Very tight tolerance (0.1%)
 			description:    "Direct lighting: connect camera-hit surface to light",
 		},
@@ -195,8 +198,9 @@ func TestCalculateMISWeight(t *testing.T) {
 			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
 				core.NewVec3(-1, 2, -1), // area light above second surface
 			}),
-			s: 1, t: 3,
-			expectedWeight: 0.066617, // Actual calculated MIS weight
+			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			s:             1, t: 3,
+			expectedWeight: 0.071113, // Actual calculated MIS weight
 			tolerance:      0.001,    // Very tight tolerance (0.1%)
 			description:    "Connect light to second bounce of camera path",
 		},
@@ -213,6 +217,7 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(0, 1, -1), // light bounces off diffuse surface
 			}),
 			s: 2, t: 2,
+			sampledVertex:  nil,      // TODO: Set appropriate sampledVertex for this strategy
 			expectedWeight: 0.109390, // Actual calculated MIS weight
 			tolerance:      0.001,    // Very tight tolerance (0.1%)
 			description:    "Light bounces once before connecting to camera path",
@@ -231,6 +236,7 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(1, 2, -1), // light bounces once
 			}),
 			s: 2, t: 3,
+			sampledVertex:  nil,      // TODO: Set appropriate sampledVertex for this strategy
 			expectedWeight: 0.065526, // Actual calculated MIS weight
 			tolerance:      0.001,    // Very tight tolerance (0.1%)
 			description:    "Both paths have multiple bounces before connection",
@@ -262,8 +268,9 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(0, 2, -2), // area light above final surface
 			}),
 			s: 1, t: 3,
-			expectedWeight: 0.066617, // Actual calculated MIS weight
-			tolerance:      0.001,    // Tight tolerance
+			sampledVertex:  createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			expectedWeight: 0.071113,                   // Actual calculated MIS weight
+			tolerance:      0.001,                      // Tight tolerance
 			description:    "Direct lighting through glass to diffuse surface",
 		},
 
@@ -282,7 +289,8 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(1, 2, -1), // area light above final surface
 			}),
 			s: 1, t: 3,
-			expectedWeight: 0.066617, // Light connects after specular bounce
+			sampledVertex:  createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			expectedWeight: 0.071113,                   // Light connects after specular bounce
 			tolerance:      0.001,
 			description:    "Light connection after perfect specular reflection",
 		},
@@ -298,7 +306,8 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(0, 2, -1), // area light
 			}),
 			s: 1, t: 2,
-			expectedWeight: 0.059852, // Direct lighting with specular BRDF
+			sampledVertex:  createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			expectedWeight: 0.194492,                   // Direct lighting with specular BRDF
 			tolerance:      0.001,
 			description:    "Direct lighting to perfect specular surface",
 		},
@@ -318,6 +327,7 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(0, 2, -1), // light bounces off mirror
 			}),
 			s: 2, t: 2,
+			sampledVertex:  nil,      // TODO: Set appropriate sampledVertex for this strategy
 			expectedWeight: 0.021385, // Both paths have specular interactions
 			tolerance:      0.001,
 			description:    "Complex path with specular bounces on both light and camera paths",
@@ -328,8 +338,8 @@ func TestCalculateMISWeight(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			scene := createSimpleTestScene()
 
-			// Add detailed validation
-			weight := integrator.calculateMISWeight(tt.cameraPath, tt.lightPath, nil, tt.s, tt.t, scene)
+			// Add detailed validation using sampledVertex from test case
+			weight := integrator.calculateMISWeight(tt.cameraPath, tt.lightPath, tt.sampledVertex, tt.s, tt.t, scene)
 
 			// Basic bounds checking - MIS weights should be in [0,1]
 			if weight < 0 || weight > 1 {
@@ -343,6 +353,231 @@ func TestCalculateMISWeight(t *testing.T) {
 			// Log successful tests for verification
 			if testing.Verbose() {
 				t.Logf("✓ %s: weight=%.6f (expected %.6f ± %.3f)", tt.description, weight, tt.expectedWeight, tt.tolerance)
+			}
+		})
+	}
+}
+
+// TestCalculateMISWeightComparison tests that both MIS weight implementations produce identical results
+func TestCalculateMISWeightComparison(t *testing.T) {
+	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 8})
+
+	// Helper to create test materials
+	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
+	glass := material.NewDielectric(1.5)
+	emissive := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
+
+	tests := []struct {
+		name          string
+		cameraPath    Path
+		lightPath     Path
+		sampledVertex *Vertex
+		s, t          int
+		description   string
+	}{
+		// Use the same test cases as the original MIS weight test
+		{
+			name: "TrivialCase_s0t2_EarlyReturn",
+			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // surface
+			}),
+			lightPath: Path{Vertices: []Vertex{}, Length: 0},
+			s:         0, t: 2,
+			description: "Verify s+t==2 early return case",
+		},
+		{
+			name: "DirectLighting_s1t2",
+			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // diffuse surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(0, 2, -1), // area light
+			}),
+			s: 1, t: 2,
+			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			description:   "Direct lighting (s=1, t=2): connect camera-hit surface to light",
+		},
+		{
+			name: "DirectLighting_s1t3_OneBounce",
+			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),   // camera
+				core.NewVec3(0, 0, -1),  // first diffuse surface
+				core.NewVec3(-1, 0, -1), // second diffuse surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(-1, 2, -1), // area light above second surface
+			}),
+			s: 1, t: 3,
+			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			description:   "Connect light to second bounce of camera path",
+		},
+		{
+			name: "IndirectLighting_s2t2",
+			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // diffuse surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+				core.NewVec3(0, 2, -1), // area light
+				core.NewVec3(0, 1, -1), // light bounces off diffuse surface
+			}),
+			s: 2, t: 2,
+			sampledVertex: nil, // TODO: Set appropriate sampledVertex for this strategy
+			description:   "Light bounces once before connecting to camera path",
+		},
+		{
+			name: "ComplexPath_s2t3_MultiBounce",
+			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // first bounce
+				core.NewVec3(1, 0, -1), // second bounce
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+				core.NewVec3(1, 3, -1), // light source
+				core.NewVec3(1, 2, -1), // light bounces once
+			}),
+			s: 2, t: 3,
+			sampledVertex: nil, // TODO: Set appropriate sampledVertex for this strategy
+			description:   "Both paths have multiple bounces before connection",
+		},
+		{
+			name: "PathTracing_s0t4_MultiBounce",
+			cameraPath: createTestCameraPath([]core.Material{white, white, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // first bounce
+				core.NewVec3(1, 0, -1), // second bounce
+				core.NewVec3(2, 0, -1), // third bounce - regular surface
+			}),
+			lightPath: Path{Vertices: []Vertex{}, Length: 0},
+			s:         0, t: 4,
+			description: "Path tracing with multiple bounces - tests complex MIS logic",
+		},
+		{
+			name: "MultiBounceGlass_s1t3",
+			cameraPath: createTestCameraPath([]core.Material{glass, white}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // glass surface
+				core.NewVec3(0, 0, -2), // diffuse surface after glass
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(0, 2, -2), // area light above final surface
+			}),
+			s: 1, t: 3,
+			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			description:   "Direct lighting through glass to diffuse surface",
+		},
+		{
+			name: "SpecularMirrorPath_s1t3",
+			cameraPath: createTestCameraPath([]core.Material{
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
+				white,
+			}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // perfect mirror
+				core.NewVec3(1, 0, -1), // diffuse surface after mirror bounce
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(1, 2, -1), // area light above final surface
+			}),
+			s: 1, t: 3,
+			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			description:   "Light connection after perfect specular reflection",
+		},
+		{
+			name: "DirectSpecularLighting_s1t2",
+			cameraPath: createTestCameraPath([]core.Material{
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
+			}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // perfect mirror surface
+			}),
+			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+				core.NewVec3(0, 2, -1), // area light
+			}),
+			s: 1, t: 2,
+			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
+			description:   "Direct lighting to perfect specular surface",
+		},
+		{
+			name: "ComplexSpecularPath_s2t2",
+			cameraPath: createTestCameraPath([]core.Material{
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
+			}, []core.Vec3{
+				core.NewVec3(0, 0, 0),  // camera
+				core.NewVec3(0, 0, -1), // perfect mirror
+			}),
+			lightPath: createTestLightPath([]core.Material{
+				emissive,
+				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // light bounces off mirror
+			}, []core.Vec3{
+				core.NewVec3(0, 3, -1), // area light
+				core.NewVec3(0, 2, -1), // light bounces off mirror
+			}),
+			s: 2, t: 2,
+			sampledVertex: nil, // TODO: Set appropriate sampledVertex for this strategy
+			description:   "Complex path with specular bounces on both light and camera paths",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scene := createSimpleTestScene()
+
+			// Create appropriate sampledVertex for strategies that need it
+			var sampledVertex *Vertex
+			if tt.s == 1 && tt.t != 1 {
+				// Direct lighting strategy: create a sampled light vertex
+				sampledVertex = createSampledLightVertex()
+			} else if tt.t == 1 && tt.s != 1 {
+				// Light tracing strategy: create a sampled camera vertex
+				sampledVertex = createSampledCameraVertex()
+			}
+			// For other strategies (s=0, s>1&&t>1, s=1&&t=1), sampledVertex remains nil
+
+			// Calculate weights using all three methods
+			originalWeight := integrator.calculateMISWeight(tt.cameraPath, tt.lightPath, sampledVertex, tt.s, tt.t, scene)
+			alt2Weight := integrator.calculateMISWeightAlt2(tt.cameraPath, tt.lightPath, sampledVertex, tt.s, tt.t, scene)
+
+			// Check if Alt2 matches original (within floating point precision)
+			tolerance := 1e-12
+			alt2MatchesOriginal := math.Abs(originalWeight-alt2Weight) <= tolerance
+
+			if !alt2MatchesOriginal {
+				// Add debug output for first failing case to understand the difference
+				if tt.s == 1 && tt.t == 2 {
+					t.Logf("DEBUG: DirectLighting_s1t2 - examining PDF differences")
+					t.Logf("Camera path vertices: %d", tt.cameraPath.Length)
+					for i := 0; i < tt.cameraPath.Length; i++ {
+						v := &tt.cameraPath.Vertices[i]
+						t.Logf("  Camera[%d]: Forward=%.9f, Reverse=%.9f, IsSpecular=%v", i, v.AreaPdfForward, v.AreaPdfReverse, v.IsSpecular)
+					}
+					t.Logf("Light path vertices: %d", tt.lightPath.Length)
+					for i := 0; i < tt.lightPath.Length; i++ {
+						v := &tt.lightPath.Vertices[i]
+						t.Logf("  Light[%d]: Forward=%.9f, Reverse=%.9f, IsSpecular=%v", i, v.AreaPdfForward, v.AreaPdfReverse, v.IsSpecular)
+					}
+					if sampledVertex != nil {
+						t.Logf("SampledVertex: Forward=%.9f, Reverse=%.9f, IsSpecular=%v", sampledVertex.AreaPdfForward, sampledVertex.AreaPdfReverse, sampledVertex.IsSpecular)
+					}
+				}
+				t.Errorf("%s: Alt2 MIS weight mismatch!\n  Original: %.15f\n  Alt2: %.15f\n  Difference: %.15e",
+					tt.description, originalWeight, alt2Weight, math.Abs(originalWeight-alt2Weight))
+			}
+
+			// Basic bounds checking - MIS weights should be in [0,1]
+			if originalWeight < 0 || originalWeight > 1 {
+				t.Errorf("Original MIS weight %v is outside valid range [0,1] for %s", originalWeight, tt.description)
+			}
+			if alt2Weight < 0 || alt2Weight > 1 {
+				t.Errorf("Alt2 MIS weight %v is outside valid range [0,1] for %s", alt2Weight, tt.description)
+			}
+
+			// Log comparisons for verification
+			if testing.Verbose() {
+				t.Logf("✓ %s:\n  Original: %.15f\n  Alt2: %.15f (diff: %.2e)",
+					tt.description, originalWeight, alt2Weight, math.Abs(originalWeight-alt2Weight))
 			}
 		})
 	}
@@ -622,5 +857,43 @@ func TestPdfPropagation(t *testing.T) {
 					expectedPdf.index, expectedPdf.description, vertex.AreaPdfForward, vertex.AreaPdfReverse)
 			}
 		})
+	}
+}
+
+// createSampledLightVertex creates a realistic sampled light vertex for s=1 (direct lighting) strategies
+func createSampledLightVertex() *Vertex {
+	emissive := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
+
+	return &Vertex{
+		Point:             core.NewVec3(0, 2, -1), // Light position above scene
+		Normal:            core.NewVec3(0, -1, 0), // Light normal pointing down
+		Light:             createTestAreaLight(),
+		Material:          emissive,
+		IncomingDirection: core.Vec3{},
+		AreaPdfForward:    1.0, // Light sampling PDF
+		AreaPdfReverse:    0.0, // Will be calculated during MIS
+		IsLight:           true,
+		IsCamera:          false,
+		IsSpecular:        false,
+		Beta:              core.NewVec3(5.0, 5.0, 5.0), // Light emission
+		EmittedLight:      core.NewVec3(5.0, 5.0, 5.0),
+	}
+}
+
+// createSampledCameraVertex creates a realistic sampled camera vertex for t=1 (light tracing) strategies
+func createSampledCameraVertex() *Vertex {
+	return &Vertex{
+		Point:             core.NewVec3(0, 0, 0),  // Camera position
+		Normal:            core.NewVec3(0, 0, -1), // Camera "normal"
+		Light:             nil,
+		Material:          nil,
+		IncomingDirection: core.Vec3{},
+		AreaPdfForward:    0.0, // Camera is starting point
+		AreaPdfReverse:    0.0, // Will be calculated during MIS
+		IsLight:           false,
+		IsCamera:          true,
+		IsSpecular:        false,
+		Beta:              core.NewVec3(1, 1, 1), // Camera importance
+		EmittedLight:      core.Vec3{},
 	}
 }
