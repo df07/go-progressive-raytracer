@@ -538,13 +538,13 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 
 			// Calculate weights using all three methods
 			originalWeight := integrator.calculateMISWeight(tt.cameraPath, tt.lightPath, sampledVertex, tt.s, tt.t, scene)
-			alt2Weight := integrator.calculateMISWeightAlt2(tt.cameraPath, tt.lightPath, sampledVertex, tt.s, tt.t, scene)
+			alt3Weight := integrator.calculateMISWeightAlt3(tt.cameraPath, tt.lightPath, sampledVertex, tt.s, tt.t, scene)
 
-			// Check if Alt2 matches original (within floating point precision)
+			// Check if Alt3 matches original (within floating point precision)
 			tolerance := 1e-12
-			alt2MatchesOriginal := math.Abs(originalWeight-alt2Weight) <= tolerance
+			alt3MatchesOriginal := math.Abs(originalWeight-alt3Weight) <= tolerance
 
-			if !alt2MatchesOriginal {
+			if !alt3MatchesOriginal {
 				// Add debug output for first failing case to understand the difference
 				if tt.s == 1 && tt.t == 2 {
 					t.Logf("DEBUG: DirectLighting_s1t2 - examining PDF differences")
@@ -562,22 +562,22 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 						t.Logf("SampledVertex: Forward=%.9f, Reverse=%.9f, IsSpecular=%v", sampledVertex.AreaPdfForward, sampledVertex.AreaPdfReverse, sampledVertex.IsSpecular)
 					}
 				}
-				t.Errorf("%s: Alt2 MIS weight mismatch!\n  Original: %.15f\n  Alt2: %.15f\n  Difference: %.15e",
-					tt.description, originalWeight, alt2Weight, math.Abs(originalWeight-alt2Weight))
+				t.Errorf("%s: Alt3 MIS weight mismatch!\n  Original: %.15f\n  Alt3: %.15f\n  Difference: %.15e",
+					tt.description, originalWeight, alt3Weight, math.Abs(originalWeight-alt3Weight))
 			}
 
 			// Basic bounds checking - MIS weights should be in [0,1]
 			if originalWeight < 0 || originalWeight > 1 {
 				t.Errorf("Original MIS weight %v is outside valid range [0,1] for %s", originalWeight, tt.description)
 			}
-			if alt2Weight < 0 || alt2Weight > 1 {
-				t.Errorf("Alt2 MIS weight %v is outside valid range [0,1] for %s", alt2Weight, tt.description)
+			if alt3Weight < 0 || alt3Weight > 1 {
+				t.Errorf("Alt3 MIS weight %v is outside valid range [0,1] for %s", alt3Weight, tt.description)
 			}
 
 			// Log comparisons for verification
 			if testing.Verbose() {
-				t.Logf("✓ %s:\n  Original: %.15f\n  Alt2: %.15f (diff: %.2e)",
-					tt.description, originalWeight, alt2Weight, math.Abs(originalWeight-alt2Weight))
+				t.Logf("✓ %s:\n  Original: %.15f\n  Alt3: %.15f (diff: %.2e)",
+					tt.description, originalWeight, alt3Weight, math.Abs(originalWeight-alt3Weight))
 			}
 		})
 	}
