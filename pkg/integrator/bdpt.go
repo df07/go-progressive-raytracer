@@ -85,7 +85,7 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler cor
 
 			// apply MIS weight to contribution and splat rays
 			if !light.IsZero() || len(splats) > 0 {
-				misWeight := bdpt.calculateMISWeightAlt3(cameraPath, lightPath, sample, s, t, scene)
+				misWeight := bdpt.calculateMISWeightAlt3(&cameraPath, &lightPath, sample, s, t, scene)
 				totalLight = totalLight.Add(light.Multiply(misWeight))
 				for i := range splats {
 					splats[i].Color = splats[i].Color.Multiply(misWeight)
@@ -321,7 +321,7 @@ func (v *Vertex) convertSolidAngleToAreaPdf(next *Vertex, pdf float64) float64 {
 
 // calculateMISWeight implements PBRT's MIS weighting for BDPT strategies
 // This compares forward vs reverse PDFs to properly weight different path construction strategies
-func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
 	disableMISWeight := false
 	if disableMISWeight {
 		return 1.0 / float64(s+t-1)
@@ -483,7 +483,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath Path, sampl
 
 // calculateMISWeightAlt3 implements zero-allocation MIS weighting using on-demand PDF calculation
 // Directly copies calculateMISWeightAlt2 logic but eliminates intermediate arrays
-func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
 	// Handle same early returns as original
 	if s+t == 2 {
 		return 1.0
@@ -502,7 +502,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath Path, s
 	// Camera path alternatives: start from connection vertex and work backward
 	ri := 1.0
 	for i := t - 1; i > 0; i-- { // t-1 down to 1
-		forwardPdf, reversePdf, isConnectible := bdpt.buildAlternativeStrategyPathForIndex(cameraPath, lightPath, sampledVertex, s, t, i, scene)
+		forwardPdf, reversePdf, isConnectible := bdpt.calculateMISVertexPdfs(i, cameraPath, lightPath, sampledVertex, s, t, scene)
 		ri *= remap0(reversePdf) / remap0(forwardPdf)
 
 		// isConnectible now includes both vertex and predecessor connectibility
@@ -515,7 +515,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath Path, s
 	ri = 1.0
 	for i := s - 1; i >= 0; i-- { // s-1 down to 0
 		lightIndex := t + i // Convert to altPath index
-		forwardPdf, reversePdf, isConnectible := bdpt.buildAlternativeStrategyPathForIndex(cameraPath, lightPath, sampledVertex, s, t, lightIndex, scene)
+		forwardPdf, reversePdf, isConnectible := bdpt.calculateMISVertexPdfs(lightIndex, cameraPath, lightPath, sampledVertex, s, t, scene)
 		ri *= remap0(reversePdf) / remap0(forwardPdf)
 
 		// isConnectible now includes both vertex and predecessor connectibility
@@ -527,10 +527,9 @@ func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath Path, s
 	return 1.0 / (1.0 + sumRi)
 }
 
-// buildAlternativeStrategyPathForIndex returns PDF values for a specific vertex index
-// This contains the same logic as buildAlternativeStrategyPath but only computes values for index i
+// calculateMISVertexPdfs returns PDF values for a specific vertex index
 // Returns (forwardPdf, reversePdf, isConnectible) where isConnectible includes predecessor checks
-func (bdpt *BDPTIntegrator) buildAlternativeStrategyPathForIndex(cameraPath, lightPath Path, sampledVertex *Vertex, s, t int, i int, scene core.Scene) (float64, float64, bool) {
+func (bdpt *BDPTIntegrator) calculateMISVertexPdfs(i int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) (float64, float64, bool) {
 	// Determine if this is a camera path vertex or light path vertex
 	isCameraPath := i < t
 
@@ -570,11 +569,12 @@ func (bdpt *BDPTIntegrator) buildAlternativeStrategyPathForIndex(cameraPath, lig
 		}
 	}
 
-	// Apply strategy-specific PDF corrections (same logic as buildAlternativeStrategyPath)
+	// Apply strategy-specific PDF corrections
 	switch {
 	case s == 0:
 		// Path tracing strategy
 		if i == t-1 && t > 1 {
+			// Vertex t-1 should be a light, calculate reverse pdf from light origin
 			reversePdf = bdpt.calculateLightOriginPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], scene)
 			isConnectible = true
 		} else if i == t-2 && t > 2 {
