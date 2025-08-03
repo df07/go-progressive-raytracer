@@ -1,18 +1,42 @@
 #!/bin/bash
 
 # Simple benchmark script for comparing performance before/after changes
-# Usage: ./benchmark.sh
+# Usage: ./benchmark.sh [baseline_commit]
+#   Without args: Compare current changes vs HEAD (stashes changes first)
+#   With commit:  Compare current changes vs specified commit (stashes changes first)
 
 set -e
 
+# Parse command line arguments
+BASELINE_COMMIT=""
+if [ $# -eq 1 ]; then
+    BASELINE_COMMIT="$1"
+    echo "Using custom baseline commit: $BASELINE_COMMIT"
+elif [ $# -gt 1 ]; then
+    echo "Usage: $0 [baseline_commit]"
+    echo "  baseline_commit: Git commit hash to use as baseline (optional)"
+    exit 1
+fi
+
 # Cleanup function to restore stashed changes on exit
 CLEANUP_DONE=false
+CURRENT_BRANCH=""
 cleanup() {
     local exit_code=$?
     if [ "$CLEANUP_DONE" = true ]; then
         exit $exit_code
     fi
     CLEANUP_DONE=true
+    
+    # Restore git state if we changed it
+    if [ -n "$BASELINE_COMMIT" ] && [ -n "$CURRENT_BRANCH" ]; then
+        echo ""
+        echo "Script interrupted - restoring original branch..."
+        git checkout "$CURRENT_BRANCH" > /dev/null 2>&1 || {
+            echo "Warning: Could not restore original branch automatically."
+            echo "Run 'git checkout $CURRENT_BRANCH' manually to restore your branch."
+        }
+    fi
     
     if [ "$STASHED" = true ]; then
         echo ""
@@ -53,7 +77,25 @@ else
     STASHED=false
 fi
 
+# Switch to baseline commit if specified
+if [ -n "$BASELINE_COMMIT" ]; then
+    echo ""
+    echo "=== SWITCHING TO BASELINE COMMIT ==="
+    CURRENT_BRANCH=$(git branch --show-current)
+    echo "Current branch: $CURRENT_BRANCH"
+    echo "Checking out baseline commit: $BASELINE_COMMIT"
+    
+    # Verify the commit exists
+    if ! git cat-file -e "$BASELINE_COMMIT^{commit}" 2>/dev/null; then
+        echo "Error: Commit '$BASELINE_COMMIT' not found"
+        exit 1
+    fi
+    
+    git -c advice.detachedHead=false checkout "$BASELINE_COMMIT"
+fi
+
 # Build and run BEFORE (baseline)
+echo ""
 echo "=== BUILDING BASELINE ==="
 go build -o raytracer main.go
 
@@ -69,6 +111,13 @@ for i in $(seq 1 $RUNS); do
     BEFORE_TIMES+=($RUNTIME)
     printf "%6.3fs\n" $RUNTIME
 done
+
+# Restore git state
+if [ -n "$BASELINE_COMMIT" ] && [ -n "$CURRENT_BRANCH" ]; then
+    echo ""
+    echo "=== RESTORING ORIGINAL BRANCH ==="
+    git checkout "$CURRENT_BRANCH" --quiet
+fi
 
 # Restore changes if we stashed them (cleanup function will handle this automatically)
 if [ "$STASHED" = true ]; then
