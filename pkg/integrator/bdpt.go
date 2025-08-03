@@ -502,7 +502,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath *Path, 
 	// Camera path alternatives: start from connection vertex and work backward
 	ri := 1.0
 	for i := t - 1; i > 0; i-- { // t-1 down to 1
-		forwardPdf, reversePdf, isConnectible := bdpt.calculateMISVertexPdfs(i, cameraPath, lightPath, sampledVertex, s, t, scene)
+		forwardPdf, reversePdf, isConnectible := bdpt.calculateMISCameraVertexPdfs(i, cameraPath, lightPath, sampledVertex, s, t, scene)
 		ri *= remap0(reversePdf) / remap0(forwardPdf)
 
 		// isConnectible now includes both vertex and predecessor connectibility
@@ -514,8 +514,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath *Path, 
 	// Light path alternatives: start from connection vertex and work backward
 	ri = 1.0
 	for i := s - 1; i >= 0; i-- { // s-1 down to 0
-		lightIndex := t + i // Convert to altPath index
-		forwardPdf, reversePdf, isConnectible := bdpt.calculateMISVertexPdfs(lightIndex, cameraPath, lightPath, sampledVertex, s, t, scene)
+		forwardPdf, reversePdf, isConnectible := bdpt.calculateMISLightVertexPdfs(i, cameraPath, lightPath, sampledVertex, s, t, scene)
 		ri *= remap0(reversePdf) / remap0(forwardPdf)
 
 		// isConnectible now includes both vertex and predecessor connectibility
@@ -527,86 +526,108 @@ func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath *Path, 
 	return 1.0 / (1.0 + sumRi)
 }
 
-// calculateMISVertexPdfs returns PDF values for a specific vertex index
+// calculateMISCameraVertexPdfs returns PDF values for a camera path vertex at index i
 // Returns (forwardPdf, reversePdf, isConnectible) where isConnectible includes predecessor checks
-func (bdpt *BDPTIntegrator) calculateMISVertexPdfs(i int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) (float64, float64, bool) {
-	// Determine if this is a camera path vertex or light path vertex
-	isCameraPath := i < t
+func (bdpt *BDPTIntegrator) calculateMISCameraVertexPdfs(cameraIdx int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) (float64, float64, bool) {
+	// Camera path vertex at index i
+	vertex := &cameraPath.Vertices[cameraIdx]
+	forwardPdf := vertex.AreaPdfForward
+	reversePdf := vertex.AreaPdfReverse
+	isConnectible := !vertex.IsSpecular
 
-	var forwardPdf, reversePdf float64
-	var isConnectible bool
-
-	if isCameraPath {
-		// Camera path vertex at index i
-		vertex := &cameraPath.Vertices[i]
-		forwardPdf = vertex.AreaPdfForward
-		reversePdf = vertex.AreaPdfReverse
-		isConnectible = !vertex.IsSpecular
-
-		// Check predecessor connectibility for camera path
-		if i > 0 {
-			predecessorConnectible := !cameraPath.Vertices[i-1].IsSpecular
-			isConnectible = isConnectible && predecessorConnectible
-		}
-
-	} else {
-		// Light path vertex at index i-t
-		lightIdx := i - t
-		vertex := &lightPath.Vertices[lightIdx]
-		forwardPdf = vertex.AreaPdfForward
-		reversePdf = vertex.AreaPdfReverse
-
-		// Light vertices: connectible if not specular AND not delta light (point light)
-		isDeltaLight := vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == core.LightTypePoint
-		isConnectible = !vertex.IsSpecular && !isDeltaLight
-
-		// Check predecessor connectibility for light path
-		if lightIdx > 0 {
-			predecessor := &lightPath.Vertices[lightIdx-1]
-			predecessorIsDeltaLight := predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == core.LightTypePoint
-			predecessorConnectible := !predecessor.IsSpecular && !predecessorIsDeltaLight
-			isConnectible = isConnectible && predecessorConnectible
-		}
+	// Check predecessor connectibility for camera path
+	if cameraIdx > 0 {
+		isConnectible = isConnectible && !cameraPath.Vertices[cameraIdx-1].IsSpecular
 	}
 
-	// Apply strategy-specific PDF corrections
+	// Apply strategy-specific PDF corrections for camera path vertices
 	switch {
 	case s == 0:
 		// Path tracing strategy
-		if i == t-1 && t > 1 {
+		if cameraIdx == t-1 && t > 1 {
 			// Vertex t-1 should be a light, calculate reverse pdf from light origin
 			reversePdf = bdpt.calculateLightOriginPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], scene)
 			isConnectible = true
-		} else if i == t-2 && t > 2 {
+		} else if cameraIdx == t-2 && t > 2 {
 			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], nil, &cameraPath.Vertices[t-2], scene)
 		}
 
 	case t == 1:
 		// Light tracing strategy: camera path has only camera vertex
-		if i == 0 {
+		if cameraIdx == 0 {
 			// Camera vertex gets sampled vertex PDFs
 			forwardPdf = sampledVertex.AreaPdfForward
 			reversePdf = sampledVertex.AreaPdfReverse
 			isConnectible = true
-		} else if i == t+s-1 && s > 1 {
+		}
+
+	case s == 1:
+		// Direct lighting strategy
+		if cameraIdx == t-1 && t > 0 {
+			// Camera vertex reverse PDF from sampled light
+			reversePdf = bdpt.calculateVertexPdf(sampledVertex, nil, &cameraPath.Vertices[t-1], scene)
+			isConnectible = true
+		} else if cameraIdx == t-2 && t > 1 {
+			// Camera predecessor reverse PDF
+			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], sampledVertex, &cameraPath.Vertices[t-2], scene)
+		}
+
+	default:
+		// Connection strategy
+		if cameraIdx == t-1 {
+			// Camera connection vertex
+			reversePdf = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], &lightPath.Vertices[s-2], &cameraPath.Vertices[t-1], scene)
+			isConnectible = true
+		} else if cameraIdx == t-2 && t > 1 {
+			// Camera predecessor
+			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &lightPath.Vertices[s-1], &cameraPath.Vertices[t-2], scene)
+		}
+	}
+
+	return forwardPdf, reversePdf, isConnectible
+}
+
+// calculateMISLightVertexPdfs returns PDF values for a light path vertex at lightIdx
+// Returns (forwardPdf, reversePdf, isConnectible) where isConnectible includes predecessor checks
+func (bdpt *BDPTIntegrator) calculateMISLightVertexPdfs(lightIdx int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) (float64, float64, bool) {
+	// Light path vertex at index lightIdx
+	vertex := &lightPath.Vertices[lightIdx]
+	forwardPdf := vertex.AreaPdfForward
+	reversePdf := vertex.AreaPdfReverse
+
+	// Light vertices: connectible if not specular AND not delta light (point light)
+	isDeltaLight := vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == core.LightTypePoint
+	isConnectible := !vertex.IsSpecular && !isDeltaLight
+
+	// Check predecessor connectibility for light path
+	if lightIdx > 0 {
+		predecessor := &lightPath.Vertices[lightIdx-1]
+		predecessorIsDeltaLight := predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == core.LightTypePoint
+		predecessorConnectible := !predecessor.IsSpecular && !predecessorIsDeltaLight
+		isConnectible = isConnectible && predecessorConnectible
+	}
+
+	// Apply strategy-specific PDF corrections for light path vertices
+
+	switch {
+	case s == 0:
+		// Path tracing strategy - no light path vertices in this strategy
+		// This should never be called for s=0
+
+	case t == 1:
+		// Light tracing strategy
+		if lightIdx == s-1 && s > 1 {
 			// Reverse PDF: from camera (sampledVertex) to this light vertex
 			reversePdf = bdpt.calculateVertexPdf(sampledVertex, nil, &lightPath.Vertices[s-1], scene)
 			isConnectible = true
-		} else if i == t+s-2 && s > 1 {
+		} else if lightIdx == s-2 && s > 1 {
 			// Reverse PDF: from light connection vertex to this predecessor
 			reversePdf = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], sampledVertex, &lightPath.Vertices[s-2], scene)
 		}
 
 	case s == 1:
 		// Direct lighting strategy
-		if i == t-1 && t > 0 {
-			// Camera vertex reverse PDF from sampled light
-			reversePdf = bdpt.calculateVertexPdf(sampledVertex, nil, &cameraPath.Vertices[t-1], scene)
-			isConnectible = true
-		} else if i == t-2 && t > 1 {
-			// Camera predecessor reverse PDF
-			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], sampledVertex, &cameraPath.Vertices[t-2], scene)
-		} else if i == t+s-1 && sampledVertex != nil {
+		if lightIdx == s-1 && sampledVertex != nil {
 			// Sampled light vertex
 			forwardPdf = sampledVertex.AreaPdfForward
 			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], sampledVertex, scene)
@@ -615,18 +636,11 @@ func (bdpt *BDPTIntegrator) calculateMISVertexPdfs(i int, cameraPath, lightPath 
 
 	default:
 		// Connection strategy
-		if i == t-1 {
-			// Camera connection vertex
-			reversePdf = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], &lightPath.Vertices[s-2], &cameraPath.Vertices[t-1], scene)
-			isConnectible = true
-		} else if i == t-2 && t > 1 {
-			// Camera predecessor
-			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &lightPath.Vertices[s-1], &cameraPath.Vertices[t-2], scene)
-		} else if i == t+s-1 {
+		if lightIdx == s-1 {
 			// Light connection vertex
 			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], &lightPath.Vertices[s-1], scene)
 			isConnectible = true
-		} else if i == t+s-2 && s > 1 {
+		} else if lightIdx == s-2 && s > 1 {
 			// Light predecessor
 			reversePdf = bdpt.calculateVertexPdf(&lightPath.Vertices[s-1], &cameraPath.Vertices[t-1], &lightPath.Vertices[s-2], scene)
 		}
