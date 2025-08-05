@@ -204,28 +204,13 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		// Check for intersections
 		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, math.Inf(1))
 		if !isHit {
-			if !isCameraPath {
-				break
+			if isCameraPath {
+				// Hit background - create a background vertex with captured light
+				bgColor := bdpt.BackgroundGradient(currentRay, scene)
+				vertex := NewBackgroundVertex(currentRay, bgColor, beta, pdfFwd)
+				path.Vertices = append(path.Vertices, vertex)
+				path.Length++
 			}
-			// Hit background - create a background vertex with captured light
-			bgColor := bdpt.BackgroundGradient(currentRay, scene)
-
-			// For background (infinite area light), we should use solid angle PDF directly
-			// Don't convert to area PDF since background is at infinite distance
-			vertex := Vertex{
-				Point:             currentRay.Origin.Add(currentRay.Direction.Multiply(1000.0)), // Far background
-				Normal:            currentRay.Direction.Multiply(-1),                            // Reverse direction
-				IncomingDirection: currentRay.Direction.Multiply(-1),
-				AreaPdfForward:    pdfFwd,            // Keep as solid angle PDF for infinite area light
-				AreaPdfReverse:    0.0,               // Cannot generate rays towards background
-				IsLight:           !bgColor.IsZero(), // Only mark as light if background actually emits
-				IsInfiniteLight:   true,              // Mark as infinite area light
-				Beta:              beta,
-				EmittedLight:      bgColor, // Capture background light
-			}
-
-			path.Vertices = append(path.Vertices, vertex)
-			path.Length++
 			break
 		}
 
@@ -288,6 +273,22 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 
 		// Prepare for next bounce
 		currentRay = scatter.Scattered
+	}
+}
+
+func NewBackgroundVertex(ray core.Ray, bgColor core.Vec3, beta core.Vec3, pdfFwd float64) Vertex {
+	// For background (infinite area light), we should use solid angle PDF directly
+	// Don't convert to area PDF since background is at infinite distance
+	return Vertex{
+		Point:             ray.Origin.Add(ray.Direction.Multiply(1000.0)), // Far background
+		Normal:            ray.Direction.Multiply(-1),                     // Reverse direction
+		IncomingDirection: ray.Direction.Multiply(-1),
+		AreaPdfForward:    pdfFwd,            // Keep as solid angle PDF for infinite area light
+		AreaPdfReverse:    0.0,               // Cannot generate rays towards background
+		IsLight:           !bgColor.IsZero(), // Only mark as light if background actually emits
+		IsInfiniteLight:   true,              // Mark as infinite area light
+		Beta:              beta,
+		EmittedLight:      bgColor, // Capture background light
 	}
 }
 
