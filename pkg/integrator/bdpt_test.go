@@ -204,7 +204,7 @@ func TestGenerateCameraSubpath(t *testing.T) {
 	ray := core.NewRay(core.NewVec3(1, 2, 3), core.NewVec3(0, 0, -1))
 
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
-	path := integrator.generateCameraSubpath(ray, scene, sampler, 2)
+	path := integrator.generateCameraPath(ray, scene, sampler, 2)
 
 	// Should have at least the camera vertex
 	if path.Length == 0 {
@@ -231,7 +231,7 @@ func TestGenerateLightSubpath(t *testing.T) {
 	scene := createSimpleTestScene()
 
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
-	path := integrator.generateLightSubpath(scene, sampler, 2)
+	path := integrator.generateLightPath(scene, sampler, 2)
 
 	// Should have at least the light vertex
 	if path.Length == 0 {

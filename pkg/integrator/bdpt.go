@@ -70,8 +70,8 @@ func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
 
 	// Generate random camera and light paths
-	cameraPath := bdpt.generateCameraSubpath(ray, scene, sampler, bdpt.config.MaxDepth)
-	lightPath := bdpt.generateLightSubpath(scene, sampler, bdpt.config.MaxDepth)
+	cameraPath := bdpt.generateCameraPath(ray, scene, sampler, bdpt.config.MaxDepth)
+	lightPath := bdpt.generateLightPath(scene, sampler, bdpt.config.MaxDepth)
 
 	// Evaluate all combinations of camera and light paths with MIS weighting
 	var totalLight core.Vec3
@@ -98,9 +98,9 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler cor
 	return totalLight, totalSplats
 }
 
-// generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
+// generateCameraPath generates a camera path with proper PDF tracking for BDPT
 // Each vertex stores forward/reverse PDFs needed for MIS weight calculation
-func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene, sampler core.Sampler, maxDepth int) Path {
+func (bdpt *BDPTIntegrator) generateCameraPath(ray core.Ray, scene core.Scene, sampler core.Sampler, maxDepth int) Path {
 	path := Path{
 		Vertices: make([]Vertex, 0, maxDepth),
 		Length:   0,
@@ -129,9 +129,9 @@ func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene
 	return path
 }
 
-// generateLightSubpath generates a light subpath with proper PDF tracking for BDPT
+// generateLightPath generates a light path with proper PDF tracking for BDPT
 // Starting from light emission, each vertex stores forward/reverse PDFs for MIS
-func (bdpt *BDPTIntegrator) generateLightSubpath(scene core.Scene, sampler core.Sampler, maxDepth int) Path {
+func (bdpt *BDPTIntegrator) generateLightPath(scene core.Scene, sampler core.Sampler, maxDepth int) Path {
 	path := Path{
 		Vertices: make([]Vertex, 0, maxDepth),
 		Length:   0,

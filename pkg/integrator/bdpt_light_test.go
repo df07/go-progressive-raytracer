@@ -871,7 +871,7 @@ func TestCameraPathBetaPropagation(t *testing.T) {
 			scene := createGlancingTestSceneWithMaterial(tt.material)
 
 			// Generate camera path using consistent glancing ray
-			path := integrator.generateCameraSubpath(glancingRay, scene, tt.sampler, 3)
+			path := integrator.generateCameraPath(glancingRay, scene, tt.sampler, 3)
 
 			// Verify we have expected vertices
 			if path.Length < len(tt.expectedVertices) {
@@ -979,7 +979,7 @@ func TestLightPathBetaPropagation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.sampler.Reset()
 			scene := createLightSceneWithMaterial(tt.material)
-			path := integrator.generateLightSubpath(scene, tt.sampler, 3)
+			path := integrator.generateLightPath(scene, tt.sampler, 3)
 
 			compareToExpectedPath(t, path, tt.expectedVertices)
 		})

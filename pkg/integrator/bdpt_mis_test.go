@@ -835,12 +835,12 @@ func TestPdfPropagation(t *testing.T) {
 					scene, ray = createGlancingTestSceneAndRay(tt.material)
 				}
 
-				path = integrator.generateCameraSubpath(ray, scene, tt.sampler, 3)
+				path = integrator.generateCameraPath(ray, scene, tt.sampler, 3)
 			} else {
 				// Generate light path
 				tt.sampler.Reset()
 				scene := createLightSceneWithMaterial(tt.material)
-				path = integrator.generateLightSubpath(scene, tt.sampler, 3)
+				path = integrator.generateLightPath(scene, tt.sampler, 3)
 			}
 
 			// Debug: log actual path length and all PDF values

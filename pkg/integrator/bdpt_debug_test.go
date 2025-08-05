@@ -193,7 +193,7 @@ func TestLightPathDirectionAndIntersection(t *testing.T) {
 	totalPaths := 10
 
 	for i := 0; i < totalPaths; i++ {
-		lightPath := bdptIntegrator.generateLightSubpath(scene, sampler, bdptConfig.MaxDepth)
+		lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
 
 		t.Logf("Light path %d: length=%d", i, lightPath.Length)
 
@@ -274,7 +274,7 @@ func TestBDPTCameraPathHitsLight(t *testing.T) {
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
 
 	// Generate camera path that should hit the light
-	cameraPath := bdptIntegrator.generateCameraSubpath(rayToLight, scene, sampler, bdptConfig.MaxDepth)
+	cameraPath := bdptIntegrator.generateCameraPath(rayToLight, scene, sampler, bdptConfig.MaxDepth)
 
 	// Assert: Camera path should have at least 2 vertices (camera + light hit)
 	if cameraPath.Length < 2 {
@@ -325,10 +325,10 @@ func TestBDPTConnectionStrategy(t *testing.T) {
 		core.NewVec3(278, 400, -200),
 		core.NewVec3(0, -1, 0.5).Normalize(),
 	)
-	cameraPath := bdptIntegrator.generateCameraSubpath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
+	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
 
 	// Generate light path
-	lightPath := bdptIntegrator.generateLightSubpath(scene, sampler, bdptConfig.MaxDepth)
+	lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
 
 	// Assert: Both paths should exist
 	if cameraPath.Length == 0 {
@@ -389,10 +389,10 @@ func TestBDPTPathIndexing(t *testing.T) {
 		core.NewVec3(278, 400, -200),
 		core.NewVec3(0, -1, 0.5).Normalize(),
 	)
-	cameraPath := bdptIntegrator.generateCameraSubpath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
+	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
 
 	// Generate light path
-	lightPath := bdptIntegrator.generateLightSubpath(scene, sampler, bdptConfig.MaxDepth)
+	lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
 
 	t.Logf("=== CAMERA PATH (length %d) ===", cameraPath.Length)
 	for i, vertex := range cameraPath.Vertices {
