@@ -58,11 +58,8 @@ func (dl *DiscLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample 
 		pdf = solidAnglePDF
 	}
 
-	// Get emission from material if it's an emitter
-	var emission core.Vec3
-	if emitter, ok := dl.Material.(core.Emitter); ok {
-		emission = emitter.Emit(core.NewRay(point, dirNormalized))
-	}
+	// Get emission from this light
+	emission := dl.Emit(core.NewRay(point, dirNormalized))
 
 	return core.LightSample{
 		Point:     samplePoint,

@@ -60,11 +60,8 @@ func (ql *QuadLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample 
 
 	solidAnglePDF := pdf * distance * distance / cosTheta
 
-	// Get emission from material if it's an emitter
-	var emission core.Vec3
-	if emitter, ok := ql.Material.(core.Emitter); ok {
-		emission = emitter.Emit(core.NewRay(point, direction))
-	}
+	// Get emission from this light
+	emission := ql.Emit(core.NewRay(point, direction))
 
 	return core.LightSample{
 		Point:     samplePoint,
@@ -118,11 +115,8 @@ func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	cosTheta := emissionDir.Dot(ql.Normal)
 	directionPDF := cosTheta / math.Pi
 
-	// Get emission from material
-	var emission core.Vec3
-	if emitter, ok := ql.Material.(core.Emitter); ok {
-		emission = emitter.Emit(core.NewRay(point, emissionDir))
-	}
+	// Get emission from this light
+	emission := ql.Emit(core.NewRay(point, emissionDir))
 
 	return core.EmissionSample{
 		Point:        point,

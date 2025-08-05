@@ -61,11 +61,8 @@ func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) core.Lig
 	// PDF for uniform sphere sampling = 1 / (4π * radius²)
 	pdf := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
 
-	// Get emission from material if it's an emitter
-	var emission core.Vec3
-	if emitter, ok := sl.Material.(core.Emitter); ok {
-		emission = emitter.Emit(core.NewRay(point, dirNormalized))
-	}
+	// Get emission from this light
+	emission := sl.Emit(core.NewRay(point, dirNormalized))
 
 	return core.LightSample{
 		Point:     samplePoint,
@@ -127,11 +124,8 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) core.Lig
 	// PDF = 1 / (2π * (1 - cos(θ_max)))
 	pdf := 1.0 / (2.0 * math.Pi * (1.0 - cosThetaMax))
 
-	// Get emission from material if it's an emitter
-	var emission core.Vec3
-	if emitter, ok := sl.Material.(core.Emitter); ok {
-		emission = emitter.Emit(ray)
-	}
+	// Get emission from this light
+	emission := sl.Emit(ray)
 
 	return core.LightSample{
 		Point:     hitRecord.Point,
