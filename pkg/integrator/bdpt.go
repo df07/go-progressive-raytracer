@@ -98,28 +98,6 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler cor
 	return totalLight, totalSplats
 }
 
-// evaluateBDPTStrategy evaluates a single BDPT strategy
-func (bdpt *BDPTIntegrator) evaluateBDPTStrategy(cameraPath, lightPath Path, s, t int, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay, *Vertex) {
-	var light core.Vec3
-	var sample *Vertex         // needed for MIS weight calculation for strategies that sample a new vertex
-	var splats []core.SplatRay // returned by light tracing strategy
-
-	switch {
-	case s == 1 && t == 1:
-		return core.Vec3{}, nil, nil // pbrt does not implement s=1,t=1 strategy. These paths are captured by s=0,t=1
-	case s == 0:
-		light = bdpt.evaluatePathTracingStrategy(cameraPath, t) // s=0: Pure camera path
-	case t == 1:
-		splats, sample = bdpt.evaluateLightTracingStrategy(lightPath, s, scene, sampler) // t=1: Light path direct to camera (light tracing)
-	case s == 1:
-		light, sample = bdpt.evaluateDirectLightingStrategy(cameraPath, t, scene, sampler) // s=1: Direct lighting
-	default:
-		light = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene) // All other cases: Connection strategies (including s=0, t<last)
-	}
-
-	return light, splats, sample
-}
-
 // generateCameraSubpath generates a camera subpath with proper PDF tracking for BDPT
 // Each vertex stores forward/reverse PDFs needed for MIS weight calculation
 func (bdpt *BDPTIntegrator) generateCameraSubpath(ray core.Ray, scene core.Scene, sampler core.Sampler, maxDepth int) Path {
@@ -207,7 +185,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			if isCameraPath {
 				// Hit background - create a background vertex with captured light
 				bgColor := bdpt.BackgroundGradient(currentRay, scene)
-				vertex := NewBackgroundVertex(currentRay, bgColor, beta, pdfFwd)
+				vertex := createBackgroundVertex(currentRay, bgColor, beta, pdfFwd)
 				path.Vertices = append(path.Vertices, vertex)
 				path.Length++
 			}
@@ -276,20 +254,26 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 	}
 }
 
-func NewBackgroundVertex(ray core.Ray, bgColor core.Vec3, beta core.Vec3, pdfFwd float64) Vertex {
-	// For background (infinite area light), we should use solid angle PDF directly
-	// Don't convert to area PDF since background is at infinite distance
-	return Vertex{
-		Point:             ray.Origin.Add(ray.Direction.Multiply(1000.0)), // Far background
-		Normal:            ray.Direction.Multiply(-1),                     // Reverse direction
-		IncomingDirection: ray.Direction.Multiply(-1),
-		AreaPdfForward:    pdfFwd,            // Keep as solid angle PDF for infinite area light
-		AreaPdfReverse:    0.0,               // Cannot generate rays towards background
-		IsLight:           !bgColor.IsZero(), // Only mark as light if background actually emits
-		IsInfiniteLight:   true,              // Mark as infinite area light
-		Beta:              beta,
-		EmittedLight:      bgColor, // Capture background light
+// evaluateBDPTStrategy evaluates a single BDPT strategy
+func (bdpt *BDPTIntegrator) evaluateBDPTStrategy(cameraPath, lightPath Path, s, t int, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay, *Vertex) {
+	var light core.Vec3
+	var sample *Vertex         // needed for MIS weight calculation for strategies that sample a new vertex
+	var splats []core.SplatRay // returned by light tracing strategy
+
+	switch {
+	case s == 1 && t == 1:
+		return core.Vec3{}, nil, nil // pbrt does not implement s=1,t=1 strategy. These paths are captured by s=0,t=1
+	case s == 0:
+		light = bdpt.evaluatePathTracingStrategy(cameraPath, t) // s=0: Pure camera path
+	case t == 1:
+		splats, sample = bdpt.evaluateLightTracingStrategy(lightPath, s, scene, sampler) // t=1: Light path direct to camera (light tracing)
+	case s == 1:
+		light, sample = bdpt.evaluateDirectLightingStrategy(cameraPath, t, scene, sampler) // s=1: Direct lighting
+	default:
+		light = bdpt.evaluateConnectionStrategy(cameraPath, lightPath, s, t, scene) // All other cases: Connection strategies (including s=0, t<last)
 	}
+
+	return light, splats, sample
 }
 
 // evaluatePathTracingStrategy evaluates the BDPT path tracing strategy
@@ -452,23 +436,6 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	return []core.SplatRay{splatRay}, sampledCameraVertex
 }
 
-// evaluateBRDF evaluates the BRDF at a vertex for a given outgoing direction
-func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.Vec3) core.Vec3 {
-	// For light sources, we don't evaluate BRDF - they emit directly
-	if vertex.IsLight && vertex.Material == nil {
-		// Light sources contribute their emission directly, not through BRDF
-		// For connections, we use identity (1.0) since the light emission is handled separately
-		return core.Vec3{X: 1, Y: 1, Z: 1}
-	}
-
-	if vertex.Material == nil {
-		return core.Vec3{X: 0, Y: 0, Z: 0}
-	}
-
-	// Use the new EvaluateBRDF method from the material interface
-	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, vertex.Normal)
-}
-
 // evaluateConnection computes the contribution from connecting two specific vertices.
 //
 // This implements the BDPT connection formula:
@@ -542,6 +509,39 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	}
 
 	return contribution
+}
+
+// evaluateBRDF evaluates the BRDF at a vertex for a given outgoing direction
+func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.Vec3) core.Vec3 {
+	// For light sources, we don't evaluate BRDF - they emit directly
+	if vertex.IsLight && vertex.Material == nil {
+		// Light sources contribute their emission directly, not through BRDF
+		// For connections, we use identity (1.0) since the light emission is handled separately
+		return core.Vec3{X: 1, Y: 1, Z: 1}
+	}
+
+	if vertex.Material == nil {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// Use the new EvaluateBRDF method from the material interface
+	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, vertex.Normal)
+}
+
+func createBackgroundVertex(ray core.Ray, bgColor core.Vec3, beta core.Vec3, pdfFwd float64) Vertex {
+	// For background (infinite area light), we should use solid angle PDF directly
+	// Don't convert to area PDF since background is at infinite distance
+	return Vertex{
+		Point:             ray.Origin.Add(ray.Direction.Multiply(1000.0)), // Far background
+		Normal:            ray.Direction.Multiply(-1),                     // Reverse direction
+		IncomingDirection: ray.Direction.Multiply(-1),
+		AreaPdfForward:    pdfFwd,            // Keep as solid angle PDF for infinite area light
+		AreaPdfReverse:    0.0,               // Cannot generate rays towards background
+		IsLight:           !bgColor.IsZero(), // Only mark as light if background actually emits
+		IsInfiniteLight:   true,              // Mark as infinite area light
+		Beta:              beta,
+		EmittedLight:      bgColor, // Capture background light
+	}
 }
 
 func (bdpt *BDPTIntegrator) logf(format string, a ...interface{}) {
