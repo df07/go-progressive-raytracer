@@ -14,13 +14,14 @@ type BVHNode struct {
 
 // BVH represents a Bounding Volume Hierarchy for fast ray-object intersection
 type BVH struct {
-	Root *BVHNode
+	Root              *BVHNode
+	FiniteWorldRadius float64 // Precomputed world radius for infinite light PDF calculations
 }
 
 // NewBVH constructs a BVH from a slice of shapes
 func NewBVH(shapes []Shape) *BVH {
 	if len(shapes) == 0 {
-		return &BVH{Root: nil}
+		return &BVH{Root: nil, FiniteWorldRadius: 0}
 	}
 
 	// Make a copy of the shapes slice to avoid modifying the original
@@ -28,8 +29,11 @@ func NewBVH(shapes []Shape) *BVH {
 	shapesCopy := make([]Shape, len(shapes))
 	copy(shapesCopy, shapes)
 
+	finiteWorldRadius := calculateFiniteWorldRadius(shapesCopy)
+
 	return &BVH{
-		Root: buildBVH(shapesCopy, 0),
+		Root:              buildBVH(shapesCopy, 0),
+		FiniteWorldRadius: finiteWorldRadius,
 	}
 }
 
@@ -265,4 +269,32 @@ func (bvh *BVH) collectStats(node *BVHNode, depth int, stats *bvhStats) {
 			bvh.collectStats(node.Right, depth+1, stats)
 		}
 	}
+}
+
+// calculateFiniteWorldRadius computes world radius from finite geometry only
+func calculateFiniteWorldRadius(shapes []Shape) float64 {
+	var finiteBounds AABB
+	hasFiniteGeometry := false
+
+	for _, shape := range shapes {
+		bounds := shape.BoundingBox()
+		// Skip shapes with very large extents (likely infinite planes)
+		if bounds.Size().X > 1e5 || bounds.Size().Y > 1e5 || bounds.Size().Z > 1e5 {
+			continue
+		}
+		if !hasFiniteGeometry {
+			finiteBounds = bounds
+			hasFiniteGeometry = true
+		} else {
+			finiteBounds = finiteBounds.Union(bounds)
+		}
+	}
+
+	if !hasFiniteGeometry {
+		return 0.0
+	}
+
+	// PBRT's BoundingSphere: radius = distance from center to corner
+	center := finiteBounds.Center()
+	return finiteBounds.Max.Subtract(center).Length()
 }

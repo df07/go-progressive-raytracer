@@ -244,3 +244,90 @@ func TestBVH_IdenticalBoundingBoxes(t *testing.T) {
 		t.Errorf("Expected closest hit at t=1.0, got t=%f", hit.T)
 	}
 }
+
+func TestCalculateFiniteWorldRadius(t *testing.T) {
+	tests := []struct {
+		name           string
+		shapes         []Shape
+		expectedRadius float64
+		tolerance      float64
+	}{
+		{
+			name:           "EmptyScene",
+			shapes:         []Shape{},
+			expectedRadius: 0.0,
+			tolerance:      0.0,
+		},
+		{
+			name: "SingleSphere",
+			shapes: []Shape{
+				MockShape{
+					boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
+				},
+			},
+			expectedRadius: math.Sqrt(3), // Distance from center (0,0,0) to corner (1,1,1)
+			tolerance:      1e-10,
+		},
+		{
+			name: "SceneWithInfinitePlane",
+			shapes: []Shape{
+				// Finite sphere
+				MockShape{
+					boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
+				},
+				// Infinite plane (large bounds)
+				MockShape{
+					boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
+				},
+			},
+			// Should only consider the finite sphere, so radius = sqrt(3)
+			expectedRadius: math.Sqrt(3),
+			tolerance:      1e-10,
+		},
+		{
+			name: "OnlyInfinitePlanes",
+			shapes: []Shape{
+				MockShape{
+					boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
+				},
+			},
+			// No finite geometry, should return 0
+			expectedRadius: 0.0,
+			tolerance:      0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateFiniteWorldRadius(tt.shapes)
+
+			if math.Abs(result-tt.expectedRadius) > tt.tolerance {
+				t.Errorf("calculateFiniteWorldRadius() = %v, expected %v (tolerance %v)",
+					result, tt.expectedRadius, tt.tolerance)
+			}
+		})
+	}
+}
+
+func TestBVHFiniteWorldRadius(t *testing.T) {
+	// Test that the BVH correctly stores the world radius
+	shapes := []Shape{
+		MockShape{
+			boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
+		},
+		// Add an infinite plane that should be filtered out
+		MockShape{
+			boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
+		},
+	}
+
+	bvh := NewBVH(shapes)
+
+	expectedRadius := math.Sqrt(3) // Only the finite sphere should contribute
+	tolerance := 1e-10
+
+	if math.Abs(bvh.FiniteWorldRadius-expectedRadius) > tolerance {
+		t.Errorf("BVH.FiniteWorldRadius = %v, expected %v (tolerance %v)",
+			bvh.FiniteWorldRadius, expectedRadius, tolerance)
+	}
+}

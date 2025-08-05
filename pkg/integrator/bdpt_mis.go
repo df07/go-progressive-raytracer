@@ -176,7 +176,9 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, samp
 		return 1.0
 	}
 
-	// For path tracing strategies that hit infinite lights, return weight 1.0
+	// For path tracing strategies that hit infinite lights, return weight 1.0.
+	// Our infinite lights are background gradients, not sampable Light objects,
+	// so there are no competing light sampling strategies (s>0) for MIS to balance.
 	if s == 0 && t > 1 {
 		lastVertex := &cameraPath.Vertices[t-1]
 		if lastVertex.IsInfiniteLight {
@@ -402,7 +404,13 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 		// Handle infinite area lights (background)
 		if curr.IsInfiniteLight {
 			// PBRT: Compute planar sampling density for infinite light sources
-			worldRadius := bdpt.getWorldRadius(scene)
+			worldRadius := scene.GetBVH().FiniteWorldRadius
+
+			// Handle zero radius case (scene with no finite geometry)
+			if worldRadius == 0.0 {
+				worldRadius = 1.0 // Small default radius for scenes with only infinite geometry
+			}
+
 			pdf = 1.0 / (math.Pi * worldRadius * worldRadius)
 			//fmt.Printf("infinite light pdf: %f\n", pdf)
 		} else if curr.Light != nil {
@@ -422,9 +430,8 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 	}
 
 	// if (v.IsOnSurface()) pdf *= AbsDot(v.ng(), w);
-	if !to.IsLight && !to.IsCamera {
-		cosTheta := to.Normal.AbsDot(w)
-		pdf *= cosTheta
+	if to.IsOnSurface() {
+		pdf *= to.Normal.AbsDot(w)
 	}
 
 	return pdf
@@ -498,31 +505,6 @@ func (v *Vertex) convertSolidAngleToAreaPdf(next *Vertex, pdf float64) float64 {
 	}
 
 	return pdf * invDist2
-}
-
-// getWorldRadius calculates the radius of the scene's bounding sphere
-// This is used for infinite light PDF calculations following PBRT
-func (bdpt *BDPTIntegrator) getWorldRadius(scene core.Scene) float64 {
-	bb := scene.GetBVH().Root.BoundingBox
-
-	// For now, use a simple heuristic based on scene shapes
-	// In a full implementation, this would use the actual scene bounds
-	// TODO: Implement this properly
-	shapes := scene.GetShapes()
-	if len(shapes) == 0 {
-		return 1000.0 // Default radius for empty scenes
-	}
-
-	// Calculate center and radius of bounding sphere
-	center := bb.Min.Add(bb.Max).Multiply(0.5)
-	radius := bb.Max.Subtract(center).Length()
-
-	// Ensure minimum radius for numerical stability
-	if radius < 100.0 {
-		radius = 100.0
-	}
-
-	return radius
 }
 
 // remap0 is equivalent to PBRT's remap0 - deals with delta functions
