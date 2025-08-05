@@ -46,6 +46,11 @@ func (ml *MockLight) EmissionPDF(point Vec3, direction Vec3) float64 {
 	return ml.pdf
 }
 
+func (ml *MockLight) Emit(ray Ray) Vec3 {
+	// Mock light doesn't emit in arbitrary directions (finite light)
+	return Vec3{X: 0, Y: 0, Z: 0}
+}
+
 func TestSampleLightEmission(t *testing.T) {
 	// Test with no lights
 	var emptyLights []Light

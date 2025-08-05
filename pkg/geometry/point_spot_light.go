@@ -204,3 +204,9 @@ func (sl *PointSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 	// Use shared cone PDF calculation
 	return core.UniformConePDF(sl.cosTotalWidth)
 }
+
+// Emit implements the Light interface - point lights emit in all directions
+func (sl *PointSpotLight) Emit(ray core.Ray) core.Vec3 {
+	// Point lights don't have a material but emit their emission uniformly
+	return sl.emission
+}

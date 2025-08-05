@@ -1,0 +1,133 @@
+package geometry
+
+import (
+	"math"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
+)
+
+// uniformSampleSphere generates a uniform random direction on the unit sphere
+func uniformSampleSphere(sample core.Vec2) core.Vec3 {
+	z := 1.0 - 2.0*sample.X // z ∈ [-1, 1]
+	r := math.Sqrt(math.Max(0, 1.0-z*z))
+	phi := 2.0 * math.Pi * sample.Y
+	x := r * math.Cos(phi)
+	y := r * math.Sin(phi)
+	return core.NewVec3(x, y, z)
+}
+
+// uniformInfiniteLightMaterial implements uniform emission for infinite lights
+type uniformInfiniteLightMaterial struct {
+	emission core.Vec3 // Uniform emission color
+}
+
+// Scatter implements the Material interface (infinite lights don't scatter, only emit)
+func (uilm *uniformInfiniteLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
+	return core.ScatterResult{}, false // No scattering, only emission
+}
+
+// Emit implements the Emitter interface with uniform emission
+func (uilm *uniformInfiniteLightMaterial) Emit(rayIn core.Ray) core.Vec3 {
+	// Uniform infinite light emits the same color in all directions
+	return uilm.emission
+}
+
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
+func (uilm *uniformInfiniteLightMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+	// Lights don't reflect - they only emit
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// PDF calculates the probability density function for specific incoming/outgoing directions
+func (uilm *uniformInfiniteLightMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+	// Lights don't scatter, so no PDF
+	return 0.0, true // isDelta = true
+}
+
+// UniformInfiniteLight represents a uniform infinite area light (constant emission in all directions)
+type UniformInfiniteLight struct {
+	emission    core.Vec3     // Uniform emission color
+	worldCenter core.Vec3     // Finite scene center from BVH
+	worldRadius float64       // Finite scene radius from BVH
+	material    core.Material // Material for emission
+}
+
+// NewUniformInfiniteLight creates a new uniform infinite light
+func NewUniformInfiniteLight(emission core.Vec3, worldCenter core.Vec3, worldRadius float64) *UniformInfiniteLight {
+	material := &uniformInfiniteLightMaterial{emission: emission}
+	return &UniformInfiniteLight{
+		emission:    emission,
+		worldCenter: worldCenter,
+		worldRadius: worldRadius,
+		material:    material,
+	}
+}
+
+func (uil *UniformInfiniteLight) Type() core.LightType {
+	return core.LightTypeInfinite
+}
+
+// GetMaterial returns the material for emission calculations
+func (uil *UniformInfiniteLight) GetMaterial() core.Material {
+	return uil.material
+}
+
+// Sample implements the Light interface - samples the infinite light for direct lighting
+func (uil *UniformInfiniteLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
+	// For infinite lights, we sample a direction uniformly on the sphere
+	// and treat it as coming from infinite distance
+	direction := uniformSampleSphere(sample)
+
+	return core.LightSample{
+		Point:     point.Add(direction.Multiply(1e10)), // Far away point
+		Normal:    direction.Multiply(-1),              // Points toward scene
+		Direction: direction,
+		Distance:  math.Inf(1),
+		Emission:  uil.emission,
+		PDF:       1.0 / (4.0 * math.Pi), // Uniform over sphere
+	}
+}
+
+// PDF implements the Light interface - returns probability density for direct lighting sampling
+func (uil *UniformInfiniteLight) PDF(point core.Vec3, direction core.Vec3) float64 {
+	// Uniform sampling over sphere
+	return 1.0 / (4.0 * math.Pi)
+}
+
+// SampleEmission implements the Light interface - samples emission for BDPT light path generation
+func (uil *UniformInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+	// For BDPT light path generation, we need to:
+	// 1. Sample a direction uniformly on the sphere
+	// 2. Find where this direction intersects the scene bounding sphere
+	// 3. Create emission ray from that point toward the scene
+
+	direction := uniformSampleSphere(sampleDirection)
+
+	// Find scene center and create ray from scene boundary
+	// Use consistent finite scene bounds from BVH
+	emissionPoint := uil.worldCenter.Add(direction.Multiply(-uil.worldRadius))
+
+	return core.EmissionSample{
+		Point:        emissionPoint,
+		Normal:       direction, // Points toward scene
+		Direction:    direction,
+		Emission:     uil.emission,
+		AreaPDF:      1.0 / (math.Pi * uil.worldRadius * uil.worldRadius), // PBRT: planar density
+		DirectionPDF: 1.0 / (4.0 * math.Pi),                               // Uniform over sphere
+	}
+}
+
+// EmissionPDF implements the Light interface - calculates PDF for BDPT MIS calculations
+func (uil *UniformInfiniteLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
+	// PBRT: For infinite lights, return planar sampling density
+	if uil.worldRadius <= 0 {
+		return 0.0
+	}
+	return 1.0 / (math.Pi * uil.worldRadius * uil.worldRadius)
+}
+
+// Emit implements the Light interface - evaluates emission in ray direction
+func (uil *UniformInfiniteLight) Emit(ray core.Ray) core.Vec3 {
+	// Uniform infinite light emits the same color in all directions
+	return uil.emission
+}

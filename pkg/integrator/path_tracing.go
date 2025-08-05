@@ -43,6 +43,21 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 	// Check for intersections with objects using scene's BVH
 	hit, isHit := scene.GetBVH().Hit(ray, 0.001, math.Inf(1))
 	if !isHit {
+		// Check for infinite light emission
+		lights := scene.GetLights()
+		var totalEmission core.Vec3
+		for _, light := range lights {
+			// Only check infinite lights when we miss all geometry
+			if light.Type() == core.LightTypeInfinite {
+				emission := light.Emit(ray)
+				totalEmission = totalEmission.Add(emission)
+			}
+		}
+		if !totalEmission.IsZero() {
+			return totalEmission.Multiply(rrCompensation)
+		}
+
+		// Fall back to background gradient if no infinite lights
 		bgColor := pt.BackgroundGradient(ray, scene)
 		return bgColor.Multiply(rrCompensation)
 	}

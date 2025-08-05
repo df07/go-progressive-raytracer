@@ -40,8 +40,9 @@ type Emitter interface {
 type LightType string
 
 const (
-	LightTypeArea  LightType = "area"
-	LightTypePoint LightType = "point"
+	LightTypeArea     LightType = "area"
+	LightTypePoint    LightType = "point"
+	LightTypeInfinite LightType = "infinite"
 )
 
 // Light interface for objects that can be sampled for direct lighting
@@ -61,6 +62,10 @@ type Light interface {
 
 	// EmissionPDF calculates PDF for emission sampling - needed for BDPT MIS calculations
 	EmissionPDF(point Vec3, direction Vec3) float64
+
+	// Emit evaluates emission in the direction of the given ray
+	// For finite lights, returns zero. For infinite lights, returns emission based on ray direction.
+	Emit(ray Ray) Vec3
 }
 
 // LightSample contains information about a sampled point on a light

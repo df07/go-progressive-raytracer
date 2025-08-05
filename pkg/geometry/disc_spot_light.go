@@ -229,3 +229,12 @@ func (dsl *DiscSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 	areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
 	return areaPDF
 }
+
+// Emit implements the Light interface - returns material emission
+func (dsl *DiscSpotLight) Emit(ray core.Ray) core.Vec3 {
+	// Spot lights emit according to their material
+	if emitter, isEmissive := dsl.discLight.Material.(core.Emitter); isEmissive {
+		return emitter.Emit(ray)
+	}
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}

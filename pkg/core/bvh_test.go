@@ -249,12 +249,14 @@ func TestCalculateFiniteWorldRadius(t *testing.T) {
 	tests := []struct {
 		name           string
 		shapes         []Shape
+		expectedCenter Vec3
 		expectedRadius float64
 		tolerance      float64
 	}{
 		{
 			name:           "EmptyScene",
 			shapes:         []Shape{},
+			expectedCenter: Vec3{},
 			expectedRadius: 0.0,
 			tolerance:      0.0,
 		},
@@ -265,7 +267,8 @@ func TestCalculateFiniteWorldRadius(t *testing.T) {
 					boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
 				},
 			},
-			expectedRadius: math.Sqrt(3), // Distance from center (0,0,0) to corner (1,1,1)
+			expectedCenter: NewVec3(0, 0, 0), // Center of AABB from (-1,-1,-1) to (1,1,1)
+			expectedRadius: math.Sqrt(3),     // Distance from center (0,0,0) to corner (1,1,1)
 			tolerance:      1e-10,
 		},
 		{
@@ -280,8 +283,9 @@ func TestCalculateFiniteWorldRadius(t *testing.T) {
 					boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
 				},
 			},
-			// Should only consider the finite sphere, so radius = sqrt(3)
-			expectedRadius: math.Sqrt(3),
+			// Should only consider the finite sphere
+			expectedCenter: NewVec3(0, 0, 0), // Center of finite sphere
+			expectedRadius: math.Sqrt(3),     // Radius from finite sphere
 			tolerance:      1e-10,
 		},
 		{
@@ -291,7 +295,8 @@ func TestCalculateFiniteWorldRadius(t *testing.T) {
 					boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
 				},
 			},
-			// No finite geometry, should return 0
+			// No finite geometry, should return zero center and radius
+			expectedCenter: Vec3{},
 			expectedRadius: 0.0,
 			tolerance:      0.0,
 		},
@@ -299,11 +304,20 @@ func TestCalculateFiniteWorldRadius(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := calculateFiniteWorldRadius(tt.shapes)
+			center, radius := calculateFiniteWorldBounds(tt.shapes)
 
-			if math.Abs(result-tt.expectedRadius) > tt.tolerance {
-				t.Errorf("calculateFiniteWorldRadius() = %v, expected %v (tolerance %v)",
-					result, tt.expectedRadius, tt.tolerance)
+			// Check radius
+			if math.Abs(radius-tt.expectedRadius) > tt.tolerance {
+				t.Errorf("calculateFiniteWorldBounds() radius = %v, expected %v (tolerance %v)",
+					radius, tt.expectedRadius, tt.tolerance)
+			}
+
+			// Check center components
+			if math.Abs(center.X-tt.expectedCenter.X) > tt.tolerance ||
+				math.Abs(center.Y-tt.expectedCenter.Y) > tt.tolerance ||
+				math.Abs(center.Z-tt.expectedCenter.Z) > tt.tolerance {
+				t.Errorf("calculateFiniteWorldBounds() center = %v, expected %v (tolerance %v)",
+					center, tt.expectedCenter, tt.tolerance)
 			}
 		})
 	}

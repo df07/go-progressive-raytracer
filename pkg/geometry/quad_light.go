@@ -175,3 +175,12 @@ func (ql *QuadLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 	areaPDF := 1.0 / ql.Area
 	return areaPDF
 }
+
+// Emit implements the Light interface - returns material emission
+func (ql *QuadLight) Emit(ray core.Ray) core.Vec3 {
+	// Area lights emit according to their material
+	if emitter, isEmissive := ql.Material.(core.Emitter); isEmissive {
+		return emitter.Emit(ray)
+	}
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
