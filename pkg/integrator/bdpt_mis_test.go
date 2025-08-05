@@ -339,7 +339,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			scene := createSimpleTestScene()
 
 			// Add detailed validation using sampledVertex from test case
-			weight := integrator.calculateMISWeightAlt3(&tt.cameraPath, &tt.lightPath, tt.sampledVertex, tt.s, tt.t, scene)
+			weight := integrator.calculateMISWeight(&tt.cameraPath, &tt.lightPath, tt.sampledVertex, tt.s, tt.t, scene)
 
 			// Basic bounds checking - MIS weights should be in [0,1]
 			if weight < 0 || weight > 1 {
@@ -564,8 +564,8 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 			// For other strategies (s=0, s>1&&t>1, s=1&&t=1), sampledVertex remains nil
 
 			// Calculate weights using all three methods
-			originalWeight := integrator.calculateMISWeight(&tt.cameraPath, &tt.lightPath, sampledVertex, tt.s, tt.t, scene)
-			alt3Weight := integrator.calculateMISWeightAlt3(&tt.cameraPath, &tt.lightPath, sampledVertex, tt.s, tt.t, scene)
+			originalWeight := integrator.calculateMISWeightPBRT(&tt.cameraPath, &tt.lightPath, sampledVertex, tt.s, tt.t, scene)
+			alt3Weight := integrator.calculateMISWeight(&tt.cameraPath, &tt.lightPath, sampledVertex, tt.s, tt.t, scene)
 
 			// Check if Alt3 matches original (within floating point precision)
 			tolerance := 1e-12

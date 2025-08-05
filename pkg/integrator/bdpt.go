@@ -85,7 +85,7 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler cor
 
 			// apply MIS weight to contribution and splat rays
 			if !light.IsZero() || len(splats) > 0 {
-				misWeight := bdpt.calculateMISWeightAlt3(&cameraPath, &lightPath, sample, s, t, scene)
+				misWeight := bdpt.calculateMISWeight(&cameraPath, &lightPath, sample, s, t, scene)
 				totalLight = totalLight.Add(light.Multiply(misWeight))
 				for i := range splats {
 					splats[i].Color = splats[i].Color.Multiply(misWeight)

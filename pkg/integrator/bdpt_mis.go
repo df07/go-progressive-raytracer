@@ -6,9 +6,9 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
-// calculateMISWeight implements PBRT's MIS weighting for BDPT strategies
+// calculateMISWeightPBRT implements PBRT's MIS weighting for BDPT strategies
 // This compares forward vs reverse PDFs to properly weight different path construction strategies
-func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
 	disableMISWeight := false
 	if disableMISWeight {
 		return 1.0 / float64(s+t-1)
@@ -168,9 +168,9 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, samp
 	return 1.0 / (1.0 + sumRi)
 }
 
-// calculateMISWeightAlt3 implements zero-allocation MIS weighting using on-demand PDF calculation
+// calculateMISWeight implements zero-allocation MIS weighting using on-demand PDF calculation
 // Directly copies calculateMISWeightAlt2 logic but eliminates intermediate arrays
-func (bdpt *BDPTIntegrator) calculateMISWeightAlt3(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
 	// Handle same early returns as original
 	if s+t == 2 {
 		return 1.0
