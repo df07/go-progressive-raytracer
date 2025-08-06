@@ -692,3 +692,15 @@ func (s *TestScene) GetCamera() core.Camera {
 
 	return s.camera
 }
+
+func (s *TestScene) Preprocess() error {
+	// Simple preprocessing for tests - just preprocess lights that need it
+	for _, light := range s.lights {
+		if preprocessor, ok := light.(core.Preprocessor); ok {
+			if err := preprocessor.Preprocess(s); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

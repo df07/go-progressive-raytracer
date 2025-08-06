@@ -7,12 +7,33 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
+// MockScene for tile renderer testing
+type MockScene struct {
+	width       int
+	height      int
+	shapes      []core.Shape
+	lights      []core.Light
+	topColor    core.Vec3
+	bottomColor core.Vec3
+	camera      core.Camera
+	config      core.SamplingConfig
+	bvh         *core.BVH
+}
+
+func (m *MockScene) GetWidth() int                               { return m.width }
+func (m *MockScene) GetHeight() int                              { return m.height }
+func (m *MockScene) GetCamera() core.Camera                      { return m.camera }
+func (m *MockScene) GetBackgroundColors() (core.Vec3, core.Vec3) { return m.topColor, m.bottomColor }
+func (m *MockScene) GetShapes() []core.Shape                     { return m.shapes }
+func (m *MockScene) GetLights() []core.Light                     { return m.lights }
+func (m *MockScene) GetSamplingConfig() core.SamplingConfig      { return m.config }
+func (m *MockScene) GetBVH() *core.BVH                           { return m.bvh }
+func (m *MockScene) Preprocess() error                           { return nil }
+
 func TestGradientInfiniteLight_Type(t *testing.T) {
 	light := NewGradientInfiniteLight(
 		core.NewVec3(0, 0, 1), // blue
 		core.NewVec3(1, 1, 1), // white
-		core.NewVec3(0, 0, 0),
-		10,
 	)
 
 	if light.Type() != core.LightTypeInfinite {
@@ -24,7 +45,7 @@ func TestGradientInfiniteLight_EmissionForDirection(t *testing.T) {
 	topColor := core.NewVec3(0, 0, 1)    // blue
 	bottomColor := core.NewVec3(1, 1, 1) // white
 
-	light := NewGradientInfiniteLight(topColor, bottomColor, core.NewVec3(0, 0, 0), 10)
+	light := NewGradientInfiniteLight(topColor, bottomColor)
 
 	tests := []struct {
 		direction core.Vec3
@@ -49,10 +70,8 @@ func TestGradientInfiniteLight_EmissionForDirection(t *testing.T) {
 func TestGradientInfiniteLight_Sample(t *testing.T) {
 	topColor := core.NewVec3(1, 0, 0)    // red
 	bottomColor := core.NewVec3(0, 1, 0) // green
-	worldCenter := core.NewVec3(0, 0, 0)
-	worldRadius := 10.0
 
-	light := NewGradientInfiniteLight(topColor, bottomColor, worldCenter, worldRadius)
+	light := NewGradientInfiniteLight(topColor, bottomColor)
 
 	point := core.NewVec3(0, 0, 0)
 	sample := core.NewVec2(0.5, 0.5)
@@ -93,8 +112,6 @@ func TestGradientInfiniteLight_PDF(t *testing.T) {
 	light := NewGradientInfiniteLight(
 		core.NewVec3(1, 0, 0),
 		core.NewVec3(0, 1, 0),
-		core.NewVec3(0, 0, 0),
-		10,
 	)
 
 	point := core.NewVec3(0, 0, 0)
@@ -114,7 +131,13 @@ func TestGradientInfiniteLight_SampleEmission(t *testing.T) {
 	worldCenter := core.NewVec3(1, 2, 3)
 	worldRadius := 15.0
 
-	light := NewGradientInfiniteLight(topColor, bottomColor, worldCenter, worldRadius)
+	light := NewGradientInfiniteLight(topColor, bottomColor)
+	light.Preprocess(&MockScene{
+		bvh: &core.BVH{
+			FiniteWorldCenter: worldCenter,
+			FiniteWorldRadius: worldRadius,
+		},
+	})
 
 	samplePoint := core.NewVec2(0.3, 0.7)
 	sampleDirection := core.NewVec2(0.1, 0.9)
@@ -157,9 +180,11 @@ func TestGradientInfiniteLight_EmissionPDF(t *testing.T) {
 	light := NewGradientInfiniteLight(
 		core.NewVec3(1, 0, 0),
 		core.NewVec3(0, 0, 1),
-		core.NewVec3(0, 0, 0),
-		worldRadius,
 	)
+
+	light.Preprocess(&MockScene{
+		bvh: &core.BVH{FiniteWorldRadius: worldRadius},
+	})
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)
@@ -173,12 +198,15 @@ func TestGradientInfiniteLight_EmissionPDF(t *testing.T) {
 }
 
 func TestGradientInfiniteLight_EmissionPDF_ZeroRadius(t *testing.T) {
+	worldRadius := 0.0
 	light := NewGradientInfiniteLight(
 		core.NewVec3(1, 0, 0),
 		core.NewVec3(0, 0, 1),
-		core.NewVec3(0, 0, 0),
-		0, // Zero radius
 	)
+
+	light.Preprocess(&MockScene{
+		bvh: &core.BVH{FiniteWorldRadius: worldRadius},
+	})
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)
@@ -195,7 +223,7 @@ func TestGradientInfiniteLight_GradientConsistency(t *testing.T) {
 	topColor := core.NewVec3(1, 0, 0)    // red at top (Y=1)
 	bottomColor := core.NewVec3(0, 0, 1) // blue at bottom (Y=-1)
 
-	light := NewGradientInfiniteLight(topColor, bottomColor, core.NewVec3(0, 0, 0), 10)
+	light := NewGradientInfiniteLight(topColor, bottomColor)
 
 	// Test specific Y values
 	testCases := []struct {

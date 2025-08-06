@@ -32,12 +32,9 @@ func createSceneWithInfiniteLight() *MockScene {
 	}
 
 	// Add a gradient infinite light (this replaces background gradient functionality)
-	bvh := scene.GetBVH()
 	infiniteLight := geometry.NewGradientInfiniteLight(
 		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
 		core.NewVec3(1.0, 0.8, 0.6), // bottomColor (warm ground)
-		bvh.FiniteWorldCenter,
-		bvh.FiniteWorldRadius,
 	)
 	scene.lights = append(scene.lights, infiniteLight)
 
@@ -160,12 +157,7 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 	}
 
 	// Add uniform infinite light
-	bvh := scene.GetBVH()
-	uniformLight := geometry.NewUniformInfiniteLight(
-		core.NewVec3(0.8, 0.6, 0.4), // Warm uniform color
-		bvh.FiniteWorldCenter,
-		bvh.FiniteWorldRadius,
-	)
+	uniformLight := geometry.NewUniformInfiniteLight(core.NewVec3(0.8, 0.6, 0.4))
 	scene.lights = append(scene.lights, uniformLight)
 
 	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())

@@ -57,7 +57,11 @@ type ProgressiveRaytracer struct {
 }
 
 // NewProgressiveRaytracer creates a new progressive raytracer with a specific integrator
-func NewProgressiveRaytracer(scene core.Scene, config ProgressiveConfig, integratorInst core.Integrator, logger core.Logger) *ProgressiveRaytracer {
+func NewProgressiveRaytracer(scene core.Scene, config ProgressiveConfig, integratorInst core.Integrator, logger core.Logger) (*ProgressiveRaytracer, error) {
+	// Preprocess the scene before creating the raytracer
+	if err := scene.Preprocess(); err != nil {
+		return nil, fmt.Errorf("failed to preprocess scene: %w", err)
+	}
 	// Create tile grid
 	width := scene.GetSamplingConfig().Width
 	height := scene.GetSamplingConfig().Height
@@ -85,7 +89,7 @@ func NewProgressiveRaytracer(scene core.Scene, config ProgressiveConfig, integra
 		integrator:  integratorInst,
 		workerPool:  workerPool,
 		logger:      logger,
-	}
+	}, nil
 }
 
 // getSamplesForPass calculates the target total samples for a given pass

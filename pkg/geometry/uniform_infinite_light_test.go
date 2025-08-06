@@ -8,11 +8,7 @@ import (
 )
 
 func TestUniformInfiniteLight_Type(t *testing.T) {
-	light := NewUniformInfiniteLight(
-		core.NewVec3(1, 1, 1),
-		core.NewVec3(0, 0, 0),
-		10,
-	)
+	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
 
 	if light.Type() != core.LightTypeInfinite {
 		t.Errorf("Expected LightTypeInfinite, got %v", light.Type())
@@ -21,10 +17,8 @@ func TestUniformInfiniteLight_Type(t *testing.T) {
 
 func TestUniformInfiniteLight_Sample(t *testing.T) {
 	emission := core.NewVec3(2, 3, 4)
-	worldCenter := core.NewVec3(0, 0, 0)
-	worldRadius := 10.0
 
-	light := NewUniformInfiniteLight(emission, worldCenter, worldRadius)
+	light := NewUniformInfiniteLight(emission)
 
 	point := core.NewVec3(0, 0, 0)
 	sample := core.NewVec2(0.5, 0.5)
@@ -61,11 +55,7 @@ func TestUniformInfiniteLight_Sample(t *testing.T) {
 }
 
 func TestUniformInfiniteLight_PDF(t *testing.T) {
-	light := NewUniformInfiniteLight(
-		core.NewVec3(1, 1, 1),
-		core.NewVec3(0, 0, 0),
-		10,
-	)
+	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(0, 1, 0)
@@ -83,7 +73,13 @@ func TestUniformInfiniteLight_SampleEmission(t *testing.T) {
 	worldCenter := core.NewVec3(1, 2, 3)
 	worldRadius := 15.0
 
-	light := NewUniformInfiniteLight(emission, worldCenter, worldRadius)
+	light := NewUniformInfiniteLight(emission)
+	light.Preprocess(&MockScene{
+		bvh: &core.BVH{
+			FiniteWorldCenter: worldCenter,
+			FiniteWorldRadius: worldRadius,
+		},
+	})
 
 	samplePoint := core.NewVec2(0.3, 0.7)
 	sampleDirection := core.NewVec2(0.1, 0.9)
@@ -122,11 +118,11 @@ func TestUniformInfiniteLight_SampleEmission(t *testing.T) {
 
 func TestUniformInfiniteLight_EmissionPDF(t *testing.T) {
 	worldRadius := 20.0
-	light := NewUniformInfiniteLight(
-		core.NewVec3(1, 1, 1),
-		core.NewVec3(0, 0, 0),
-		worldRadius,
-	)
+	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
+
+	light.Preprocess(&MockScene{
+		bvh: &core.BVH{FiniteWorldRadius: worldRadius},
+	})
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)
@@ -140,11 +136,7 @@ func TestUniformInfiniteLight_EmissionPDF(t *testing.T) {
 }
 
 func TestUniformInfiniteLight_EmissionPDF_ZeroRadius(t *testing.T) {
-	light := NewUniformInfiniteLight(
-		core.NewVec3(1, 1, 1),
-		core.NewVec3(0, 0, 0),
-		0, // Zero radius
-	)
+	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)

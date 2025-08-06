@@ -192,7 +192,11 @@ func renderProgressive(config Config, sceneObj *scene.Scene) RenderResult {
 		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
 	}
 
-	progressiveRT := renderer.NewProgressiveRaytracer(sceneObj, progressiveConfig, selectedIntegrator, renderer.NewDefaultLogger())
+	progressiveRT, err := renderer.NewProgressiveRaytracer(sceneObj, progressiveConfig, selectedIntegrator, renderer.NewDefaultLogger())
+	if err != nil {
+		fmt.Printf("Error creating progressive raytracer: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Create output directory
 	outputDir := createOutputDir(config.SceneType)

@@ -208,7 +208,10 @@ func TestSplatSystemIntegration(t *testing.T) {
 	}
 
 	logger := NewDefaultLogger()
-	raytracer := NewProgressiveRaytracer(sceneObj, progressiveConfig, bdptIntegrator, logger)
+	raytracer, err := NewProgressiveRaytracer(sceneObj, progressiveConfig, bdptIntegrator, logger)
+	if err != nil {
+		t.Fatalf("Failed to create progressive raytracer: %v", err)
+	}
 
 	// Render one pass
 	img, stats, err := raytracer.RenderPass(1, nil)

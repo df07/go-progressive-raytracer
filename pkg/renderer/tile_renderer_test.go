@@ -50,6 +50,18 @@ func (m *MockScene) GetBVH() *core.BVH {
 	return m.bvh
 }
 
+func (m *MockScene) Preprocess() error {
+	// Simple preprocessing for tests - just preprocess lights that need it
+	for _, light := range m.lights {
+		if preprocessor, ok := light.(core.Preprocessor); ok {
+			if err := preprocessor.Preprocess(m); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // createMockScene creates a simple test scene
 func createMockScene() *MockScene {
 	// Simple camera

@@ -47,13 +47,11 @@ type GradientInfiniteLight struct {
 }
 
 // NewGradientInfiniteLight creates a new gradient infinite light
-func NewGradientInfiniteLight(topColor, bottomColor core.Vec3, worldCenter core.Vec3, worldRadius float64) *GradientInfiniteLight {
+func NewGradientInfiniteLight(topColor, bottomColor core.Vec3) *GradientInfiniteLight {
 	material := &gradientInfiniteLightMaterial{topColor: topColor, bottomColor: bottomColor}
 	return &GradientInfiniteLight{
 		topColor:    topColor,
 		bottomColor: bottomColor,
-		worldCenter: worldCenter,
-		worldRadius: worldRadius,
 		material:    material,
 	}
 }
@@ -135,4 +133,12 @@ func (gil *GradientInfiniteLight) Emit(ray core.Ray) core.Vec3 {
 	direction := ray.Direction.Normalize()
 	t := 0.5 * (direction.Y + 1.0) // Map Y from [-1,1] to [0,1]
 	return gil.bottomColor.Multiply(1.0 - t).Add(gil.topColor.Multiply(t))
+}
+
+// Preprocess implements the Preprocessor interface - sets world bounds from scene
+func (gil *GradientInfiniteLight) Preprocess(scene core.Scene) error {
+	bvh := scene.GetBVH()
+	gil.worldCenter = bvh.FiniteWorldCenter
+	gil.worldRadius = bvh.FiniteWorldRadius
+	return nil
 }

@@ -37,6 +37,11 @@ type Emitter interface {
 	Emit(rayIn Ray) Vec3
 }
 
+// Preprocessor interface for objects that need scene preprocessing
+type Preprocessor interface {
+	Preprocess(scene Scene) error
+}
+
 type LightType string
 
 const (
@@ -123,7 +128,8 @@ type Scene interface {
 	GetShapes() []Shape
 	GetLights() []Light
 	GetSamplingConfig() SamplingConfig
-	GetBVH() *BVH // For integrators to access acceleration structure
+	GetBVH() *BVH      // For integrators to access acceleration structure
+	Preprocess() error // Preprocess scene objects that need it
 }
 
 // Logger interface for raytracer logging

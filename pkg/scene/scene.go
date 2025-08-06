@@ -95,14 +95,7 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 	s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundPlane,
 		solidGlassSphere, hollowGlassOuter, hollowGlassInner, hollowGlassCenter)
 
-	// TODO: Fix scene creation so infinite lights don't need to be added last
-	// The issue is that AddGradientInfiniteLight calls GetBVH() which caches an empty BVH
-	// if no shapes have been added yet. We need to either:
-	// 1. Defer BVH creation until render time, or
-	// 2. Invalidate BVH cache when shapes are added, or
-	// 3. Pass world bounds explicitly to infinite light constructors
-
-	// Add gradient infinite light (replaces background gradient) - MUST BE LAST
+	// Add gradient infinite light (replaces background gradient)
 	s.AddGradientInfiniteLight(
 		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
 		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white ground)
@@ -138,10 +131,33 @@ func (s *Scene) GetSamplingConfig() core.SamplingConfig {
 
 // GetBVH returns the scene's BVH acceleration structure, building it lazily if needed
 func (s *Scene) GetBVH() *core.BVH {
-	if s.bvh == nil {
-		s.bvh = core.NewBVH(s.Shapes)
-	}
 	return s.bvh
+}
+
+// Preprocess prepares the scene for rendering by preprocessing all objects that need it
+func (s *Scene) Preprocess() error {
+	// Create the BVH
+	s.bvh = core.NewBVH(s.Shapes)
+
+	// Preprocess all lights that implement the Preprocessor interface
+	for _, light := range s.Lights {
+		if preprocessor, ok := light.(core.Preprocessor); ok {
+			if err := preprocessor.Preprocess(s); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Could also preprocess shapes here in the future if needed
+	for _, shape := range s.Shapes {
+		if preprocessor, ok := shape.(core.Preprocessor); ok {
+			if err := preprocessor.Preprocess(s); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // GetPrimitiveCount returns the total number of primitive objects in the scene
@@ -197,14 +213,12 @@ func (s *Scene) AddPointSpotLight(from, to, emission core.Vec3, coneAngleDegrees
 
 // AddUniformInfiniteLight adds a uniform infinite light to the scene
 func (s *Scene) AddUniformInfiniteLight(emission core.Vec3) {
-	bvh := s.GetBVH()
-	infiniteLight := geometry.NewUniformInfiniteLight(emission, bvh.FiniteWorldCenter, bvh.FiniteWorldRadius)
+	infiniteLight := geometry.NewUniformInfiniteLight(emission)
 	s.Lights = append(s.Lights, infiniteLight)
 }
 
 // AddGradientInfiniteLight adds a gradient infinite light to the scene
 func (s *Scene) AddGradientInfiniteLight(topColor, bottomColor core.Vec3) {
-	bvh := s.GetBVH()
-	infiniteLight := geometry.NewGradientInfiniteLight(topColor, bottomColor, bvh.FiniteWorldCenter, bvh.FiniteWorldRadius)
+	infiniteLight := geometry.NewGradientInfiniteLight(topColor, bottomColor)
 	s.Lights = append(s.Lights, infiniteLight)
 }

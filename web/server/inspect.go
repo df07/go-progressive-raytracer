@@ -112,6 +112,11 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 	// Get camera and create a ray for the pixel center (no jitter for inspection)
 	camera := sceneObj.GetCamera()
 
+	// Preprocess scene to build the bvh
+	if err := sceneObj.Preprocess(); err != nil {
+		return InspectResult{Hit: false}
+	}
+
 	// Create a deterministic random generator for ray generation
 	// This ensures we get a consistent ray through the pixel center
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(0)))

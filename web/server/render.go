@@ -215,7 +215,10 @@ func (s *Server) setupRenderingPipeline(req *RenderRequest, logger core.Logger) 
 		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
 	}
 
-	raytracer := renderer.NewProgressiveRaytracer(sceneObj, config, selectedIntegrator, logger)
+	raytracer, err := renderer.NewProgressiveRaytracer(sceneObj, config, selectedIntegrator, logger)
+	if err != nil {
+		return nil, fmt.Errorf("error creating progressive raytracer: %w", err)
+	}
 	return &RenderingPipeline{
 		Scene:     sceneObj,
 		Raytracer: raytracer,

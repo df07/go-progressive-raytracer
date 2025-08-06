@@ -53,13 +53,11 @@ type UniformInfiniteLight struct {
 }
 
 // NewUniformInfiniteLight creates a new uniform infinite light
-func NewUniformInfiniteLight(emission core.Vec3, worldCenter core.Vec3, worldRadius float64) *UniformInfiniteLight {
+func NewUniformInfiniteLight(emission core.Vec3) *UniformInfiniteLight {
 	material := &uniformInfiniteLightMaterial{emission: emission}
 	return &UniformInfiniteLight{
-		emission:    emission,
-		worldCenter: worldCenter,
-		worldRadius: worldRadius,
-		material:    material,
+		emission: emission,
+		material: material,
 	}
 }
 
@@ -130,4 +128,12 @@ func (uil *UniformInfiniteLight) EmissionPDF(point core.Vec3, direction core.Vec
 func (uil *UniformInfiniteLight) Emit(ray core.Ray) core.Vec3 {
 	// Uniform infinite light emits the same color in all directions
 	return uil.emission
+}
+
+// Preprocess implements the Preprocessor interface - sets world bounds from scene
+func (uil *UniformInfiniteLight) Preprocess(scene core.Scene) error {
+	bvh := scene.GetBVH()
+	uil.worldCenter = bvh.FiniteWorldCenter
+	uil.worldRadius = bvh.FiniteWorldRadius
+	return nil
 }
