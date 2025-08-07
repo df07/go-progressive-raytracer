@@ -7,6 +7,18 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
+// NewGroundQuad creates a large quad to replace infinite ground planes
+// Creates a horizontal quad centered at the given point with normal pointing up (0,1,0)
+func NewGroundQuad(center core.Vec3, size float64, material core.Material) *geometry.Quad {
+	// Create corner at bottom-left of the quad
+	corner := core.NewVec3(center.X-size/2, center.Y, center.Z-size/2)
+	// Edge vectors: u along X axis, v along Z axis
+	// u × v = (size,0,0) × (0,0,size) = (0,size²,0) which normalizes to (0,1,0)
+	u := core.NewVec3(size, 0, 0)
+	v := core.NewVec3(0, 0, size)
+	return geometry.NewQuad(corner, u, v, material)
+}
+
 // Scene contains all the elements needed for rendering
 type Scene struct {
 	Camera         *renderer.Camera
@@ -60,11 +72,11 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 	}
 
 	// Add the specified light: pos [30, 30.5, 15], r: 10, emit: [15.0, 14.0, 13.0]
-	s.AddSphereLight(
+	/*s.AddSphereLight(
 		core.NewVec3(30, 30.5, 15),     // position
 		10,                             // radius
 		core.NewVec3(15.0, 14.0, 13.0), // emission
-	)
+	)*/
 
 	// Create materials
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
@@ -83,8 +95,8 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 	sphereRight := geometry.NewSphere(core.NewVec3(1, 0.5, -1), 0.5, metalGold)
 	solidGlassSphere := geometry.NewSphere(core.NewVec3(0.5, 0.25, -0.5), 0.25, materialGlass)
 
-	// Create ground plane instead of sphere
-	groundPlane := geometry.NewPlane(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0), lambertianGreen)
+	// Create ground quad instead of infinite plane (large but finite for proper bounds)
+	groundQuad := NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGreen)
 
 	// Create hollow glass sphere with blue sphere inside
 	hollowGlassOuter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.25, materialGlass)
@@ -92,8 +104,13 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 	hollowGlassCenter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.20, lambertianBlue)
 
 	// Add objects to the scene
-	s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundPlane,
-		solidGlassSphere, hollowGlassOuter, hollowGlassInner, hollowGlassCenter)
+	groundOnly := true
+	if groundOnly {
+		s.Shapes = append(s.Shapes, groundQuad)
+	} else {
+		s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundQuad,
+			solidGlassSphere, hollowGlassOuter, hollowGlassInner, hollowGlassCenter)
+	}
 
 	// Add gradient infinite light (replaces background gradient)
 	s.AddGradientInfiniteLight(

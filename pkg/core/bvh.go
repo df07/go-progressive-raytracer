@@ -14,15 +14,15 @@ type BVHNode struct {
 
 // BVH represents a Bounding Volume Hierarchy for fast ray-object intersection
 type BVH struct {
-	Root              *BVHNode
-	FiniteWorldCenter Vec3    // Precomputed finite scene center for infinite light calculations
-	FiniteWorldRadius float64 // Precomputed world radius for infinite light PDF calculations
+	Root   *BVHNode
+	Center Vec3    // Precomputed finite scene center for infinite light calculations
+	Radius float64 // Precomputed world radius for infinite light PDF calculations
 }
 
 // NewBVH constructs a BVH from a slice of shapes
 func NewBVH(shapes []Shape) *BVH {
 	if len(shapes) == 0 {
-		return &BVH{Root: nil, FiniteWorldCenter: Vec3{}, FiniteWorldRadius: 0}
+		return &BVH{Root: nil, Center: Vec3{}, Radius: 0}
 	}
 
 	// Make a copy of the shapes slice to avoid modifying the original
@@ -30,12 +30,24 @@ func NewBVH(shapes []Shape) *BVH {
 	shapesCopy := make([]Shape, len(shapes))
 	copy(shapesCopy, shapes)
 
-	finiteWorldCenter, finiteWorldRadius := calculateFiniteWorldBounds(shapesCopy)
+	root := buildBVH(shapesCopy, 0)
+
+	// Use the root BVH node's bounding box for world bounds (no need to recalculate)
+	var worldCenter Vec3
+	var worldRadius float64
+	if root != nil {
+		worldCenter = root.BoundingBox.Center()
+		worldRadius = root.BoundingBox.Max.Subtract(worldCenter).Length()
+	} else {
+		// Empty scene fallback
+		worldCenter = Vec3{}
+		worldRadius = 100.0
+	}
 
 	return &BVH{
-		Root:              buildBVH(shapesCopy, 0),
-		FiniteWorldCenter: finiteWorldCenter,
-		FiniteWorldRadius: finiteWorldRadius,
+		Root:   root,
+		Center: worldCenter,
+		Radius: worldRadius,
 	}
 }
 
@@ -271,33 +283,4 @@ func (bvh *BVH) collectStats(node *BVHNode, depth int, stats *bvhStats) {
 			bvh.collectStats(node.Right, depth+1, stats)
 		}
 	}
-}
-
-// calculateFiniteWorldBounds computes world center and radius from finite geometry only
-func calculateFiniteWorldBounds(shapes []Shape) (Vec3, float64) {
-	var finiteBounds AABB
-	hasFiniteGeometry := false
-
-	for _, shape := range shapes {
-		bounds := shape.BoundingBox()
-		// Skip shapes with very large extents (likely infinite planes)
-		if bounds.Size().X > 1e5 || bounds.Size().Y > 1e5 || bounds.Size().Z > 1e5 {
-			continue
-		}
-		if !hasFiniteGeometry {
-			finiteBounds = bounds
-			hasFiniteGeometry = true
-		} else {
-			finiteBounds = finiteBounds.Union(bounds)
-		}
-	}
-
-	if !hasFiniteGeometry {
-		return Vec3{}, 0.0
-	}
-
-	// PBRT's BoundingSphere: radius = distance from center to corner
-	center := finiteBounds.Center()
-	radius := finiteBounds.Max.Subtract(center).Length()
-	return center, radius
 }

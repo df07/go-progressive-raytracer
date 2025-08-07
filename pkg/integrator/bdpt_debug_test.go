@@ -9,6 +9,7 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // TestCornellSpecularReflections compares BDPT vs path tracing on specular reflections
@@ -541,11 +542,11 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 }
 
 func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene, core.SamplingConfig) {
-	// simple scene with a green ground plane mirroring default scene (without spheres)
+	// simple scene with a green ground quad mirroring default scene (without spheres)
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
-	groundPlane := geometry.NewPlane(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0), lambertianGreen)
+	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGreen)
 
-	shapes := []core.Shape{groundPlane}
+	shapes := []core.Shape{groundQuad}
 	lights := []core.Light{}
 	if includeLight {
 		emissiveMaterial := material.NewEmissive(core.NewVec3(15.0, 14.0, 13.0))

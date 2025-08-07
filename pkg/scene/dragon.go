@@ -111,13 +111,14 @@ func addDragonLighting(s *Scene) {
 // addDragonGround adds a ground plane (matching PBRT scene at Z = -40)
 func addDragonGround(s *Scene) {
 	groundMaterial := material.NewLambertian(core.NewVec3(0.6, 0.6, 0.6))
-	// PBRT ground: Translate 0 0 -40 (exact coordinates)
-	groundPlane := geometry.NewPlane(
-		core.NewVec3(0, 0, -40), // Ground at Z = -40 exactly like PBRT
-		core.NewVec3(0, 0, 1),   // Z-up normal exactly like PBRT
-		groundMaterial,
-	)
-	s.Shapes = append(s.Shapes, groundPlane)
+	// Create ground quad at Z = -40 to match PBRT dragon scene
+	// Note: This uses Z-up coordinate system (normal = (0,0,1))
+	corner := core.NewVec3(-5000, -5000, -40)
+	u := core.NewVec3(10000, 0, 0) // X direction
+	v := core.NewVec3(0, 10000, 0) // Y direction
+	// u × v = (10000,0,0) × (0,10000,0) = (0,0,10000²) which normalizes to (0,0,1)
+	groundQuad := geometry.NewQuad(corner, u, v, groundMaterial)
+	s.Shapes = append(s.Shapes, groundQuad)
 }
 
 // addDragonMesh loads the dragon PLY file and adds it to the scene

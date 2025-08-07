@@ -168,10 +168,7 @@ func (s *Server) extractGeometryInfo(shape core.Shape) (string, map[string]inter
 		properties["normal"] = [3]float64{geom.Normal.X, geom.Normal.Y, geom.Normal.Z}
 		return "quad", properties
 
-	case *geometry.Plane:
-		properties["point"] = [3]float64{geom.Point.X, geom.Point.Y, geom.Point.Z}
-		properties["normal"] = [3]float64{geom.Normal.X, geom.Normal.Y, geom.Normal.Z}
-		return "plane", properties
+	// Note: Planes removed, replaced with finite quads
 
 	case *geometry.SphereLight:
 		properties["center"] = [3]float64{geom.Center.X, geom.Center.Y, geom.Center.Z}

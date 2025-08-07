@@ -76,8 +76,8 @@ func TestUniformInfiniteLight_SampleEmission(t *testing.T) {
 	light := NewUniformInfiniteLight(emission)
 	light.Preprocess(&MockScene{
 		bvh: &core.BVH{
-			FiniteWorldCenter: worldCenter,
-			FiniteWorldRadius: worldRadius,
+			Center: worldCenter,
+			Radius: worldRadius,
 		},
 	})
 
@@ -121,7 +121,7 @@ func TestUniformInfiniteLight_EmissionPDF(t *testing.T) {
 	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
 
 	light.Preprocess(&MockScene{
-		bvh: &core.BVH{FiniteWorldRadius: worldRadius},
+		bvh: &core.BVH{Radius: worldRadius},
 	})
 
 	point := core.NewVec3(0, 0, 0)

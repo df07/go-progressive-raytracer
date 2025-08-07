@@ -94,13 +94,13 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 		core.NewVec3(8.0, 7.5, 6.5), // dimmed warm white emission
 	)
 
-	// Create ground plane (gray lambertian)
-	groundPlane := geometry.NewPlane(
-		core.NewVec3(0, 0, 0),                               // point on plane
-		core.NewVec3(0, 1, 0),                               // normal vector (up)
+	// Create ground quad (gray lambertian)
+	groundQuad := NewGroundQuad(
+		core.NewVec3(0, 0, 0), // center point
+		10000.0,               // large size for effectively infinite ground
 		material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), // medium gray
 	)
-	s.Shapes = append(s.Shapes, groundPlane)
+	s.Shapes = append(s.Shapes, groundQuad)
 
 	// Create grid of spheres - automatically scale to fit in same visual space
 	// Calculate spacing and radius to fit grid in same visual area

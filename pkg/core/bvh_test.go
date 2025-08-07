@@ -340,8 +340,8 @@ func TestBVHFiniteWorldRadius(t *testing.T) {
 	expectedRadius := math.Sqrt(3) // Only the finite sphere should contribute
 	tolerance := 1e-10
 
-	if math.Abs(bvh.FiniteWorldRadius-expectedRadius) > tolerance {
+	if math.Abs(bvh.Radius-expectedRadius) > tolerance {
 		t.Errorf("BVH.FiniteWorldRadius = %v, expected %v (tolerance %v)",
-			bvh.FiniteWorldRadius, expectedRadius, tolerance)
+			bvh.Radius, expectedRadius, tolerance)
 	}
 }

@@ -109,12 +109,12 @@ func addTriangleMeshLighting(s *Scene) {
 // addTriangleMeshGround adds a ground plane to the scene
 func addTriangleMeshGround(s *Scene) {
 	groundMaterial := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
-	groundPlane := geometry.NewPlane(
+	groundQuad := NewGroundQuad(
 		core.NewVec3(0, 0, 0),
-		core.NewVec3(0, 1, 0),
+		10000.0,
 		groundMaterial,
 	)
-	s.Shapes = append(s.Shapes, groundPlane)
+	s.Shapes = append(s.Shapes, groundQuad)
 }
 
 // addSphereTriangleMeshGeometryWithComplexity adds triangle mesh and regular spheres for comparison

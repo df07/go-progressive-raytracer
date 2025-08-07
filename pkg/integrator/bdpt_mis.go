@@ -404,7 +404,7 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 		// Handle infinite area lights (background)
 		if curr.IsInfiniteLight {
 			// PBRT: Compute planar sampling density for infinite light sources
-			worldRadius := scene.GetBVH().FiniteWorldRadius
+			worldRadius := scene.GetBVH().Radius
 
 			// Handle zero radius case (scene with no finite geometry)
 			if worldRadius == 0.0 {
