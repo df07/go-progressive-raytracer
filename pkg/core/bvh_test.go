@@ -245,7 +245,7 @@ func TestBVH_IdenticalBoundingBoxes(t *testing.T) {
 	}
 }
 
-func TestCalculateFiniteWorldRadius(t *testing.T) {
+func TestWorldRadius(t *testing.T) {
 	tests := []struct {
 		name           string
 		shapes         []Shape
@@ -304,7 +304,11 @@ func TestCalculateFiniteWorldRadius(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			center, radius := calculateFiniteWorldBounds(tt.shapes)
+			// Constructor calculates world radius
+
+			bvh := NewBVH(tt.shapes)
+			radius := bvh.Radius
+			center := bvh.Center
 
 			// Check radius
 			if math.Abs(radius-tt.expectedRadius) > tt.tolerance {
