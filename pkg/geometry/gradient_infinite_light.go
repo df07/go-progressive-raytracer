@@ -75,7 +75,7 @@ func (gil *GradientInfiniteLight) emissionForDirection(direction core.Vec3) core
 func (gil *GradientInfiniteLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
 	// For infinite lights, we sample a direction uniformly on the sphere
 	// and treat it as coming from infinite distance
-	direction := uniformSampleSphere(sample)
+	direction := core.SampleUniformSphere(sample)
 	emission := gil.emissionForDirection(direction)
 
 	return core.LightSample{
@@ -96,25 +96,17 @@ func (gil *GradientInfiniteLight) PDF(point core.Vec3, direction core.Vec3) floa
 
 // SampleEmission implements the Light interface - samples emission for BDPT light path generation
 func (gil *GradientInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
-	// For BDPT light path generation, we need to:
-	// 1. Sample a direction uniformly on the sphere
-	// 2. Find where this direction intersects the scene bounding sphere
-	// 3. Create emission ray from that point toward the scene
-
-	direction := uniformSampleSphere(sampleDirection)
-	emission := gil.emissionForDirection(direction)
-
-	// Find scene center and create ray from scene boundary
-	// Use consistent finite scene bounds from BVH
-	emissionPoint := gil.worldCenter.Add(direction.Multiply(-gil.worldRadius))
+	// Use PBRT's disk sampling approach from shared function
+	emissionRay, areaPDF, directionPDF := core.SampleInfiniteLight(gil.worldCenter, gil.worldRadius, samplePoint, sampleDirection)
+	emission := gil.emissionForDirection(emissionRay.Direction)
 
 	return core.EmissionSample{
-		Point:        emissionPoint,
-		Normal:       direction, // Points toward scene
-		Direction:    direction,
+		Point:        emissionRay.Origin,
+		Normal:       emissionRay.Direction.Multiply(-1), // Points toward scene
+		Direction:    emissionRay.Direction,              // Ray direction (parallel rays)
 		Emission:     emission,
-		AreaPDF:      1.0 / (math.Pi * gil.worldRadius * gil.worldRadius), // PBRT: planar density
-		DirectionPDF: 1.0 / (4.0 * math.Pi),                               // Uniform over sphere
+		AreaPDF:      areaPDF,
+		DirectionPDF: directionPDF,
 	}
 }
 

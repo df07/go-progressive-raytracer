@@ -6,16 +6,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
-// uniformSampleSphere generates a uniform random direction on the unit sphere
-func uniformSampleSphere(sample core.Vec2) core.Vec3 {
-	z := 1.0 - 2.0*sample.X // z ∈ [-1, 1]
-	r := math.Sqrt(math.Max(0, 1.0-z*z))
-	phi := 2.0 * math.Pi * sample.Y
-	x := r * math.Cos(phi)
-	y := r * math.Sin(phi)
-	return core.NewVec3(x, y, z)
-}
-
 // uniformInfiniteLightMaterial implements uniform emission for infinite lights
 type uniformInfiniteLightMaterial struct {
 	emission core.Vec3 // Uniform emission color
@@ -74,7 +64,7 @@ func (uil *UniformInfiniteLight) GetMaterial() core.Material {
 func (uil *UniformInfiniteLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
 	// For infinite lights, we sample a direction uniformly on the sphere
 	// and treat it as coming from infinite distance
-	direction := uniformSampleSphere(sample)
+	direction := core.SampleUniformSphere(sample)
 
 	return core.LightSample{
 		Point:     point.Add(direction.Multiply(1e10)), // Far away point
@@ -94,24 +84,16 @@ func (uil *UniformInfiniteLight) PDF(point core.Vec3, direction core.Vec3) float
 
 // SampleEmission implements the Light interface - samples emission for BDPT light path generation
 func (uil *UniformInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
-	// For BDPT light path generation, we need to:
-	// 1. Sample a direction uniformly on the sphere
-	// 2. Find where this direction intersects the scene bounding sphere
-	// 3. Create emission ray from that point toward the scene
-
-	direction := uniformSampleSphere(sampleDirection)
-
-	// Find scene center and create ray from scene boundary
-	// Use consistent finite scene bounds from BVH
-	emissionPoint := uil.worldCenter.Add(direction.Multiply(-uil.worldRadius))
+	// Use PBRT's disk sampling approach from shared function
+	emissionRay, areaPDF, directionPDF := core.SampleInfiniteLight(uil.worldCenter, uil.worldRadius, samplePoint, sampleDirection)
 
 	return core.EmissionSample{
-		Point:        emissionPoint,
-		Normal:       direction, // Points toward scene
-		Direction:    direction,
+		Point:        emissionRay.Origin,
+		Normal:       emissionRay.Direction.Multiply(-1), // Points toward scene
+		Direction:    emissionRay.Direction,              // Ray direction (parallel rays)
 		Emission:     uil.emission,
-		AreaPDF:      1.0 / (math.Pi * uil.worldRadius * uil.worldRadius), // PBRT: planar density
-		DirectionPDF: 1.0 / (4.0 * math.Pi),                               // Uniform over sphere
+		AreaPDF:      areaPDF,
+		DirectionPDF: directionPDF,
 	}
 }
 

@@ -224,3 +224,43 @@ func ValidatePointOnDisc(point Vec3, center Vec3, normal Vec3, radius float64, t
 func ValidateDirectionInHemisphere(direction Vec3, normal Vec3) bool {
 	return direction.Dot(normal) > 0
 }
+
+// SampleUniformSphere generates a uniform random direction on the unit sphere
+func SampleUniformSphere(sample Vec2) Vec3 {
+	z := 1.0 - 2.0*sample.X // z ∈ [-1, 1]
+	r := math.Sqrt(math.Max(0, 1.0-z*z))
+	phi := 2.0 * math.Pi * sample.Y
+	x := r * math.Cos(phi)
+	y := r * math.Sin(phi)
+	return NewVec3(x, y, z)
+}
+
+// SampleInfiniteLight samples emission from an infinite light using PBRT's disk sampling approach
+// Returns emission ray, area PDF, and direction PDF
+func SampleInfiniteLight(worldCenter Vec3, worldRadius float64, samplePoint Vec2, sampleDirection Vec2) (Ray, float64, float64) {
+	// Sample direction uniformly on sphere
+	direction := SampleUniformSphere(sampleDirection)
+
+	// Create orthonormal basis with direction as one axis
+	var up Vec3
+	if math.Abs(direction.X) > 0.9 {
+		up = NewVec3(0, 1, 0)
+	} else {
+		up = NewVec3(1, 0, 0)
+	}
+	right := direction.Cross(up).Normalize()
+	up = right.Cross(direction).Normalize()
+
+	// Sample point on unit disk, then scale by world radius
+	diskSample := RandomInUnitDisk(samplePoint)
+	diskPoint := worldCenter.Add(right.Multiply(diskSample.X * worldRadius)).Add(up.Multiply(diskSample.Y * worldRadius))
+
+	// Emission point is behind the disk, ray travels in sampled direction (parallel rays)
+	emissionPoint := diskPoint.Add(direction.Multiply(-worldRadius))
+
+	// PBRT PDF calculations
+	areaPDF := 1.0 / (math.Pi * worldRadius * worldRadius) // Planar density
+	directionPDF := 1.0 / (4.0 * math.Pi)                  // Uniform over sphere
+
+	return NewRay(emissionPoint, direction), areaPDF, directionPDF
+}
