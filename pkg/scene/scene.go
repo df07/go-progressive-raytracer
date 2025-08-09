@@ -71,13 +71,6 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 		CameraConfig:   cameraConfig,
 	}
 
-	// Add the specified light: pos [30, 30.5, 15], r: 10, emit: [15.0, 14.0, 13.0]
-	/*s.AddSphereLight(
-		core.NewVec3(30, 30.5, 15),     // position
-		10,                             // radius
-		core.NewVec3(15.0, 14.0, 13.0), // emission
-	)*/
-
 	// Create materials
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
 	lambertianBlue := material.NewLambertian(core.NewVec3(0.1, 0.2, 0.5))
@@ -104,10 +97,16 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 	hollowGlassCenter := geometry.NewSphere(core.NewVec3(-0.5, 0.25, -0.5), 0.20, lambertianBlue)
 
 	// Add objects to the scene
-	groundOnly := true
+	groundOnly := false
 	if groundOnly {
 		s.Shapes = append(s.Shapes, groundQuad)
 	} else {
+		// Add the specified light: pos [30, 30.5, 15], r: 10, emit: [15.0, 14.0, 13.0]
+		s.AddSphereLight(
+			core.NewVec3(30, 30.5, 15),     // position
+			10,                             // radius
+			core.NewVec3(15.0, 14.0, 13.0), // emission
+		)
 		s.Shapes = append(s.Shapes, sphereCenter, sphereLeft, sphereRight, groundQuad,
 			solidGlassSphere, hollowGlassOuter, hollowGlassInner, hollowGlassCenter)
 	}
