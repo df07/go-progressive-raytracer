@@ -103,16 +103,10 @@ func TestUniformInfiniteLight_SampleEmission(t *testing.T) {
 		t.Errorf("Expected direction PDF %f, got %f", expectedDirectionPDF, emissionSample.DirectionPDF)
 	}
 
-	// Check that emission point is on the world boundary sphere
-	vectorFromCenter := emissionSample.Point.Subtract(worldCenter)
-	distanceFromCenter := vectorFromCenter.Length()
-	if math.Abs(distanceFromCenter-worldRadius) > 1e-6 {
-		t.Errorf("Expected emission point at distance %f from center, got %f", worldRadius, distanceFromCenter)
-	}
-
-	// Check that direction and normal match
-	if !emissionSample.Direction.Equals(emissionSample.Normal) {
-		t.Errorf("Expected direction and normal to match for infinite light")
+	// Check that normal points toward scene (opposite to ray direction)
+	expectedNormal := emissionSample.Direction.Multiply(-1)
+	if !emissionSample.Normal.Equals(expectedNormal) {
+		t.Errorf("Expected normal %v (toward scene), got %v", expectedNormal, emissionSample.Normal)
 	}
 }
 
@@ -158,7 +152,7 @@ func TestUniformSampleSphere(t *testing.T) {
 	}
 
 	for i, sample := range samples {
-		direction := uniformSampleSphere(sample)
+		direction := core.SampleUniformSphere(sample)
 
 		// Check normalization
 		length := direction.Length()
@@ -170,5 +164,31 @@ func TestUniformSampleSphere(t *testing.T) {
 		if direction.Z < -1.0 || direction.Z > 1.0 {
 			t.Errorf("Sample %d: z component %f out of range [-1, 1]", i, direction.Z)
 		}
+	}
+}
+
+// TestUniformInfiniteLight_ParallelRays tests that rays with same direction sample are parallel
+func TestUniformInfiniteLight_ParallelRays(t *testing.T) {
+	worldRadius := 10.0
+	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
+	worldCenter := core.NewVec3(0, 0, 0)
+
+	light.Preprocess(&MockScene{
+		bvh: &core.BVH{Radius: worldRadius, Center: worldCenter},
+	})
+
+	// Same direction sample, different point samples should give parallel rays
+	directionSample := core.NewVec2(0.3, 0.7)
+
+	sample1 := light.SampleEmission(core.NewVec2(0.1, 0.2), directionSample)
+	sample2 := light.SampleEmission(core.NewVec2(0.8, 0.9), directionSample)
+	sample3 := light.SampleEmission(core.NewVec2(0.5, 0.5), directionSample)
+
+	// All rays should have the same direction
+	if !sample1.Direction.Equals(sample2.Direction) {
+		t.Errorf("Expected parallel rays, got directions %v and %v", sample1.Direction, sample2.Direction)
+	}
+	if !sample1.Direction.Equals(sample3.Direction) {
+		t.Errorf("Expected parallel rays, got directions %v and %v", sample1.Direction, sample3.Direction)
 	}
 }

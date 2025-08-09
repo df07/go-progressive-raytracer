@@ -162,16 +162,10 @@ func TestGradientInfiniteLight_SampleEmission(t *testing.T) {
 		t.Errorf("Expected direction PDF %f, got %f", expectedDirectionPDF, emissionSample.DirectionPDF)
 	}
 
-	// Check that emission point is on the world boundary sphere
-	vectorFromCenter := emissionSample.Point.Subtract(worldCenter)
-	distanceFromCenter := vectorFromCenter.Length()
-	if math.Abs(distanceFromCenter-worldRadius) > 1e-6 {
-		t.Errorf("Expected emission point at distance %f from center, got %f", worldRadius, distanceFromCenter)
-	}
-
-	// Check that direction and normal match
-	if !emissionSample.Direction.Equals(emissionSample.Normal) {
-		t.Errorf("Expected direction and normal to match for infinite light")
+	// Check that normal points toward scene (opposite to ray direction)
+	expectedNormal := emissionSample.Direction.Multiply(-1)
+	if !emissionSample.Normal.Equals(expectedNormal) {
+		t.Errorf("Expected normal %v (toward scene), got %v", expectedNormal, emissionSample.Normal)
 	}
 }
 
