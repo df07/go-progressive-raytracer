@@ -30,7 +30,7 @@ func (ql *QuadLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the quad for direct lighting
-func (ql *QuadLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
+func (ql *QuadLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
 	// Sample uniformly on the quad surface
 	samplePoint := ql.Corner.Add(ql.U.Multiply(sample.X)).Add(ql.V.Multiply(sample.Y))
 
@@ -74,7 +74,7 @@ func (ql *QuadLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample 
 }
 
 // PDF implements the Light interface - returns the probability density for sampling a given direction
-func (ql *QuadLight) PDF(point core.Vec3, direction core.Vec3) float64 {
+func (ql *QuadLight) PDF(point, normal, direction core.Vec3) float64 {
 	// Check if ray from point in direction hits the quad
 	ray := core.NewRay(point, direction)
 	hitRecord, hit := ql.Quad.Hit(ray, 0.001, math.Inf(1))

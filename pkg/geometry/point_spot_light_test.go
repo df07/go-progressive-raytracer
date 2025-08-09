@@ -56,7 +56,7 @@ func TestPointSpotLight_Sample_WithinCone(t *testing.T) {
 	testPoint := core.NewVec3(0, 1, 0)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(testPoint, sampler.Get2D())
+	sample := light.Sample(testPoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 	// Check that sample point is the light position
 	if sample.Point.Subtract(from).Length() > 1e-6 {
@@ -99,7 +99,7 @@ func TestPointSpotLight_Sample_OutsideCone(t *testing.T) {
 	testPoint := core.NewVec3(10, 1, 0)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(testPoint, sampler.Get2D())
+	sample := light.Sample(testPoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 	// Should receive minimal or no light due to being outside cone
 	emissionMagnitude := sample.Emission.Length()
@@ -121,21 +121,21 @@ func TestPointSpotLight_PDF(t *testing.T) {
 
 	// Direction pointing towards light
 	directionToLight := from.Subtract(testPoint).Normalize()
-	pdf := light.PDF(testPoint, directionToLight)
+	pdf := light.PDF(testPoint, core.NewVec3(0, 1, 0), directionToLight)
 	if pdf != 1.0 {
 		t.Errorf("Expected PDF 1.0 for direction towards light, got %v", pdf)
 	}
 
 	// Direction pointing away from light
 	directionAway := directionToLight.Multiply(-1)
-	pdf = light.PDF(testPoint, directionAway)
+	pdf = light.PDF(testPoint, core.NewVec3(0, 1, 0), directionAway)
 	if pdf != 0.0 {
 		t.Errorf("Expected PDF 0.0 for direction away from light, got %v", pdf)
 	}
 
 	// Random direction not towards light
 	randomDirection := core.NewVec3(1, 0, 0).Normalize()
-	pdf = light.PDF(testPoint, randomDirection)
+	pdf = light.PDF(testPoint, core.NewVec3(0, 1, 0), randomDirection)
 	if pdf != 0.0 {
 		t.Errorf("Expected PDF 0.0 for random direction, got %v", pdf)
 	}

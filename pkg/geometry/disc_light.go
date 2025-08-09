@@ -23,7 +23,7 @@ func (dl *DiscLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the disc for direct lighting
-func (dl *DiscLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
+func (dl *DiscLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
 	// Sample a point on the disc
 	samplePoint, normal := dl.Disc.SampleUniform(sample)
 
@@ -72,7 +72,7 @@ func (dl *DiscLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample 
 }
 
 // PDF implements the Light interface - returns the probability density for sampling a given direction
-func (dl *DiscLight) PDF(point core.Vec3, direction core.Vec3) float64 {
+func (dl *DiscLight) PDF(point, normal, direction core.Vec3) float64 {
 	// Check if ray from point in direction hits the disc
 	ray := core.NewRay(point, direction)
 	hitRecord, hit := dl.Disc.Hit(ray, 0.001, math.Inf(1))

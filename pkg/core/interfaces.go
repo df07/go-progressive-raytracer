@@ -56,10 +56,12 @@ type Light interface {
 
 	// Sample samples light toward a specific point for direct lighting
 	// Returns LightSample with direction FROM shading point TO light
-	Sample(point Vec3, sample Vec2) LightSample
+	// For infinite lights: surfaceNormal constrains sampling to visible hemisphere
+	Sample(point Vec3, normal Vec3, sample Vec2) LightSample
 
 	// PDF calculates the probability density for sampling a given direction toward the light
-	PDF(point Vec3, direction Vec3) float64
+	// For infinite lights: surfaceNormal needed to compute cosine-weighted PDF
+	PDF(point Vec3, normal Vec3, direction Vec3) float64
 
 	// SampleEmission samples emission from the light surface for BDPT light path generation
 	// Returns EmissionSample with direction FROM light surface (for light transport)

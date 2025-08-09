@@ -97,14 +97,14 @@ func SphereConePDF(distance, radius float64) float64 {
 }
 
 // CalculateLightPDF calculates the combined PDF for a given direction toward multiple lights
-func CalculateLightPDF(lights []Light, point Vec3, direction Vec3) float64 {
+func CalculateLightPDF(lights []Light, point, normal, direction Vec3) float64 {
 	if len(lights) == 0 {
 		return 0.0
 	}
 
 	totalPDF := 0.0
 	for _, light := range lights {
-		lightPDF := light.PDF(point, direction)
+		lightPDF := light.PDF(point, normal, direction)
 		// Weight by light selection probability (uniform selection)
 		totalPDF += lightPDF / float64(len(lights))
 	}
@@ -113,13 +113,13 @@ func CalculateLightPDF(lights []Light, point Vec3, direction Vec3) float64 {
 }
 
 // SampleLight randomly selects and samples a light from the scene
-func SampleLight(lights []Light, point Vec3, sampler Sampler) (LightSample, Light, bool) {
+func SampleLight(lights []Light, point Vec3, normal Vec3, sampler Sampler) (LightSample, Light, bool) {
 	if len(lights) == 0 {
 		return LightSample{}, nil, false
 	}
 
 	sampledLight := lights[int(sampler.Get1D()*float64(len(lights)))]
-	sample := sampledLight.Sample(point, sampler.Get2D())
+	sample := sampledLight.Sample(point, normal, sampler.Get2D())
 	sample.PDF *= 1.0 / float64(len(lights))
 
 	return sample, sampledLight, true

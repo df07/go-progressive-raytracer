@@ -121,7 +121,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 	lights := scene.GetLights()
 
 	// Sample a light
-	lightSample, _, hasLight := core.SampleLight(lights, hit.Point, sampler)
+	lightSample, _, hasLight := core.SampleLight(lights, hit.Point, hit.Normal, sampler)
 	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -176,7 +176,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 
 	// Get light PDF for this direction (for MIS)
 	lights := scene.GetLights()
-	lightPDF := core.CalculateLightPDF(lights, hit.Point, scatterDirection)
+	lightPDF := core.CalculateLightPDF(lights, hit.Point, hit.Normal, scatterDirection)
 
 	// Calculate MIS weight
 	misWeight := core.PowerHeuristic(1, scatter.PDF, 1, lightPDF)

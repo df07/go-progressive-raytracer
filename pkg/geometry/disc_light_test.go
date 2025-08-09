@@ -22,7 +22,7 @@ func TestDiscLightSample(t *testing.T) {
 	testPoint := core.NewVec3(0, 0, 0)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := discLight.Sample(testPoint, sampler.Get2D())
+	sample := discLight.Sample(testPoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 	// Check that sample point is on the disc
 	distanceFromCenter := sample.Point.Subtract(center).Length()
@@ -92,7 +92,7 @@ func TestDiscLightPDF(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pdf := discLight.PDF(testPoint, tt.direction)
+			pdf := discLight.PDF(testPoint, core.NewVec3(0, 1, 0), tt.direction)
 
 			if tt.shouldHit {
 				if pdf <= 0 {
@@ -121,8 +121,8 @@ func TestDiscLightSampleConsistency(t *testing.T) {
 
 	// Take multiple samples and check PDF consistency
 	for i := 0; i < 100; i++ {
-		sample := discLight.Sample(testPoint, sampler.Get2D())
-		pdfFromMethod := discLight.PDF(testPoint, sample.Direction)
+		sample := discLight.Sample(testPoint, core.NewVec3(0, 1, 0), sampler.Get2D())
+		pdfFromMethod := discLight.PDF(testPoint, core.NewVec3(0, 1, 0), sample.Direction)
 
 		// The PDFs should be reasonably close (allowing for numerical precision)
 		tolerance := 1e-10
@@ -149,7 +149,7 @@ func TestDiscLightSampleDistribution(t *testing.T) {
 	outerCount := 0
 
 	for i := 0; i < numSamples; i++ {
-		sample := discLight.Sample(testPoint, sampler.Get2D())
+		sample := discLight.Sample(testPoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 		// Check if sample is in center circle (radius 0.5) or outer ring
 		distanceFromCenter := sample.Point.Subtract(center).Length()
@@ -184,7 +184,7 @@ func TestDiscLightEdgeCase(t *testing.T) {
 	testPoint := core.NewVec3(0, 0.99, 0) // Very close to disc
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(789)))
 
-	sample := discLight.Sample(testPoint, sampler.Get2D())
+	sample := discLight.Sample(testPoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 	// Should handle very small distances gracefully
 	if sample.Distance <= 0 {

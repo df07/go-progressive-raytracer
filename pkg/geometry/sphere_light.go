@@ -23,7 +23,7 @@ func (sl *SphereLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the sphere for direct lighting
-func (sl *SphereLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
+func (sl *SphereLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
 	// Vector from shading point to sphere center
 	toCenter := sl.Center.Subtract(point)
 	distanceToCenter := toCenter.Length()
@@ -138,7 +138,7 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) core.Lig
 }
 
 // PDF implements the Light interface - returns the probability density for sampling a given direction
-func (sl *SphereLight) PDF(point core.Vec3, direction core.Vec3) float64 {
+func (sl *SphereLight) PDF(point, normal, direction core.Vec3) float64 {
 	// Check if ray from point in direction hits the sphere
 	ray := core.NewRay(point, direction)
 	_, hit := sl.Sphere.Hit(ray, 0.001, math.Inf(1))

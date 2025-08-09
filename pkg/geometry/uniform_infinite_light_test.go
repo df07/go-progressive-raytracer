@@ -23,7 +23,7 @@ func TestUniformInfiniteLight_Sample(t *testing.T) {
 	point := core.NewVec3(0, 0, 0)
 	sample := core.NewVec2(0.5, 0.5)
 
-	lightSample := light.Sample(point, sample)
+	lightSample := light.Sample(point, core.NewVec3(0, 1, 0), sample)
 
 	// Check that emission matches
 	if lightSample.Emission != emission {
@@ -35,10 +35,13 @@ func TestUniformInfiniteLight_Sample(t *testing.T) {
 		t.Errorf("Expected infinite distance, got %f", lightSample.Distance)
 	}
 
-	// Check that PDF is uniform over sphere
-	expectedPDF := 1.0 / (4.0 * math.Pi)
-	if math.Abs(lightSample.PDF-expectedPDF) > 1e-10 {
-		t.Errorf("Expected PDF %f, got %f", expectedPDF, lightSample.PDF)
+	// Check that PDF is cosine-weighted hemisphere
+	// PDF should be cosTheta/π where cosTheta is direction dot surfaceNormal
+	surfaceNormal := core.NewVec3(0, 1, 0)
+	cosTheta := lightSample.Direction.Dot(surfaceNormal)
+	expectedPDF := cosTheta / math.Pi
+	if math.Abs(lightSample.PDF-expectedPDF) > 1e-6 {
+		t.Errorf("Expected PDF %f (cosTheta=%f), got %f", expectedPDF, cosTheta, lightSample.PDF)
 	}
 
 	// Check that direction is normalized
@@ -60,11 +63,15 @@ func TestUniformInfiniteLight_PDF(t *testing.T) {
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(0, 1, 0)
 
-	pdf := light.PDF(point, direction)
-	expectedPDF := 1.0 / (4.0 * math.Pi)
+	normal := core.NewVec3(0, 1, 0)
+	pdf := light.PDF(point, normal, direction)
+
+	// For cosine-weighted hemisphere: PDF = cosTheta/π
+	cosTheta := direction.Dot(normal)
+	expectedPDF := cosTheta / math.Pi
 
 	if math.Abs(pdf-expectedPDF) > 1e-10 {
-		t.Errorf("Expected PDF %f, got %f", expectedPDF, pdf)
+		t.Errorf("Expected PDF %f (cosTheta=%f), got %f", expectedPDF, cosTheta, pdf)
 	}
 }
 

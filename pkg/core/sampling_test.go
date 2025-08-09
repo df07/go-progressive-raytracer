@@ -16,7 +16,7 @@ func (ml *MockLight) Type() LightType {
 	return LightTypeArea
 }
 
-func (ml *MockLight) Sample(point Vec3, sample Vec2) LightSample {
+func (ml *MockLight) Sample(point Vec3, normal Vec3, sample Vec2) LightSample {
 	return LightSample{
 		Point:     Vec3{X: 0, Y: 1, Z: 0},
 		Normal:    Vec3{X: 0, Y: -1, Z: 0},
@@ -27,7 +27,7 @@ func (ml *MockLight) Sample(point Vec3, sample Vec2) LightSample {
 	}
 }
 
-func (ml *MockLight) PDF(point Vec3, direction Vec3) float64 {
+func (ml *MockLight) PDF(point, normal, direction Vec3) float64 {
 	return ml.pdf
 }
 

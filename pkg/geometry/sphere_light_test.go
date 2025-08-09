@@ -23,7 +23,7 @@ func TestSphereLight_Sample_UniformSampling(t *testing.T) {
 	insidePoint := core.NewVec3(0.5, 0, 0)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(insidePoint, sampler.Get2D())
+	sample := light.Sample(insidePoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 	// Verify sample is on the sphere surface
 	distanceToCenter := sample.Point.Subtract(center).Length()
@@ -57,7 +57,7 @@ func TestSphereLight_Sample_ConeSampling(t *testing.T) {
 	outsidePoint := core.NewVec3(5, 0, 0)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(outsidePoint, sampler.Get2D())
+	sample := light.Sample(outsidePoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 	// Verify sample is on the sphere surface
 	distanceToCenter := sample.Point.Subtract(center).Length()
@@ -120,7 +120,7 @@ func TestSphereLight_PDF(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pdf := light.PDF(tt.point, tt.direction)
+			pdf := light.PDF(tt.point, core.NewVec3(0, 1, 0), tt.direction)
 
 			if !tt.expectPDF {
 				if pdf != 0 {
@@ -161,7 +161,7 @@ func TestSphereLight_Sample_MultipleDirections(t *testing.T) {
 	numSamples := 100
 	samples := make([]core.LightSample, numSamples)
 	for i := 0; i < numSamples; i++ {
-		samples[i] = light.Sample(outsidePoint, sampler.Get2D())
+		samples[i] = light.Sample(outsidePoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 	}
 
 	// Verify all samples are valid
@@ -196,7 +196,7 @@ func TestSphereLight_EdgeCase_ZeroRadius(t *testing.T) {
 	outsidePoint := core.NewVec3(1, 0, 0)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample := light.Sample(outsidePoint, sampler.Get2D())
+	sample := light.Sample(outsidePoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 	// Should still produce valid sample
 	if sample.PDF <= 0 {

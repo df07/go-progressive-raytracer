@@ -42,7 +42,7 @@ func (sl *PointSpotLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the light for direct lighting
-func (sl *PointSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
+func (sl *PointSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
 	// For a point light, the sample point is always the light position
 	samplePoint := sl.position
 
@@ -80,12 +80,9 @@ func (sl *PointSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSa
 	// For point lights, PDF is delta function (represented as 1.0)
 	pdf := 1.0
 
-	// Normal points from light towards the shading point
-	normal := toLight
-
 	return core.LightSample{
 		Point:     samplePoint,
-		Normal:    normal,
+		Normal:    toLight,
 		Direction: toLight,
 		Distance:  distance,
 		Emission:  emission,
@@ -95,7 +92,7 @@ func (sl *PointSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSa
 
 // PDF implements the Light interface - returns the probability density for sampling a given direction
 // For point lights, this is effectively a delta function
-func (sl *PointSpotLight) PDF(point core.Vec3, direction core.Vec3) float64 {
+func (sl *PointSpotLight) PDF(point, normal, direction core.Vec3) float64 {
 	// For point lights, PDF is essentially a delta function
 	// We return 1.0 if the direction points toward the light, 0 otherwise
 

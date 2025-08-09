@@ -32,7 +32,7 @@ func (gilm *gradientInfiniteLightMaterial) EvaluateBRDF(incomingDir, outgoingDir
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
-func (gilm *gradientInfiniteLightMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
+func (gilm *gradientInfiniteLightMaterial) PDF(incomingDir, normal core.Vec3, outgoingDir core.Vec3) (float64, bool) {
 	// Lights don't scatter, so no PDF
 	return 0.0, true // isDelta = true
 }
@@ -72,10 +72,11 @@ func (gil *GradientInfiniteLight) emissionForDirection(direction core.Vec3) core
 }
 
 // Sample implements the Light interface - samples the infinite light for direct lighting
-func (gil *GradientInfiniteLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
-	// For infinite lights, we sample a direction uniformly on the sphere
-	// and treat it as coming from infinite distance
-	direction := core.SampleUniformSphere(sample)
+func (gil *GradientInfiniteLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
+	// For infinite lights, sample the visible hemisphere using cosine-weighted sampling
+	// This provides better importance sampling since cosine terms cancel in the rendering equation
+	direction := core.RandomCosineDirection(normal, sample)
+	cosTheta := direction.Dot(normal)
 	emission := gil.emissionForDirection(direction)
 
 	return core.LightSample{
@@ -84,14 +85,18 @@ func (gil *GradientInfiniteLight) Sample(point core.Vec3, sample core.Vec2) core
 		Direction: direction,
 		Distance:  math.Inf(1),
 		Emission:  emission,
-		PDF:       1.0 / (4.0 * math.Pi), // Uniform over sphere
+		PDF:       cosTheta / math.Pi, // Cosine-weighted hemisphere PDF
 	}
 }
 
 // PDF implements the Light interface - returns probability density for direct lighting sampling
-func (gil *GradientInfiniteLight) PDF(point core.Vec3, direction core.Vec3) float64 {
-	// Uniform sampling over sphere
-	return 1.0 / (4.0 * math.Pi)
+func (gil *GradientInfiniteLight) PDF(point, normal, direction core.Vec3) float64 {
+	// Cosine-weighted hemisphere PDF
+	cosTheta := direction.Dot(normal)
+	if cosTheta <= 0 {
+		return 0.0 // Direction is below hemisphere
+	}
+	return cosTheta / math.Pi
 }
 
 // SampleEmission implements the Light interface - samples emission for BDPT light path generation

@@ -116,7 +116,7 @@ func TestDiscSpotLightSample(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sample := spotLight.Sample(tt.testPoint, sampler.Get2D())
+			sample := spotLight.Sample(tt.testPoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 
 			// Check that sample point is on the disc
 			distanceFromCenter := sample.Point.Subtract(from).Length()
@@ -270,6 +270,7 @@ func TestDiscSpotLightConsistentFalloff(t *testing.T) {
 	// From edge point (1.5,3,0) to (1.5,0,0): angle = 0 degrees (definitely inside)
 	// From opposite edge (-1.5,3,0) to (1.5,0,0): angle = atan(3/3) = 45 degrees (outside cone)
 	testPoint := core.NewVec3(1.5, 0, 0)
+	normal := core.NewVec3(0, 1, 0) // unused
 
 	// Force samples at specific disc positions to test consistency
 	samples := []core.Vec2{
@@ -280,7 +281,7 @@ func TestDiscSpotLightConsistentFalloff(t *testing.T) {
 
 	var emissions []core.Vec3
 	for _, samplePos := range samples {
-		lightSample := spotLight.Sample(testPoint, samplePos)
+		lightSample := spotLight.Sample(testPoint, normal, samplePos)
 		emissions = append(emissions, lightSample.Emission)
 	}
 

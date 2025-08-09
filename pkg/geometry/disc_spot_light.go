@@ -104,9 +104,9 @@ func (dsl *DiscSpotLight) Type() core.LightType {
 }
 
 // Sample implements the Light interface - samples a point on the disc for direct lighting
-func (dsl *DiscSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSample {
+func (dsl *DiscSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
 	// Sample the underlying disc light
-	lightSample := dsl.discLight.Sample(point, sample)
+	lightSample := dsl.discLight.Sample(point, normal, sample)
 
 	// Apply spot light directional falloff
 	// Calculate direction from actual sampled point on disc to shading point
@@ -121,8 +121,8 @@ func (dsl *DiscSpotLight) Sample(point core.Vec3, sample core.Vec2) core.LightSa
 }
 
 // PDF implements the Light interface - returns the probability density for sampling a given direction
-func (dsl *DiscSpotLight) PDF(point core.Vec3, direction core.Vec3) float64 {
-	return dsl.discLight.PDF(point, direction)
+func (dsl *DiscSpotLight) PDF(point, normal, direction core.Vec3) float64 {
+	return dsl.discLight.PDF(point, normal, direction)
 }
 
 // falloff calculates the spot light falloff

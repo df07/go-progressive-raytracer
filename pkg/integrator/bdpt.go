@@ -303,7 +303,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	}
 
 	lights := scene.GetLights()
-	lightSample, sampledLight, hasLight := core.SampleLight(lights, cameraVertex.Point, sampler)
+	lightSample, sampledLight, hasLight := core.SampleLight(lights, cameraVertex.Point, cameraVertex.Normal, sampler)
 	if !hasLight || lightSample.Emission.IsZero() || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
