@@ -53,13 +53,11 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 				totalEmission = totalEmission.Add(emission)
 			}
 		}
-		if !totalEmission.IsZero() {
-			return totalEmission.Multiply(rrCompensation)
-		}
-
-		// Fall back to background gradient if no infinite lights
+		// Also add background gradient if it exists
 		bgColor := pt.BackgroundGradient(ray, scene)
-		return bgColor.Multiply(rrCompensation)
+		totalEmission = totalEmission.Add(bgColor)
+
+		return totalEmission.Multiply(rrCompensation)
 	}
 
 	// Start with emitted light from the hit material
