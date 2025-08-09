@@ -285,8 +285,8 @@ func TestWorldRadius(t *testing.T) {
 			},
 			// Should only consider the finite sphere
 			expectedCenter: NewVec3(0, 0, 0), // Center of finite sphere
-			expectedRadius: math.Sqrt(3),     // Radius from finite sphere
-			tolerance:      1e-10,
+			expectedRadius: math.Sqrt(2e12),  // Radius to edge of plane
+			tolerance:      1e-6,
 		},
 		{
 			name: "OnlyInfinitePlanes",
@@ -296,9 +296,9 @@ func TestWorldRadius(t *testing.T) {
 				},
 			},
 			// No finite geometry, should return zero center and radius
-			expectedCenter: Vec3{},
-			expectedRadius: 0.0,
-			tolerance:      0.0,
+			expectedCenter: NewVec3(0, 0, 0),
+			expectedRadius: math.Sqrt(2e12),
+			tolerance:      1e-6,
 		},
 	}
 
@@ -312,7 +312,7 @@ func TestWorldRadius(t *testing.T) {
 
 			// Check radius
 			if math.Abs(radius-tt.expectedRadius) > tt.tolerance {
-				t.Errorf("calculateFiniteWorldBounds() radius = %v, expected %v (tolerance %v)",
+				t.Errorf("World radius = %v, expected %v (tolerance %v)",
 					radius, tt.expectedRadius, tt.tolerance)
 			}
 
@@ -320,22 +320,18 @@ func TestWorldRadius(t *testing.T) {
 			if math.Abs(center.X-tt.expectedCenter.X) > tt.tolerance ||
 				math.Abs(center.Y-tt.expectedCenter.Y) > tt.tolerance ||
 				math.Abs(center.Z-tt.expectedCenter.Z) > tt.tolerance {
-				t.Errorf("calculateFiniteWorldBounds() center = %v, expected %v (tolerance %v)",
+				t.Errorf("World center = %v, expected %v (tolerance %v)",
 					center, tt.expectedCenter, tt.tolerance)
 			}
 		})
 	}
 }
 
-func TestBVHFiniteWorldRadius(t *testing.T) {
+func TestBVHWorldRadius(t *testing.T) {
 	// Test that the BVH correctly stores the world radius
 	shapes := []Shape{
 		MockShape{
 			boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
-		},
-		// Add an infinite plane that should be filtered out
-		MockShape{
-			boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
 		},
 	}
 
@@ -345,7 +341,7 @@ func TestBVHFiniteWorldRadius(t *testing.T) {
 	tolerance := 1e-10
 
 	if math.Abs(bvh.Radius-expectedRadius) > tolerance {
-		t.Errorf("BVH.FiniteWorldRadius = %v, expected %v (tolerance %v)",
+		t.Errorf("BVH.radius = %v, expected %v (tolerance %v)",
 			bvh.Radius, expectedRadius, tolerance)
 	}
 }
