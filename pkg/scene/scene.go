@@ -22,8 +22,6 @@ func NewGroundQuad(center core.Vec3, size float64, material core.Material) *geom
 // Scene contains all the elements needed for rendering
 type Scene struct {
 	Camera         *renderer.Camera
-	TopColor       core.Vec3    // Color at top of gradient
-	BottomColor    core.Vec3    // Color at bottom of gradient
 	Shapes         []core.Shape // Objects in the scene
 	Lights         []core.Light // Lights in the scene
 	SamplingConfig core.SamplingConfig
@@ -63,8 +61,6 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 
 	s := &Scene{
 		Camera:         camera,
-		TopColor:       core.NewVec3(0, 0, 0), // Black - no background gradient
-		BottomColor:    core.NewVec3(0, 0, 0), // Black - no background gradient
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: samplingConfig,
@@ -123,11 +119,6 @@ func NewDefaultScene(cameraOverrides ...renderer.CameraConfig) *Scene {
 // GetCamera returns the scene's camera
 func (s *Scene) GetCamera() core.Camera {
 	return s.Camera
-}
-
-// GetBackgroundColors returns the top and bottom colors for the background gradient
-func (s *Scene) GetBackgroundColors() (topColor, bottomColor core.Vec3) {
-	return s.TopColor, s.BottomColor
 }
 
 // GetShapes returns all shapes in the scene

@@ -26,8 +26,6 @@ func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...render
 
 	s := &Scene{
 		Camera:         camera,
-		TopColor:       core.NewVec3(0.0, 0.0, 0.0), // Black background
-		BottomColor:    core.NewVec3(0.0, 0.0, 0.0), // Black background
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: createCornellSamplingConfig(),

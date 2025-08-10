@@ -21,8 +21,6 @@ func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, ca
 
 	s := &Scene{
 		Camera:         camera,
-		TopColor:       core.NewVec3(0.5, 0.7, 1.0), // Light blue sky
-		BottomColor:    core.NewVec3(0.0, 0.0, 0.0), // Dark horizon
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: createDragonSamplingConfig(),
@@ -42,6 +40,12 @@ func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, ca
 		// Add a placeholder for configuration purposes
 		logger.Printf("Dragon scene created without mesh for configuration\n")
 	}
+
+	// Add gradient infinite light (replaces background gradient)
+	s.AddGradientInfiniteLight(
+		core.NewVec3(0.5, 0.7, 1.0), // topColor (light blue sky)
+		core.NewVec3(0.0, 0.0, 0.0), // bottomColor (dark horizon)
+	)
 
 	return s
 }

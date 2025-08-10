@@ -21,8 +21,6 @@ func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.L
 
 	s := &Scene{
 		Camera:         camera,
-		TopColor:       core.NewVec3(0.2, 0.2, 0.2), // Dark background like PBRT infinite light
-		BottomColor:    core.NewVec3(0.2, 0.2, 0.2), // Consistent dark background
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: createCausticGlassSamplingConfig(),
@@ -97,7 +95,9 @@ func addCausticGlassLighting(s *Scene, lightType core.LightType) {
 		s.AddSpotLight(spotFrom, spotTo, spotIntensity, 30.0, 5.0, 0.7)
 	}
 
-	// Infinite light is handled by the background colors (already set to 0.1, 0.1, 0.1)
+	// Add uniform infinite light (replaces background gradient)
+	// PBRT scene uses "infinite" "rgb L" [ 0.1000000015 0.1000000015 0.1000000015 ]
+	s.AddUniformInfiniteLight(core.NewVec3(0.2, 0.2, 0.2))
 }
 
 // addCausticGlassMeshes loads the PLY files and adds them to the scene

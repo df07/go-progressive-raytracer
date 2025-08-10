@@ -29,8 +29,6 @@ func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...rende
 
 	s := &Scene{
 		Camera:         camera,
-		TopColor:       core.NewVec3(0.5, 0.7, 1.0), // Light blue
-		BottomColor:    core.NewVec3(1.0, 1.0, 1.0), // White
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: createTriangleMeshSamplingConfig(),
@@ -45,6 +43,12 @@ func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...rende
 
 	// Add sphere comparison geometry
 	addSphereTriangleMeshGeometryWithComplexity(s, complexity)
+
+	// Add gradient infinite light (replaces background gradient)
+	s.AddGradientInfiniteLight(
+		core.NewVec3(0.5, 0.7, 1.0), // topColor (light blue)
+		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white)
+	)
 
 	return s
 }

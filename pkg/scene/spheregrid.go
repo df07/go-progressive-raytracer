@@ -79,8 +79,6 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 	// Create the scene
 	s := &Scene{
 		Camera:         camera,
-		TopColor:       core.NewVec3(0.5, 0.7, 1.0), // Blue sky (same as default scene)
-		BottomColor:    core.NewVec3(1.0, 1.0, 1.0), // White horizon (same as default scene)
 		Shapes:         make([]core.Shape, 0),
 		Lights:         make([]core.Light, 0),
 		SamplingConfig: samplingConfig,
@@ -180,6 +178,12 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 			s.Shapes = append(s.Shapes, sphere)
 		}
 	}
+
+	// Add gradient infinite light (replaces background gradient)
+	s.AddGradientInfiniteLight(
+		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
+		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white horizon)
+	)
 
 	return s
 }
