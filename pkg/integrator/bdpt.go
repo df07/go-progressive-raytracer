@@ -149,14 +149,15 @@ func (bdpt *BDPTIntegrator) generateLightPath(scene core.Scene, sampler core.Sam
 	cosTheta := emissionSample.Direction.AbsDot(emissionSample.Normal)
 
 	lightVertex := Vertex{
-		Point:          emissionSample.Point,
-		Normal:         emissionSample.Normal,
-		Light:          sampledLight,
-		AreaPdfForward: emissionSample.AreaPDF * lightSelectionPdf, // probability of generating this point is the light sampling pdf
-		AreaPdfReverse: 0.0,                                        // probability of generating this point in reverse is set by MIS weight calculation
-		IsLight:        true,
-		Beta:           emissionSample.Emission, // PBRT: light vertex stores raw emission, transport beta used for path continuation
-		EmittedLight:   emissionSample.Emission, // Already properly scaled
+		Point:           emissionSample.Point,
+		Normal:          emissionSample.Normal,
+		Light:           sampledLight,
+		AreaPdfForward:  emissionSample.AreaPDF * lightSelectionPdf, // probability of generating this point is the light sampling pdf
+		AreaPdfReverse:  0.0,                                        // probability of generating this point in reverse is set by MIS weight calculation
+		IsLight:         true,
+		IsInfiniteLight: sampledLight.Type() == core.LightTypeInfinite, // Detect infinite lights for proper MIS handling
+		Beta:            emissionSample.Emission,                       // PBRT: light vertex stores raw emission, transport beta used for path continuation
+		EmittedLight:    emissionSample.Emission,                       // Already properly scaled
 	}
 
 	path.Vertices = append(path.Vertices, lightVertex)
@@ -168,6 +169,26 @@ func (bdpt *BDPTIntegrator) generateLightPath(scene core.Scene, sampler core.Sam
 	beta := emissionSample.Emission.Multiply(cosTheta / (lightSelectionPdf * emissionSample.AreaPDF * emissionSample.DirectionPDF))
 	// bdpt.logf("generateLightSubpath: forwardThroughput=%v, cosTheta=%f, lightSelectionPdf=%f, AreaPDF=%f, DirectionPDF=%f\n", beta, cosTheta, lightSelectionPdf, emissionSample.AreaPDF, emissionSample.DirectionPDF)
 	bdpt.extendPath(&path, ray, beta, emissionSample.DirectionPDF, scene, sampler, maxDepth-1, false)
+
+	// PBRT: Correct subpath sampling densities for infinite area lights
+	if path.Vertices[0].IsInfiniteLight {
+		// Set spatial density of path[1] for infinite area light (first bounce after infinite light)
+		if path.Length > 1 {
+			firstBounceVertex := &path.Vertices[1]
+			firstBounceVertex.AreaPdfForward = emissionSample.AreaPDF * lightSelectionPdf
+
+			// Apply cosine term if the vertex is on a surface
+			if firstBounceVertex.Material != nil {
+				cosineAtFirstBounce := ray.Direction.AbsDot(firstBounceVertex.Normal)
+				firstBounceVertex.AreaPdfForward *= cosineAtFirstBounce
+			}
+		}
+
+		// Set spatial density of path[0] for infinite area light (use directional density)
+		// PBRT: Use InfiniteLightDensity to account for all infinite lights in this direction
+		// Use direct lighting PDF (cosine-weighted) to match what our Sample() function does
+		path.Vertices[0].AreaPdfForward = bdpt.calculateInfiniteLightDensity(emissionSample.Point, emissionSample.Normal, emissionSample.Direction, scene)
+	}
 
 	return path
 }
@@ -183,8 +204,21 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		hit, isHit := scene.GetBVH().Hit(currentRay, 0.001, math.Inf(1))
 		if !isHit {
 			if isCameraPath {
-				// Hit background - create a background vertex with captured light
-				bgColor := bdpt.BackgroundGradient(currentRay, scene)
+				// Hit background - check for infinite light emission
+				lights := scene.GetLights()
+				var totalEmission core.Vec3
+				for _, light := range lights {
+					// Only check infinite lights when we miss all geometry
+					if light.Type() == core.LightTypeInfinite {
+						emission := light.Emit(currentRay)
+						totalEmission = totalEmission.Add(emission)
+					}
+				}
+
+				// Also add background gradient for compatibility during transition
+				bgGradient := bdpt.BackgroundGradient(currentRay, scene)
+				bgColor := totalEmission.Add(bgGradient)
+
 				vertex := createBackgroundVertex(currentRay, bgColor, beta, pdfFwd)
 				path.Vertices = append(path.Vertices, vertex)
 				path.Length++
@@ -337,17 +371,18 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 	// Create sampled light vertex for PBRT MIS calculation
 	sampledVertex := &Vertex{
-		Point:          lightSample.Point,
-		Normal:         lightSample.Normal,
-		Light:          sampledLight,
-		AreaPdfForward: lightSample.PDF, // probability of generating this point is the light sampling pdf
-		AreaPdfReverse: 0.0,             // probability of generating this point in reverse is set by MIS weight calculation
-		IsLight:        true,
-		Beta:           lightBeta,
-		EmittedLight:   lightSample.Emission,
+		Point:           lightSample.Point,
+		Normal:          lightSample.Normal,
+		Light:           sampledLight,
+		AreaPdfForward:  lightSample.PDF, // probability of generating this point is the light sampling pdf
+		AreaPdfReverse:  0.0,             // probability of generating this point in reverse is set by MIS weight calculation
+		IsLight:         true,
+		IsInfiniteLight: sampledLight.Type() == core.LightTypeInfinite, // Properly mark infinite lights
+		Beta:            lightBeta,
+		EmittedLight:    lightSample.Emission,
 	}
 
-	// bdpt.logf(" (s=1,t=%d) evaluateDirectLightingStrategy: L=%v => brdf=%v * beta=%v * emission=%v * (cosine=%f / pdf=%f)\n", t, lightContribution, brdf, cameraVertex.Beta, lightSample.Emission, cosine, lightSample.PDF)
+	//bdpt.logf(" (s=1,t=%d) evaluateDirectLightingStrategy: L=%v => brdf=%v * beta=%v * emission=%v * (cosTheta=%f / pdf=%f)\n", t, lightContribution, brdf, cameraVertex.Beta, lightSample.Emission, cosTheta, lightSample.PDF)
 
 	return lightContribution, sampledVertex
 }
@@ -513,7 +548,12 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 
 // evaluateBRDF evaluates the BRDF at a vertex for a given outgoing direction
 func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.Vec3) core.Vec3 {
-	// For light sources, we don't evaluate BRDF - they emit directly
+	// Infinite lights don't scatter - they only emit (no BRDF)
+	if vertex.IsInfiniteLight {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
+
+	// For other light sources, we don't evaluate BRDF - they emit directly
 	if vertex.IsLight && vertex.Material == nil {
 		// Light sources contribute their emission directly, not through BRDF
 		// For connections, we use identity (1.0) since the light emission is handled separately

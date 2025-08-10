@@ -19,16 +19,6 @@ func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, 
 		return 1.0
 	}
 
-	// For path tracing strategies that hit infinite lights (background),
-	// return MIS weight 1.0 since we can't actually sample infinite lights directly
-	if s == 0 && t > 1 {
-		lastVertex := &cameraPath.Vertices[t-1]
-		if lastVertex.IsInfiniteLight {
-			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight: infinite light hit, weight=1.0\n", s, t)
-			return 1.0
-		}
-	}
-
 	sumRi := 0.0
 
 	// Look up connection vertices and their predecessors
@@ -152,9 +142,12 @@ func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, 
 
 		var deltaLightVertex bool
 		if i > 0 {
-			deltaLightVertex = lightPath.Vertices[i-1].IsSpecular
+			// PBRT: Check if predecessor is delta (either specular material or delta light)
+			predecessor := &lightPath.Vertices[i-1]
+			deltaLightVertex = predecessor.IsSpecular || (predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == core.LightTypePoint)
 		} else {
-			deltaLightVertex = vertex.IsLight && vertex.Light.Type() == core.LightTypePoint
+			// PBRT: Check if current vertex is a delta light
+			deltaLightVertex = vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == core.LightTypePoint
 		}
 
 		if !vertex.IsSpecular && !deltaLightVertex {
@@ -171,19 +164,15 @@ func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, 
 // calculateMISWeight implements zero-allocation MIS weighting using on-demand PDF calculation
 // Directly copies calculateMISWeightAlt2 logic but eliminates intermediate arrays
 func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+	disableMISWeight := false
+	if disableMISWeight {
+		//return 1.0 / float64(s+t-1)
+		return 1.0 / float64(cameraPath.Length+lightPath.Length-1)
+	}
+
 	// Handle same early returns as original
 	if s+t == 2 {
 		return 1.0
-	}
-
-	// For path tracing strategies that hit infinite lights, return weight 1.0.
-	// Our infinite lights are background gradients, not sampable Light objects,
-	// so there are no competing light sampling strategies (s>0) for MIS to balance.
-	if s == 0 && t > 1 {
-		lastVertex := &cameraPath.Vertices[t-1]
-		if lastVertex.IsInfiniteLight {
-			return 1.0
-		}
 	}
 
 	sumRi := 0.0
@@ -198,6 +187,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, samp
 		if isConnectible {
 			sumRi += ri
 		}
+		// bdpt.logf(" (s=%d,t=%d) cameraPath[%d]: fwd=%.3g, rev=%.3g, conn=%v, ri=%.3g, sumRi=%.3g\n", s, t, i, forwardPdf, reversePdf, isConnectible, ri, sumRi)
 	}
 
 	// Light path alternatives: start from connection vertex and work backward
@@ -210,8 +200,12 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, samp
 		if isConnectible {
 			sumRi += ri
 		}
+
+		// bdpt.logf(" (s=%d,t=%d) lightPath[%d]: fwd=%.3g, rev=%.3g, conn=%v, ri=%.3g, sumRi=%.3g\n", s, t, i, forwardPdf, reversePdf, isConnectible, ri, sumRi)
+
 	}
 
+	// bdpt.logf(" (s=%d,t=%d) calculateMISWeight: sumRi=%0.3g, weight=%0.3f\n", s, t, sumRi, 1.0/(1.0+sumRi))
 	return 1.0 / (1.0 + sumRi)
 }
 
@@ -223,11 +217,6 @@ func (bdpt *BDPTIntegrator) calculateMISCameraVertexPdfs(cameraIdx int, cameraPa
 	forwardPdf := vertex.AreaPdfForward
 	reversePdf := vertex.AreaPdfReverse
 	isConnectible := !vertex.IsSpecular
-
-	// Check predecessor connectibility for camera path
-	if cameraIdx > 0 {
-		isConnectible = isConnectible && !cameraPath.Vertices[cameraIdx-1].IsSpecular
-	}
 
 	// Apply strategy-specific PDF corrections for camera path vertices
 	switch {
@@ -271,6 +260,12 @@ func (bdpt *BDPTIntegrator) calculateMISCameraVertexPdfs(cameraIdx int, cameraPa
 			// Camera predecessor
 			reversePdf = bdpt.calculateVertexPdf(&cameraPath.Vertices[t-1], &lightPath.Vertices[s-1], &cameraPath.Vertices[t-2], scene)
 		}
+	}
+
+	// Apply general connectibility rules after strategy-specific corrections (mirroring PBRT)
+	// Check predecessor connectibility for camera path
+	if cameraIdx > 0 {
+		isConnectible = isConnectible && !cameraPath.Vertices[cameraIdx-1].IsSpecular
 	}
 
 	return forwardPdf, reversePdf, isConnectible
@@ -412,7 +407,6 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 			}
 
 			pdf = 1.0 / (math.Pi * worldRadius * worldRadius)
-			//fmt.Printf("infinite light pdf: %f\n", pdf)
 		} else if curr.Light != nil {
 			// Use the light's EmissionPDF which gives area PDF
 			areaPdf := curr.Light.EmissionPDF(curr.Point, w)
@@ -447,18 +441,10 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Ver
 
 	// Handle infinite area lights (background)
 	if lightVertex.IsInfiniteLight {
-		// PBRT: Return solid angle density for infinite light sources
-		// For our simple background, use uniform solid angle distribution
-		// In PBRT this would be InfiniteLightDensity(scene, lightDistr, lightToDistrIndex, w)
-
-		// Light selection probability (uniform among all lights)
-		lightSelectionPdf := 1.0 // no light selection for infinite light
-
-		// For uniform background, PDF is uniform over sphere
-		infiniteLightPdf := 1.0 / (4.0 * math.Pi)
-
-		// bdpt.logf(" (s=?,t=?) calculateLightOriginPdf: infinite light, infiniteLightPdf=%0.3g, lightSelectionPdf=%0.3g\n", infiniteLightPdf, lightSelectionPdf)
-		return infiniteLightPdf / lightSelectionPdf
+		// PBRT: Return infinite light density - sum PDFs of all infinite lights in direction w
+		// This accounts for multiple infinite lights and direction-specific emission
+		// Use direct lighting PDF (cosine-weighted) to match what our Sample() function does
+		return bdpt.calculateInfiniteLightDensity(to.Point, to.Normal, w.Multiply(-1), scene) // PBRT uses -w
 	}
 
 	if !lightVertex.IsLight || lightVertex.Light == nil {
@@ -477,6 +463,31 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Ver
 	pdfPos := lightVertex.Light.EmissionPDF(lightVertex.Point, w)
 
 	return pdfPos * pdfChoice
+}
+
+// calculateInfiniteLightDensity implements PBRT's InfiniteLightDensity function
+// Sums the directional PDFs of all infinite lights in the given direction, weighted by selection probability
+// Uses cosine-weighted hemisphere PDF for consistency with direct lighting sampling
+func (bdpt *BDPTIntegrator) calculateInfiniteLightDensity(point, normal, direction core.Vec3, scene core.Scene) float64 {
+	lights := scene.GetLights()
+	if len(lights) == 0 {
+		return 0
+	}
+
+	var totalPdf float64
+	lightSelectionPdf := 1.0 / float64(len(lights)) // Uniform light selection
+
+	// Sum PDFs of all infinite lights in this direction
+	for _, light := range lights {
+		if light.Type() == core.LightTypeInfinite {
+			// Use cosine-weighted hemisphere PDF (matches light.Sample behavior)
+			// This corresponds to PBRT's light.PDF_Li(Interaction(), direction)
+			directionalPdf := light.PDF(point, normal, direction)
+			totalPdf += directionalPdf * lightSelectionPdf
+		}
+	}
+
+	return totalPdf
 }
 
 // convertSolidAngleToAreaPdf converts a directional PDF to an area PDF
