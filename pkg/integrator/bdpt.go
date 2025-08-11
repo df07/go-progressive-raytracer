@@ -215,11 +215,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 					}
 				}
 
-				// Also add background gradient for compatibility during transition
-				bgGradient := bdpt.BackgroundGradient(currentRay, scene)
-				bgColor := totalEmission.Add(bgGradient)
-
-				vertex := createBackgroundVertex(currentRay, bgColor, beta, pdfFwd)
+				vertex := createBackgroundVertex(currentRay, totalEmission, beta, pdfFwd)
 				path.Vertices = append(path.Vertices, vertex)
 				path.Length++
 			}

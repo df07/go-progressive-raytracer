@@ -305,12 +305,10 @@ func createSimpleTestScene() core.Scene {
 	camera := renderer.NewCamera(cameraConfig)
 
 	return &MockScene{
-		shapes:      []core.Shape{sphere, light.Quad},
-		lights:      []core.Light{light},
-		topColor:    core.NewVec3(0.3, 0.3, 0.3),
-		bottomColor: core.NewVec3(0.1, 0.1, 0.1),
-		camera:      camera,
-		config:      core.SamplingConfig{MaxDepth: 5},
+		shapes: []core.Shape{sphere, light.Quad},
+		lights: []core.Light{light},
+		camera: camera,
+		config: core.SamplingConfig{MaxDepth: 5},
 	}
 }
 
@@ -341,7 +339,6 @@ func createSceneWithLight(light core.Light) core.Scene {
 
 	return &MockScene{
 		shapes: shapes, lights: []core.Light{light},
-		topColor: core.NewVec3(0.3, 0.3, 0.3), bottomColor: core.NewVec3(0.1, 0.1, 0.1),
 		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
 }
@@ -371,9 +368,8 @@ func createGlancingTestSceneWithMaterial(mat core.Material) core.Scene {
 	camera := renderer.NewCamera(cameraConfig)
 
 	return &MockScene{
-		shapes:   []core.Shape{sphere},
-		lights:   []core.Light{pointLight},
-		topColor: core.NewVec3(0.1, 0.1, 0.1), bottomColor: core.NewVec3(0.05, 0.05, 0.05),
+		shapes: []core.Shape{sphere},
+		lights: []core.Light{pointLight},
 		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
 }
@@ -413,9 +409,8 @@ func createLightSceneWithMaterial(mat core.Material) core.Scene {
 	camera := renderer.NewCamera(cameraConfig)
 
 	return &MockScene{
-		shapes:   []core.Shape{sphere, boundingSphere},
-		lights:   []core.Light{quadLight},
-		topColor: core.NewVec3(0.1, 0.1, 0.1), bottomColor: core.NewVec3(0.05, 0.05, 0.05),
+		shapes: []core.Shape{sphere, boundingSphere},
+		lights: []core.Light{quadLight},
 		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
 }

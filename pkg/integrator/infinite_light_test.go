@@ -20,11 +20,9 @@ func createSceneWithInfiniteLight() *MockScene {
 	camera := &MockCamera{}
 
 	scene := &MockScene{
-		shapes:      []core.Shape{sphere},
-		lights:      []core.Light{},
-		topColor:    core.NewVec3(0, 0, 0), // Black background (no gradient)
-		bottomColor: core.NewVec3(0, 0, 0), // Black background (no gradient)
-		camera:      camera,
+		shapes: []core.Shape{sphere},
+		lights: []core.Light{},
+		camera: camera,
 		config: core.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
@@ -98,45 +96,6 @@ func TestPathTracingInfiniteLight_GradientVariation(t *testing.T) {
 	}
 }
 
-// TestPathTracingInfiniteLight_vs_BackgroundGradient compares infinite light with equivalent background gradient
-func TestPathTracingInfiniteLight_vs_BackgroundGradient(t *testing.T) {
-	// Create scene with background gradient
-	sceneWithGradient := createTestScene() // Uses topColor/bottomColor
-
-	// Create scene with infinite light using same colors
-	sceneWithInfiniteLight := createSceneWithInfiniteLight()
-
-	integrator := NewPathTracingIntegrator(sceneWithGradient.GetSamplingConfig())
-
-	// Test ray that misses all objects (pointing up)
-	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0))
-
-	// Get colors from both scenes
-	gradientSampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
-	infiniteSampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
-
-	gradientColor, _ := integrator.RayColor(ray, sceneWithGradient, gradientSampler)
-	infiniteColor, _ := integrator.RayColor(ray, sceneWithInfiniteLight, infiniteSampler)
-
-	// With background gradient scene, we expect the gradient color
-	expectedGradientColor := integrator.BackgroundGradient(ray, sceneWithGradient)
-	tolerance := 0.01
-	if math.Abs(gradientColor.X-expectedGradientColor.X) > tolerance ||
-		math.Abs(gradientColor.Y-expectedGradientColor.Y) > tolerance ||
-		math.Abs(gradientColor.Z-expectedGradientColor.Z) > tolerance {
-		t.Errorf("Background gradient scene: expected %v, got %v", expectedGradientColor, gradientColor)
-	}
-
-	// With infinite light scene, we should get a similar but potentially different result
-	// (since infinite light sampling may have different characteristics)
-	if infiniteColor == (core.Vec3{}) {
-		t.Error("Infinite light scene should produce non-black color")
-	}
-
-	t.Logf("Background gradient color: %v", gradientColor)
-	t.Logf("Infinite light color: %v", infiniteColor)
-}
-
 // TestUniformInfiniteLight_PathTracing tests uniform infinite light with path tracing
 func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 	// Create scene with uniform infinite light
@@ -145,11 +104,9 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 	camera := &MockCamera{}
 
 	scene := &MockScene{
-		shapes:      []core.Shape{sphere},
-		lights:      []core.Light{},
-		topColor:    core.NewVec3(0, 0, 0), // Black background
-		bottomColor: core.NewVec3(0, 0, 0), // Black background
-		camera:      camera,
+		shapes: []core.Shape{sphere},
+		lights: []core.Light{},
+		camera: camera,
 		config: core.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,

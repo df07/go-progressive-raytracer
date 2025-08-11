@@ -126,7 +126,6 @@ type Camera interface {
 // Scene interface for scene management
 type Scene interface {
 	GetCamera() Camera
-	GetBackgroundColors() (topColor, bottomColor Vec3)
 	GetShapes() []Shape
 	GetLights() []Light
 	GetSamplingConfig() SamplingConfig

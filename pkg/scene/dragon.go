@@ -41,12 +41,6 @@ func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, ca
 		logger.Printf("Dragon scene created without mesh for configuration\n")
 	}
 
-	// Add gradient infinite light (replaces background gradient)
-	s.AddGradientInfiniteLight(
-		core.NewVec3(0.5, 0.7, 1.0), // topColor (light blue sky)
-		core.NewVec3(0.0, 0.0, 0.0), // bottomColor (dark horizon)
-	)
-
 	return s
 }
 
@@ -97,19 +91,11 @@ func addDragonLighting(s *Scene) {
 		core.NewVec3(15.0, 14.0, 12.0).Multiply(0.25), // reduced intensity
 	)
 
-	// Soft fill light - position on opposite side, away from camera
-	/*s.AddSphereLight(
-		core.NewVec3(-250, 150, 200), // position (left, behind dragon, elevated)
-		25.0,                         // larger radius for soft fill
-		core.NewVec3(2.0, 2.5, 3.0),  // much dimmer fill
+	// Add gradient infinite light (replaces background gradient)
+	s.AddGradientInfiniteLight(
+		core.NewVec3(0.5, 0.7, 1.0), // topColor (light blue sky)
+		core.NewVec3(0.0, 0.0, 0.0), // bottomColor (dark horizon)
 	)
-
-	// Rim light - well behind dragon and high up
-	s.AddSphereLight(
-		core.NewVec3(100, 300, 400), // position (behind dragon, very high up)
-		10.0,                        // small radius for sharp rim
-		core.NewVec3(6.0, 5.0, 4.0), // slightly dimmer rim light
-	)*/
 }
 
 // addDragonGround adds a ground plane (matching PBRT scene at Z = -40)

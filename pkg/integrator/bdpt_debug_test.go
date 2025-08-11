@@ -379,10 +379,6 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 		camera: camera,
 	}
 
-	// Remove gradient background:
-	// topColor:    core.NewVec3(0.1, 0.1, 0.1),
-	// bottomColor: core.NewVec3(0.05, 0.05, 0.05),
-
 	infiniteLight := geometry.NewGradientInfiniteLight(
 		core.NewVec3(0.1, 0.1, 0.1),    // topColor
 		core.NewVec3(0.05, 0.05, 0.05), // bottomColor
@@ -469,18 +465,13 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene
 	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
 
 	testScene := &MockScene{
-		lights:      lights,
-		shapes:      shapes,
-		config:      config,
-		camera:      renderer.NewCamera(defaultCameraConfig),
-		topColor:    core.NewVec3(0.5, 0.7, 1.0), // Blue sky background
-		bottomColor: core.NewVec3(1.0, 1.0, 1.0), // White ground
+		lights: lights,
+		shapes: shapes,
+		config: config,
+		camera: renderer.NewCamera(defaultCameraConfig),
 	}
 
-	if !includeBackground {
-		testScene.topColor = core.NewVec3(0, 0, 0)
-		testScene.bottomColor = core.NewVec3(0, 0, 0)
-	} else {
+	if includeBackground {
 		// Add infinite light to match background colors for BDPT compatibility
 		infiniteLight := geometry.NewGradientInfiniteLight(
 			core.NewVec3(0.5, 0.7, 1.0), // topColor
@@ -640,12 +631,10 @@ func SceneWithReflectiveGroundPlane() (core.Scene, core.SamplingConfig) {
 	config := core.SamplingConfig{MaxDepth: 6, RussianRouletteMinBounces: 100}
 
 	testScene := &MockScene{
-		lights:      []core.Light{infiniteLight},
-		shapes:      shapes,
-		config:      config,
-		camera:      camera,
-		topColor:    core.NewVec3(0.8, 0.9, 1.0),
-		bottomColor: core.NewVec3(0.9, 0.9, 1.0),
+		lights: []core.Light{infiniteLight},
+		shapes: shapes,
+		config: config,
+		camera: camera,
 	}
 
 	// Preprocess the infinite light

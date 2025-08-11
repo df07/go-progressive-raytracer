@@ -44,12 +44,6 @@ func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...rende
 	// Add sphere comparison geometry
 	addSphereTriangleMeshGeometryWithComplexity(s, complexity)
 
-	// Add gradient infinite light (replaces background gradient)
-	s.AddGradientInfiniteLight(
-		core.NewVec3(0.5, 0.7, 1.0), // topColor (light blue)
-		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white)
-	)
-
 	return s
 }
 
@@ -107,6 +101,12 @@ func addTriangleMeshLighting(s *Scene) {
 		core.NewVec3(4, 4, 3),       // position (right side, mirrored)
 		0.8,                         // radius
 		core.NewVec3(8.0, 8.0, 8.0), // neutral white emission (same as left)
+	)
+
+	// Add gradient infinite light (replaces background gradient)
+	s.AddGradientInfiniteLight(
+		core.NewVec3(0.5, 0.7, 1.0), // topColor (light blue)
+		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white)
 	)
 }
 

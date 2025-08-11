@@ -12,22 +12,19 @@ import (
 
 // MockScene implements core.Scene for testing
 type MockScene struct {
-	width       int
-	height      int
-	shapes      []core.Shape
-	lights      []core.Light
-	topColor    core.Vec3
-	bottomColor core.Vec3
-	camera      core.Camera
-	config      core.SamplingConfig
-	bvh         *core.BVH
+	width  int
+	height int
+	shapes []core.Shape
+	lights []core.Light
+	camera core.Camera
+	config core.SamplingConfig
+	bvh    *core.BVH
 }
 
-func (m *MockScene) GetCamera() core.Camera                      { return m.camera }
-func (m *MockScene) GetBackgroundColors() (core.Vec3, core.Vec3) { return m.topColor, m.bottomColor }
-func (m *MockScene) GetShapes() []core.Shape                     { return m.shapes }
-func (m *MockScene) GetLights() []core.Light                     { return m.lights }
-func (m *MockScene) GetSamplingConfig() core.SamplingConfig      { return m.config }
+func (m *MockScene) GetCamera() core.Camera                 { return m.camera }
+func (m *MockScene) GetShapes() []core.Shape                { return m.shapes }
+func (m *MockScene) GetLights() []core.Light                { return m.lights }
+func (m *MockScene) GetSamplingConfig() core.SamplingConfig { return m.config }
 func (m *MockScene) GetBVH() *core.BVH {
 	if m.bvh == nil {
 		m.bvh = core.NewBVH(m.shapes)
@@ -79,53 +76,22 @@ func createTestScene() *MockScene {
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.3, 0.3))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
+	infiniteLight := geometry.NewGradientInfiniteLight(
+		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
+		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white ground)
+	)
+
 	// Create a simple mock camera
 	camera := &MockCamera{}
 
 	return &MockScene{
-		shapes:      []core.Shape{sphere},
-		lights:      []core.Light{},
-		topColor:    core.NewVec3(0.5, 0.7, 1.0),
-		bottomColor: core.NewVec3(1.0, 1.0, 1.0),
-		camera:      camera,
+		shapes: []core.Shape{sphere},
+		lights: []core.Light{infiniteLight},
+		camera: camera,
 		config: core.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
 		},
-	}
-}
-
-// TestPathTracingBackgroundGradient tests the background gradient calculation
-func TestPathTracingBackgroundGradient(t *testing.T) {
-	scene := createTestScene()
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
-
-	// Test ray pointing up (should get top color)
-	upRay := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0))
-	upColor := integrator.BackgroundGradient(upRay, scene)
-
-	// Test ray pointing down (should get bottom color)
-	downRay := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, -1, 0))
-	downColor := integrator.BackgroundGradient(downRay, scene)
-
-	// Colors should be different
-	if upColor == downColor {
-		t.Error("Expected different colors for up and down rays")
-	}
-
-	// Up ray should be closer to top color (blue-ish)
-	if upColor.Z < downColor.Z {
-		t.Error("Expected up ray to have more blue component")
-	}
-
-	// Colors should be in valid range
-	for _, color := range []core.Vec3{upColor, downColor} {
-		if color.X < 0 || color.Y < 0 || color.Z < 0 {
-			t.Errorf("Color has negative components: %v", color)
-		}
-		if color.X > 1 || color.Y > 1 || color.Z > 1 {
-			t.Errorf("Color has components > 1: %v", color)
-		}
 	}
 }
 
@@ -208,12 +174,15 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, metal)
 	camera := &MockCamera{}
 
+	infiniteLight := geometry.NewGradientInfiniteLight(
+		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
+		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white ground)
+	)
+
 	scene := &MockScene{
-		shapes:      []core.Shape{sphere},
-		lights:      []core.Light{},
-		topColor:    core.NewVec3(0.5, 0.7, 1.0),
-		bottomColor: core.NewVec3(1.0, 1.0, 1.0),
-		camera:      camera,
+		shapes: []core.Shape{sphere},
+		lights: []core.Light{infiniteLight},
+		camera: camera,
 		config: core.SamplingConfig{
 			MaxDepth:                  5,
 			RussianRouletteMinBounces: 5,
@@ -248,11 +217,9 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 	camera := &MockCamera{}
 
 	scene := &MockScene{
-		shapes:      []core.Shape{sphere},
-		lights:      []core.Light{},
-		topColor:    core.NewVec3(0.0, 0.0, 0.0), // Black background
-		bottomColor: core.NewVec3(0.0, 0.0, 0.0),
-		camera:      camera,
+		shapes: []core.Shape{sphere},
+		lights: []core.Light{},
+		camera: camera,
 		config: core.SamplingConfig{
 			MaxDepth: 10,
 		},
@@ -288,13 +255,13 @@ func TestPathTracingMissedRay(t *testing.T) {
 
 	color, _ := integrator.RayColor(ray, scene, sampler)
 
-	// Should get background gradient color
+	// Should get infinite light color
 	if color == (core.Vec3{}) {
-		t.Error("Expected background color, got black")
+		t.Error("Expected infinite light color, got black")
 	}
 
-	// Should be similar to what BackgroundGradient returns
-	expectedBg := integrator.BackgroundGradient(ray, scene)
+	// Should be similar to what infinite light returns
+	expectedBg := scene.GetLights()[0].Emit(ray)
 	tolerance := 0.01
 	if math.Abs(color.X-expectedBg.X) > tolerance ||
 		math.Abs(color.Y-expectedBg.Y) > tolerance ||

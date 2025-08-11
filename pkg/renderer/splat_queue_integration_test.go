@@ -188,14 +188,12 @@ func TestSplatSystemIntegration(t *testing.T) {
 
 	// Create scene with geometry
 	sceneObj := &MockScene{
-		camera:      camera,
-		config:      config,
-		shapes:      shapes,
-		lights:      lights,
-		topColor:    core.Vec3{X: 0.1, Y: 0.1, Z: 0.1},
-		bottomColor: core.Vec3{X: 0.05, Y: 0.05, Z: 0.05},
-		width:       config.Width,
-		height:      config.Height,
+		camera: camera,
+		config: config,
+		shapes: shapes,
+		lights: lights,
+		width:  config.Width,
+		height: config.Height,
 	}
 
 	// Create progressive raytracer

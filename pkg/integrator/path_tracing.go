@@ -47,15 +47,10 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 		lights := scene.GetLights()
 		var totalEmission core.Vec3
 		for _, light := range lights {
-			// Only check infinite lights when we miss all geometry
 			if light.Type() == core.LightTypeInfinite {
-				emission := light.Emit(ray)
-				totalEmission = totalEmission.Add(emission)
+				totalEmission = totalEmission.Add(light.Emit(ray))
 			}
 		}
-		// Also add background gradient if it exists
-		bgColor := pt.BackgroundGradient(ray, scene)
-		totalEmission = totalEmission.Add(bgColor)
 
 		return totalEmission.Multiply(rrCompensation)
 	}
@@ -224,21 +219,6 @@ func (pt *PathTracingIntegrator) ApplyRussianRoulette(depth int, throughput core
 	// Energy-conserving compensation (no artificial cap)
 	compensationFactor := 1.0 / survivalProb
 	return false, compensationFactor
-}
-
-// backgroundGradient returns a gradient color based on ray direction
-func (pt *PathTracingIntegrator) BackgroundGradient(r core.Ray, scene core.Scene) core.Vec3 {
-	// Get colors from the scene
-	topColor, bottomColor := scene.GetBackgroundColors()
-
-	// Normalize the ray direction to get consistent results
-	unitDirection := r.Direction.Normalize()
-
-	// Use the y-component to create a gradient (map from -1,1 to 0,1)
-	t := 0.5 * (unitDirection.Y + 1.0)
-
-	// Linear interpolation: (1-t)*bottom + t*top
-	return bottomColor.Multiply(1.0 - t).Add(topColor.Multiply(t))
 }
 
 func (pt *PathTracingIntegrator) logf(format string, a ...interface{}) {
