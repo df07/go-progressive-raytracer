@@ -97,7 +97,7 @@ func addCausticGlassLighting(s *Scene, lightType core.LightType) {
 
 	// Add uniform infinite light (replaces background gradient)
 	// PBRT scene uses "infinite" "rgb L" [ 0.1000000015 0.1000000015 0.1000000015 ]
-	s.AddUniformInfiniteLight(core.NewVec3(0.2, 0.2, 0.2))
+	s.AddUniformInfiniteLight(core.NewVec3(0.1, 0.1, 0.1))
 }
 
 // addCausticGlassMeshes loads the PLY files and adds them to the scene
