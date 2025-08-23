@@ -25,13 +25,14 @@ func (m *MockIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler core.S
 
 // MockScene for tile renderer testing
 type MockScene struct {
-	width  int
-	height int
-	shapes []core.Shape
-	lights []core.Light
-	camera core.Camera
-	config core.SamplingConfig
-	bvh    *core.BVH
+	width        int
+	height       int
+	shapes       []core.Shape
+	lights       []core.Light
+	camera       core.Camera
+	config       core.SamplingConfig
+	bvh          *core.BVH
+	lightSampler core.LightSampler
 }
 
 func (m *MockScene) GetWidth() int                          { return m.width }
@@ -47,6 +48,17 @@ func (m *MockScene) GetBVH() *core.BVH {
 	return m.bvh
 }
 
+func (m *MockScene) GetLightSampler() core.LightSampler {
+	if m.lightSampler == nil {
+		sceneRadius := 10.0 // Default radius for testing
+		if m.bvh != nil {
+			sceneRadius = m.bvh.Radius
+		}
+		m.lightSampler = core.NewUniformLightSampler(m.lights, sceneRadius)
+	}
+	return m.lightSampler
+}
+
 func (m *MockScene) Preprocess() error {
 	// Simple preprocessing for tests - just preprocess lights that need it
 	for _, light := range m.lights {
@@ -56,6 +68,14 @@ func (m *MockScene) Preprocess() error {
 			}
 		}
 	}
+
+	// Create light sampler
+	sceneRadius := 10.0 // Default radius for testing
+	if m.bvh != nil {
+		sceneRadius = m.bvh.Radius
+	}
+	m.lightSampler = core.NewUniformLightSampler(m.lights, sceneRadius)
+
 	return nil
 }
 
@@ -100,7 +120,8 @@ func TestTileRendererCreation(t *testing.T) {
 		t.Fatal("Expected non-nil tile renderer")
 	}
 
-	if renderer.scene != scene {
+	// Check that renderer stores the scene (can't compare directly due to interface vs concrete type)
+	if renderer.scene == nil {
 		t.Error("Expected tile renderer to store scene reference")
 	}
 

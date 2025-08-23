@@ -95,6 +95,21 @@ type EmissionSample struct {
 	DirectionPDF float64
 }
 
+// LightSampler interface for different light sampling strategies
+type LightSampler interface {
+	// SampleLight selects a light for the given surface point and returns the light, selection probability, and light index
+	SampleLight(point Vec3, normal Vec3, u float64) (Light, float64, int)
+
+	// SampleLightEmission selects a light for emission sampling and returns the light, selection probability, and light index
+	SampleLightEmission(u float64) (Light, float64, int)
+
+	// GetLightProbability returns the selection probability for a specific light at a surface point
+	GetLightProbability(lightIndex int, point Vec3, normal Vec3) float64
+
+	// GetLightCount returns the number of lights in this sampler
+	GetLightCount() int
+}
+
 // CameraSample represents camera sampling result for t=1 strategies
 type CameraSample struct {
 	Ray    Ray     // Ray from camera toward reference point
@@ -128,6 +143,7 @@ type Scene interface {
 	GetCamera() Camera
 	GetShapes() []Shape
 	GetLights() []Light
+	GetLightSampler() LightSampler // For light sampling
 	GetSamplingConfig() SamplingConfig
 	GetBVH() *BVH      // For integrators to access acceleration structure
 	Preprocess() error // Preprocess scene objects that need it

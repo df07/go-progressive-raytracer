@@ -9,10 +9,11 @@ import (
 
 // Vertex represents a single vertex in a light transport path
 type Vertex struct {
-	Point    core.Vec3     // 3D position
-	Normal   core.Vec3     // Surface normal
-	Light    core.Light    // Light at this vertex
-	Material core.Material // Material at this vertex
+	Point      core.Vec3     // 3D position
+	Normal     core.Vec3     // Surface normal
+	Light      core.Light    // Light at this vertex (TODO: remove after cleanup)
+	LightIndex int           // Index of light in scene's light array (-1 if not a light vertex)
+	Material   core.Material // Material at this vertex
 
 	// Path tracing information
 	IncomingDirection core.Vec3 // Direction ray arrived from
@@ -143,15 +144,16 @@ func (bdpt *BDPTIntegrator) generateLightPath(scene core.Scene, sampler core.Sam
 		return path
 	}
 
-	sampledLight := lights[int(sampler.Get1D()*float64(len(lights)))]
+	lightSampler := scene.GetLightSampler()
+	sampledLight, lightSelectionPdf, lightIndex := lightSampler.SampleLightEmission(sampler.Get1D())
 	emissionSample := sampledLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
-	lightSelectionPdf := 1.0 / float64(len(lights))
 	cosTheta := emissionSample.Direction.AbsDot(emissionSample.Normal)
 
 	lightVertex := Vertex{
 		Point:           emissionSample.Point,
 		Normal:          emissionSample.Normal,
-		Light:           sampledLight,
+		Light:           sampledLight, // TODO: remove after cleanup
+		LightIndex:      lightIndex,
 		AreaPdfForward:  emissionSample.AreaPDF * lightSelectionPdf, // probability of generating this point is the light sampling pdf
 		AreaPdfReverse:  0.0,                                        // probability of generating this point in reverse is set by MIS weight calculation
 		IsLight:         true,
@@ -216,7 +218,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 				}
 
 				vertex := createBackgroundVertex(currentRay, totalEmission, beta, pdfFwd)
-				path.Vertices = append(path.Vertices, vertex)
+				path.Vertices = append(path.Vertices, *vertex)
 				path.Length++
 			}
 			break
@@ -332,8 +334,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
 
-	lights := scene.GetLights()
-	lightSample, sampledLight, hasLight := core.SampleLight(lights, cameraVertex.Point, cameraVertex.Normal, sampler)
+	lightSample, sampledLight, hasLight := core.SampleLight(scene, cameraVertex.Point, cameraVertex.Normal, sampler)
 	if !hasLight || lightSample.Emission.IsZero() || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
@@ -369,7 +370,8 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	sampledVertex := &Vertex{
 		Point:           lightSample.Point,
 		Normal:          lightSample.Normal,
-		Light:           sampledLight,
+		Light:           sampledLight,    // TODO: remove after cleanup
+		LightIndex:      -1,              // TODO: get actual light index from core.SampleLight
 		AreaPdfForward:  lightSample.PDF, // probability of generating this point is the light sampling pdf
 		AreaPdfReverse:  0.0,             // probability of generating this point in reverse is set by MIS weight calculation
 		IsLight:         true,
@@ -564,10 +566,10 @@ func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.
 	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, vertex.Normal)
 }
 
-func createBackgroundVertex(ray core.Ray, bgColor core.Vec3, beta core.Vec3, pdfFwd float64) Vertex {
+func createBackgroundVertex(ray core.Ray, bgColor core.Vec3, beta core.Vec3, pdfFwd float64) *Vertex {
 	// For background (infinite area light), we should use solid angle PDF directly
 	// Don't convert to area PDF since background is at infinite distance
-	return Vertex{
+	return &Vertex{
 		Point:             ray.Origin.Add(ray.Direction.Multiply(1000.0)), // Far background
 		Normal:            ray.Direction.Multiply(-1),                     // Reverse direction
 		IncomingDirection: ray.Direction.Multiply(-1),

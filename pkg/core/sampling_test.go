@@ -51,10 +51,39 @@ func (ml *MockLight) Emit(ray Ray) Vec3 {
 	return Vec3{X: 0, Y: 0, Z: 0}
 }
 
+// Note: CalculatePower method removed - using importance-based sampling now
+
+// MockScene implements the Scene interface for testing
+type MockScene struct {
+	lights       []Light
+	lightSampler LightSampler
+	bvh          *BVH
+}
+
+func NewMockScene(lights []Light) *MockScene {
+	// Create a minimal BVH for testing
+	bvh := &BVH{Root: nil, Center: Vec3{}, Radius: 10.0}
+	lightSampler := NewUniformLightSampler(lights, 10.0)
+
+	return &MockScene{
+		lights:       lights,
+		lightSampler: lightSampler,
+		bvh:          bvh,
+	}
+}
+
+func (ms *MockScene) GetCamera() Camera                 { return nil }
+func (ms *MockScene) GetShapes() []Shape                { return nil }
+func (ms *MockScene) GetLights() []Light                { return ms.lights }
+func (ms *MockScene) GetLightSampler() LightSampler     { return ms.lightSampler }
+func (ms *MockScene) GetSamplingConfig() SamplingConfig { return SamplingConfig{} }
+func (ms *MockScene) GetBVH() *BVH                      { return ms.bvh }
+func (ms *MockScene) Preprocess() error                 { return nil }
+
 func TestSampleLightEmission(t *testing.T) {
 	// Test with no lights
-	var emptyLights []Light
-	_, found := SampleLightEmission(emptyLights, NewRandomSampler(rand.New(rand.NewSource(42))))
+	emptyScene := NewMockScene([]Light{})
+	_, found := SampleLightEmission(emptyScene, NewRandomSampler(rand.New(rand.NewSource(42))))
 	if found {
 		t.Error("Expected no sample from empty light list")
 	}
@@ -62,17 +91,18 @@ func TestSampleLightEmission(t *testing.T) {
 	// Test with single light
 	emission := NewVec3(5.0, 5.0, 5.0)
 	mockLight := &MockLight{emission: emission, pdf: 0.5}
-	lights := []Light{mockLight}
+	singleLightScene := NewMockScene([]Light{mockLight})
 
 	random := rand.New(rand.NewSource(42))
-	sample, found := SampleLightEmission(lights, NewRandomSampler(random))
+	sample, found := SampleLightEmission(singleLightScene, NewRandomSampler(random))
 
 	if !found {
 		t.Error("Expected to find sample from single light")
 	}
 
-	// Area PDF should be divided by number of lights
-	expectedAreaPDF := mockLight.pdf / float64(len(lights))
+	// With importance sampling for emission, we use uniform selection (no surface point)
+	// So the area PDF should just be the light's PDF
+	expectedAreaPDF := mockLight.pdf
 	if math.Abs(sample.AreaPDF-expectedAreaPDF) > 1e-9 {
 		t.Errorf("AreaPDF incorrect: got %f, expected %f", sample.AreaPDF, expectedAreaPDF)
 	}
@@ -83,9 +113,9 @@ func TestSampleLightEmission(t *testing.T) {
 
 	// Test with multiple lights
 	mockLight2 := &MockLight{emission: NewVec3(3.0, 3.0, 3.0), pdf: 0.8}
-	multiLights := []Light{mockLight, mockLight2}
+	multiLightScene := NewMockScene([]Light{mockLight, mockLight2})
 
-	sample2, found2 := SampleLightEmission(multiLights, NewRandomSampler(random))
+	sample2, found2 := SampleLightEmission(multiLightScene, NewRandomSampler(random))
 	if !found2 {
 		t.Error("Expected to find sample from multiple lights")
 	}

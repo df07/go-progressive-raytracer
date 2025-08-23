@@ -97,45 +97,57 @@ func SphereConePDF(distance, radius float64) float64 {
 }
 
 // CalculateLightPDF calculates the combined PDF for a given direction toward multiple lights
-func CalculateLightPDF(lights []Light, point, normal, direction Vec3) float64 {
+func CalculateLightPDF(scene Scene, point, normal, direction Vec3) float64 {
+	lights := scene.GetLights()
 	if len(lights) == 0 {
 		return 0.0
 	}
 
+	lightSampler := scene.GetLightSampler()
 	totalPDF := 0.0
-	for _, light := range lights {
+
+	// For each light, calculate the PDF weighted by its selection probability
+	for i, light := range lights {
 		lightPDF := light.PDF(point, normal, direction)
-		// Weight by light selection probability (uniform selection)
-		totalPDF += lightPDF / float64(len(lights))
+		lightSelectionPdf := lightSampler.GetLightProbability(i, point, normal)
+		totalPDF += lightPDF * lightSelectionPdf
 	}
 
 	return totalPDF
 }
 
-// SampleLight randomly selects and samples a light from the scene
-func SampleLight(lights []Light, point Vec3, normal Vec3, sampler Sampler) (LightSample, Light, bool) {
+// SampleLight selects and samples a light from the scene using importance sampling
+func SampleLight(scene Scene, point Vec3, normal Vec3, sampler Sampler) (LightSample, Light, bool) {
+	lights := scene.GetLights()
 	if len(lights) == 0 {
 		return LightSample{}, nil, false
 	}
 
-	sampledLight := lights[int(sampler.Get1D()*float64(len(lights)))]
-	sample := sampledLight.Sample(point, normal, sampler.Get2D())
-	sample.PDF *= 1.0 / float64(len(lights))
+	// Use importance-based light sampler that considers surface point and normal
+	lightSampler := scene.GetLightSampler()
+	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLight(point, normal, sampler.Get1D())
 
-	return sample, sampledLight, true
+	sample := selectedLight.Sample(point, normal, sampler.Get2D())
+	sample.PDF *= lightSelectionPdf // Combined PDF for MIS calculations
+
+	return sample, selectedLight, true
 }
 
-// SampleLightEmission randomly selects and samples emission from a light in the scene
-func SampleLightEmission(lights []Light, sampler Sampler) (EmissionSample, bool) {
+// SampleLightEmission selects and samples emission from a light using uniform sampling
+// For emission sampling, we don't have a specific surface point, so use uniform distribution
+func SampleLightEmission(scene Scene, sampler Sampler) (EmissionSample, bool) {
+	lights := scene.GetLights()
 	if len(lights) == 0 {
 		return EmissionSample{}, false
 	}
 
-	sampledLight := lights[int(sampler.Get1D()*float64(len(lights)))]
-	sample := sampledLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
+	// Use uniform sampling for emission since we don't have a specific surface point
+	lightSampler := scene.GetLightSampler()
+	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLightEmission(sampler.Get1D())
+
+	sample := selectedLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
 	// Apply light selection probability to area PDF only (combined effect when multiplied)
-	lightSelectionProb := 1.0 / float64(len(lights))
-	sample.AreaPDF *= lightSelectionProb
+	sample.AreaPDF *= lightSelectionPdf
 	// Don't modify DirectionPDF - it's independent of light selection
 
 	return sample, true

@@ -7,28 +7,36 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
-// MockScene for tile renderer testing
+// MockScene for geometry testing
 type MockScene struct {
-	width       int
-	height      int
-	shapes      []core.Shape
-	lights      []core.Light
-	topColor    core.Vec3
-	bottomColor core.Vec3
-	camera      core.Camera
-	config      core.SamplingConfig
-	bvh         *core.BVH
+	width        int
+	height       int
+	shapes       []core.Shape
+	lights       []core.Light
+	camera       core.Camera
+	config       core.SamplingConfig
+	bvh          *core.BVH
+	lightSampler core.LightSampler
 }
 
-func (m *MockScene) GetWidth() int                               { return m.width }
-func (m *MockScene) GetHeight() int                              { return m.height }
-func (m *MockScene) GetCamera() core.Camera                      { return m.camera }
-func (m *MockScene) GetBackgroundColors() (core.Vec3, core.Vec3) { return m.topColor, m.bottomColor }
-func (m *MockScene) GetShapes() []core.Shape                     { return m.shapes }
-func (m *MockScene) GetLights() []core.Light                     { return m.lights }
-func (m *MockScene) GetSamplingConfig() core.SamplingConfig      { return m.config }
-func (m *MockScene) GetBVH() *core.BVH                           { return m.bvh }
-func (m *MockScene) Preprocess() error                           { return nil }
+func (m *MockScene) GetWidth() int                          { return m.width }
+func (m *MockScene) GetHeight() int                         { return m.height }
+func (m *MockScene) GetCamera() core.Camera                 { return m.camera }
+func (m *MockScene) GetShapes() []core.Shape                { return m.shapes }
+func (m *MockScene) GetLights() []core.Light                { return m.lights }
+func (m *MockScene) GetSamplingConfig() core.SamplingConfig { return m.config }
+func (m *MockScene) GetBVH() *core.BVH                      { return m.bvh }
+func (m *MockScene) GetLightSampler() core.LightSampler {
+	if m.lightSampler == nil {
+		sceneRadius := 10.0 // Default radius for testing
+		if m.bvh != nil {
+			sceneRadius = m.bvh.Radius
+		}
+		m.lightSampler = core.NewUniformLightSampler(m.lights, sceneRadius)
+	}
+	return m.lightSampler
+}
+func (m *MockScene) Preprocess() error { return nil }
 
 func TestGradientInfiniteLight_Type(t *testing.T) {
 	light := NewGradientInfiniteLight(

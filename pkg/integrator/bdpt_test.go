@@ -648,10 +648,11 @@ func createMinimalCornellScene(includeBoxes bool) core.Scene {
 
 // TestScene is a minimal scene implementation for testing
 type TestScene struct {
-	shapes []core.Shape
-	lights []core.Light
-	bvh    *core.BVH
-	camera *renderer.Camera
+	shapes       []core.Shape
+	lights       []core.Light
+	bvh          *core.BVH
+	camera       *renderer.Camera
+	lightSampler core.LightSampler
 }
 
 func (s *TestScene) GetShapes() []core.Shape { return s.shapes }
@@ -662,9 +663,15 @@ func (s *TestScene) GetBVH() *core.BVH {
 	}
 	return s.bvh
 }
-func (s *TestScene) GetBackgroundColors() (core.Vec3, core.Vec3) {
-	// Black background for simplicity
-	return core.NewVec3(0, 0, 0), core.NewVec3(0, 0, 0)
+func (s *TestScene) GetLightSampler() core.LightSampler {
+	if s.lightSampler == nil {
+		sceneRadius := 10.0 // Default radius for testing
+		if s.bvh != nil {
+			sceneRadius = s.bvh.Radius
+		}
+		s.lightSampler = core.NewUniformLightSampler(s.lights, sceneRadius)
+	}
+	return s.lightSampler
 }
 func (s *TestScene) GetSamplingConfig() core.SamplingConfig {
 	return core.SamplingConfig{MaxDepth: 5, SamplesPerPixel: 1}
@@ -697,5 +704,13 @@ func (s *TestScene) Preprocess() error {
 			}
 		}
 	}
+
+	// Create light sampler
+	sceneRadius := 10.0 // Default radius for testing
+	if s.bvh != nil {
+		sceneRadius = s.bvh.Radius
+	}
+	s.lightSampler = core.NewUniformLightSampler(s.lights, sceneRadius)
+
 	return nil
 }

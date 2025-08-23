@@ -456,7 +456,10 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Ver
 	if len(lights) == 0 {
 		return 0
 	}
-	pdfChoice := 1.0 / float64(len(lights)) // Uniform light selection
+
+	// Use the actual light selection probability from the light sampler
+	lightSampler := scene.GetLightSampler()
+	pdfChoice := lightSampler.GetLightProbability(lightVertex.LightIndex, lightVertex.Point, lightVertex.Normal)
 
 	// Get position PDF from the light's EmissionPDF
 	// This is equivalent to PBRT's light->Pdf_Le(..., &pdfPos, &pdfDir)
@@ -475,14 +478,16 @@ func (bdpt *BDPTIntegrator) calculateInfiniteLightDensity(point, normal, directi
 	}
 
 	var totalPdf float64
-	lightSelectionPdf := 1.0 / float64(len(lights)) // Uniform light selection
+	lightSampler := scene.GetLightSampler()
 
 	// Sum PDFs of all infinite lights in this direction
-	for _, light := range lights {
+	for i, light := range lights {
 		if light.Type() == core.LightTypeInfinite {
 			// Use cosine-weighted hemisphere PDF (matches light.Sample behavior)
 			// This corresponds to PBRT's light.PDF_Li(Interaction(), direction)
 			directionalPdf := light.PDF(point, normal, direction)
+			// Get the actual light selection probability from the light sampler
+			lightSelectionPdf := lightSampler.GetLightProbability(i, point, normal)
 			totalPdf += directionalPdf * lightSelectionPdf
 		}
 	}
