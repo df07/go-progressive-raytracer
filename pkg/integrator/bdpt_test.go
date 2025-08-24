@@ -303,31 +303,33 @@ func createSimpleTestScene() core.Scene {
 		FocusDistance: 0.0,
 	}
 	camera := renderer.NewCamera(cameraConfig)
+	lights := []core.Light{light}
 
 	return &MockScene{
 		shapes: []core.Shape{sphere, light.Quad},
-		lights: []core.Light{light},
-		camera: camera,
-		config: core.SamplingConfig{MaxDepth: 5},
+		lights: lights, lightSampler: core.NewUniformLightSampler(lights, 10),
+		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
 }
 
-// Helper function to create a simple scene with a specific light
-func createSceneWithLight(light core.Light) core.Scene {
+// Helper function to create a simple scene with specific lights
+// If weights is provided, uses WeightedLightSampler; otherwise uses uniform sampling
+func createSceneWithLightsAndWeights(lights []core.Light, weights []float64) core.Scene {
 	// Simple diffuse sphere (not used in our tests but needed for complete scene)
 	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -5), 0.5, white)
 
-	var shapes []core.Shape
-	switch l := light.(type) {
-	case *geometry.QuadLight:
-		shapes = []core.Shape{sphere, l.Quad}
-	case *geometry.SphereLight:
-		shapes = []core.Shape{sphere, l.Sphere}
-	case *geometry.PointSpotLight:
-		shapes = []core.Shape{sphere} // Point lights don't have geometry
-	default:
-		shapes = []core.Shape{sphere}
+	var shapes []core.Shape = []core.Shape{sphere}
+
+	// Add geometry for each light that has it
+	for _, light := range lights {
+		switch l := light.(type) {
+		case *geometry.QuadLight:
+			shapes = append(shapes, l.Quad)
+		case *geometry.SphereLight:
+			shapes = append(shapes, l.Sphere)
+			// Point lights and infinite lights don't have geometry
+		}
 	}
 
 	// Simple camera
@@ -337,10 +339,22 @@ func createSceneWithLight(light core.Light) core.Scene {
 	}
 	camera := renderer.NewCamera(cameraConfig)
 
-	return &MockScene{
-		shapes: shapes, lights: []core.Light{light},
+	mockScene := &MockScene{
+		shapes: shapes,
+		lights: lights, lightSampler: core.NewUniformLightSampler(lights, 10),
 		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
+
+	if len(weights) > 0 {
+		mockScene.lightSampler = core.NewWeightedLightSampler(lights, weights, 10.0)
+	}
+
+	return mockScene
+}
+
+// Helper function to create a simple scene with a specific light (backwards compatibility)
+func createSceneWithLight(light core.Light) core.Scene {
+	return createSceneWithLightsAndWeights([]core.Light{light}, []float64{})
 }
 
 // createTestVertex creates a test vertex with specified properties
@@ -366,10 +380,11 @@ func createGlancingTestSceneWithMaterial(mat core.Material) core.Scene {
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
 	camera := renderer.NewCamera(cameraConfig)
+	lights := []core.Light{pointLight}
 
 	return &MockScene{
 		shapes: []core.Shape{sphere},
-		lights: []core.Light{pointLight},
+		lights: lights, lightSampler: core.NewUniformLightSampler(lights, 10),
 		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
 }
@@ -407,10 +422,11 @@ func createLightSceneWithMaterial(mat core.Material) core.Scene {
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
 	camera := renderer.NewCamera(cameraConfig)
+	lights := []core.Light{quadLight}
 
 	return &MockScene{
 		shapes: []core.Shape{sphere, boundingSphere},
-		lights: []core.Light{quadLight},
+		lights: lights, lightSampler: core.NewUniformLightSampler(lights, 10),
 		camera: camera, config: core.SamplingConfig{MaxDepth: 5},
 	}
 }
@@ -454,16 +470,21 @@ func createTestCameraPath(materials []core.Material, positions []core.Vec3) Path
 
 	// Subsequent vertices use provided materials
 	for i := 1; i < len(positions); i++ {
-		material := materials[i-1]
-		// For test purposes, assume Metal and Dielectric are specular
-		// This is a simplification - in reality we'd check PDF behavior
+		mat := materials[i-1]
+
+		// TODO: check proper specular and emissive types
 		isSpecular := false
+		isEmissive := false
+
+		//_, isSpecular := mat.(*material.Metal)
+		//_, isEmissive := mat.(*material.Emissive)
 
 		vertices[i] = Vertex{
 			Point:          positions[i],
 			Normal:         core.NewVec3(0, 1, 0), // upward normal
-			Material:       material,
+			Material:       mat,
 			IsSpecular:     isSpecular,
+			IsLight:        isEmissive,
 			Beta:           core.Vec3{X: 0.7, Y: 0.7, Z: 0.7}, // typical diffuse reflectance
 			AreaPdfForward: 1.0 / math.Pi,                     // cosine-weighted hemisphere sampling
 			AreaPdfReverse: 1.0 / math.Pi,
@@ -643,6 +664,8 @@ func createMinimalCornellScene(includeBoxes bool) core.Scene {
 		scene.shapes = append(scene.shapes, shortBox, tallBox)
 	}
 
+	scene.lightSampler = core.NewUniformLightSampler(scene.lights, 10)
+
 	return scene
 }
 
@@ -664,13 +687,6 @@ func (s *TestScene) GetBVH() *core.BVH {
 	return s.bvh
 }
 func (s *TestScene) GetLightSampler() core.LightSampler {
-	if s.lightSampler == nil {
-		sceneRadius := 10.0 // Default radius for testing
-		if s.bvh != nil {
-			sceneRadius = s.bvh.Radius
-		}
-		s.lightSampler = core.NewUniformLightSampler(s.lights, sceneRadius)
-	}
 	return s.lightSampler
 }
 func (s *TestScene) GetSamplingConfig() core.SamplingConfig {

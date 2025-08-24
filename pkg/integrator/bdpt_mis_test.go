@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
@@ -156,6 +157,7 @@ func TestCalculateMISWeight(t *testing.T) {
 		expectedWeight float64
 		tolerance      float64
 		description    string
+		customScene    func() core.Scene // Optional custom scene factory
 	}{
 		// Basic case - test the trivial s+t==2 early return
 		{
@@ -332,11 +334,52 @@ func TestCalculateMISWeight(t *testing.T) {
 			tolerance:      0.001,
 			description:    "Complex path with specular bounces on both light and camera paths",
 		},
+
+		// ========== WEIGHTED LIGHT SAMPLER TEST ==========
+		{
+			name: "WeightedLightSampler_PathTracing_s0t3",
+			cameraPath: func() Path {
+				path := createTestCameraPath([]core.Material{white, emissive}, []core.Vec3{
+					core.NewVec3(0, 0, 0),  // camera
+					core.NewVec3(0, 0, -1), // diffuse surface
+					core.NewVec3(0, 2, -1), // camera path hits light directly (second light)
+				})
+				// Fix up the last vertex to be a proper light vertex
+				lightVertex := &path.Vertices[2]
+				lightVertex.IsLight = true
+				lightVertex.LightIndex = 1 // Index of second light in weighted scene
+				lightVertex.Light = geometry.NewQuadLight(
+					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
+					material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
+				return path
+			}(),
+			lightPath:     Path{Vertices: []Vertex{}, Length: 0}, // No light path for s=0
+			sampledVertex: nil,                                   // No sampledVertex needed for s=0 strategies
+			s:             0, t: 3,
+			expectedWeight: 0.087650, // Actual weight with weighted sampler (0.2, 0.8 weights)
+			tolerance:      0.001,    // Very tight tolerance (0.1%)
+			description:    "Path tracing hitting light with weighted sampler - verifies MIS uses actual sampler weights",
+			customScene: func() core.Scene {
+				// Create two lights with different emissions to test weighted sampling
+				light1 := geometry.NewQuadLight(
+					core.NewVec3(-1.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0), material.NewEmissive(core.NewVec3(2.0, 2.0, 2.0)))
+				light2 := geometry.NewQuadLight(
+					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0), material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
+
+				// Use weighted sampling: 20% weight to first light, 80% to second light
+				return createSceneWithLightsAndWeights([]core.Light{light1, light2}, []float64{0.2, 0.8})
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			scene := createSimpleTestScene()
+			var scene core.Scene
+			if tt.customScene != nil {
+				scene = tt.customScene()
+			} else {
+				scene = createSimpleTestScene()
+			}
 
 			// Add detailed validation using sampledVertex from test case
 			weight := integrator.calculateMISWeight(&tt.cameraPath, &tt.lightPath, tt.sampledVertex, tt.s, tt.t, scene)
