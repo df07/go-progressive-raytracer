@@ -260,6 +260,27 @@ func TestCalculateMISWeight(t *testing.T) {
 			description:    "Path tracing with multiple bounces - tests complex MIS logic",
 		},
 		{
+			name: "PathTracing_s0t3_HitsLight",
+			cameraPath: func() Path {
+				// Create a light for the path tracing to hit
+				hitLight := geometry.NewQuadLight(
+					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
+					material.NewEmissive(core.NewVec3(4.0, 4.0, 4.0)))
+
+				return createTestCameraPathWithLight([]core.Material{white, emissive}, []core.Vec3{
+					core.NewVec3(0, 0, 0),  // camera
+					core.NewVec3(0, 0, -1), // diffuse bounce
+					core.NewVec3(0, 2, -1), // path hits light directly
+				}, hitLight)
+			}(),
+			lightPath:     Path{Vertices: []Vertex{}, Length: 0}, // No light path for s=0
+			sampledVertex: nil,                                   // No sampledVertex needed for s=0 strategies
+			s:             0, t: 3,
+			expectedWeight: 0.071371, // Actual calculated weight for s=0 path tracing hitting light
+			tolerance:      0.001,    // Very tight tolerance (0.1%)
+			description:    "Path tracing hitting light directly - tests light sampling in path tracing context",
+		},
+		{
 			name: "MultiBounceGlass_s1t3",
 			cameraPath: createTestCameraPath([]core.Material{glass, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
@@ -271,7 +292,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			}),
 			s: 1, t: 3,
 			sampledVertex:  createSampledLightVertex(), // Direct lighting requires sampled light vertex
-			expectedWeight: 0.071113,                   // Actual calculated MIS weight
+			expectedWeight: 0.951539,                   // Actual calculated MIS weight (glass now properly detected as specular)
 			tolerance:      0.001,                      // Tight tolerance
 			description:    "Direct lighting through glass to diffuse surface",
 		},
@@ -292,7 +313,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			}),
 			s: 1, t: 3,
 			sampledVertex:  createSampledLightVertex(), // Direct lighting requires sampled light vertex
-			expectedWeight: 0.071113,                   // Light connects after specular bounce
+			expectedWeight: 0.951539,                   // Light connects after specular bounce
 			tolerance:      0.001,
 			description:    "Light connection after perfect specular reflection",
 		},
@@ -339,18 +360,19 @@ func TestCalculateMISWeight(t *testing.T) {
 		{
 			name: "WeightedLightSampler_PathTracing_s0t3",
 			cameraPath: func() Path {
-				path := createTestCameraPath([]core.Material{white, emissive}, []core.Vec3{
+				// Create the light that the camera path will hit
+				hitLight := geometry.NewQuadLight(
+					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
+					material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
+
+				path := createTestCameraPathWithLight([]core.Material{white, emissive}, []core.Vec3{
 					core.NewVec3(0, 0, 0),  // camera
 					core.NewVec3(0, 0, -1), // diffuse surface
 					core.NewVec3(0, 2, -1), // camera path hits light directly (second light)
-				})
-				// Fix up the last vertex to be a proper light vertex
-				lightVertex := &path.Vertices[2]
-				lightVertex.IsLight = true
-				lightVertex.LightIndex = 1 // Index of second light in weighted scene
-				lightVertex.Light = geometry.NewQuadLight(
-					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
-					material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
+				}, hitLight)
+
+				// Set the correct light index for the weighted scene
+				path.Vertices[2].LightIndex = 1 // Index of second light in weighted scene
 				return path
 			}(),
 			lightPath:     Path{Vertices: []Vertex{}, Length: 0}, // No light path for s=0

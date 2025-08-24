@@ -453,6 +453,10 @@ func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera 
 
 // createTestCameraPath creates a camera path with specified materials and positions
 func createTestCameraPath(materials []core.Material, positions []core.Vec3) Path {
+	return createTestCameraPathWithLight(materials, positions, nil)
+}
+
+func createTestCameraPathWithLight(materials []core.Material, positions []core.Vec3, hitLight core.Light) Path {
 	if len(positions) != len(materials)+1 {
 		panic("positions must be one more than materials")
 	}
@@ -472,12 +476,11 @@ func createTestCameraPath(materials []core.Material, positions []core.Vec3) Path
 	for i := 1; i < len(positions); i++ {
 		mat := materials[i-1]
 
-		// TODO: check proper specular and emissive types
-		isSpecular := false
-		isEmissive := false
-
-		//_, isSpecular := mat.(*material.Metal)
-		//_, isEmissive := mat.(*material.Emissive)
+		// Check proper specular and emissive types
+		_, isMetalSpecular := mat.(*material.Metal)
+		_, isDielectricSpecular := mat.(*material.Dielectric)
+		isSpecular := isMetalSpecular || isDielectricSpecular
+		_, isEmissive := mat.(*material.Emissive)
 
 		vertices[i] = Vertex{
 			Point:          positions[i],
@@ -488,6 +491,17 @@ func createTestCameraPath(materials []core.Material, positions []core.Vec3) Path
 			Beta:           core.Vec3{X: 0.7, Y: 0.7, Z: 0.7}, // typical diffuse reflectance
 			AreaPdfForward: 1.0 / math.Pi,                     // cosine-weighted hemisphere sampling
 			AreaPdfReverse: 1.0 / math.Pi,
+		}
+
+		// If this is the last vertex, it's emissive, and we have a hitLight, set it up properly
+		if i == len(positions)-1 && isEmissive && hitLight != nil {
+			vertices[i].Light = hitLight
+			vertices[i].LightIndex = 0 // Default to light index 0 for tests
+			// Set EmittedLight using the same pattern as BDPT - use incoming ray
+			incomingRay := core.NewRayTo(positions[i-1], positions[i])
+			if emitter, isEmissive := mat.(core.Emitter); isEmissive {
+				vertices[i].EmittedLight = emitter.Emit(incomingRay)
+			}
 		}
 	}
 
@@ -520,14 +534,16 @@ func createTestLightPath(materials []core.Material, positions []core.Vec3) Path 
 
 	// Subsequent vertices are bounces from the light
 	for i := 1; i < len(positions); i++ {
-		material := materials[i]
-		// For test purposes, assume Metal and Dielectric are specular
-		isSpecular := false
+		mat := materials[i]
+		// Check if material is specular (Metal or Dielectric)
+		_, isMetalSpecular := mat.(*material.Metal)
+		_, isDielectricSpecular := mat.(*material.Dielectric)
+		isSpecular := isMetalSpecular || isDielectricSpecular
 
 		vertices[i] = Vertex{
 			Point:          positions[i],
 			Normal:         core.NewVec3(0, 1, 0),
-			Material:       material,
+			Material:       mat,
 			IsSpecular:     isSpecular,
 			Beta:           core.Vec3{X: 0.7, Y: 0.7, Z: 0.7},
 			AreaPdfForward: 1.0 / math.Pi,

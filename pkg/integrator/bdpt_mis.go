@@ -223,7 +223,7 @@ func (bdpt *BDPTIntegrator) calculateMISCameraVertexPdfs(cameraIdx int, cameraPa
 	case s == 0:
 		// Path tracing strategy
 		if cameraIdx == t-1 && t > 1 {
-			// Vertex t-1 should be a light, calculate reverse pdf from light origin
+			// Vertex t-1 may be a light, calculate reverse pdf from light origin if so
 			reversePdf = bdpt.calculateLightOriginPdf(&cameraPath.Vertices[t-1], &cameraPath.Vertices[t-2], scene)
 			isConnectible = true
 		} else if cameraIdx == t-2 && t > 2 {
