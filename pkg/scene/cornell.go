@@ -6,7 +6,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
 // CornellGeometryType represents the type of geometry to use in the Cornell box
@@ -19,10 +18,10 @@ const (
 )
 
 // NewCornellScene creates a classic Cornell box scene with quad walls and area lighting
-func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...core.CameraConfig) *Scene {
 	// Setup camera and basic scene configuration
 	cameraConfig := setupCornellCamera(cameraOverrides...)
-	camera := renderer.NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	s := &Scene{
 		Camera:         camera,
@@ -45,8 +44,8 @@ func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...render
 }
 
 // setupCornellCamera configures the camera for the Cornell box scene
-func setupCornellCamera(cameraOverrides ...renderer.CameraConfig) renderer.CameraConfig {
-	defaultCameraConfig := renderer.CameraConfig{
+func setupCornellCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
+	defaultCameraConfig := core.CameraConfig{
 		Center:        core.NewVec3(278, 278, -800), // Centered camera position
 		LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
 		Up:            core.NewVec3(0, 1, 0),        // Standard up direction
@@ -60,7 +59,7 @@ func setupCornellCamera(cameraOverrides ...renderer.CameraConfig) renderer.Camer
 	// Apply any overrides using the reusable merge function
 	cameraConfig := defaultCameraConfig
 	if len(cameraOverrides) > 0 {
-		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
+		cameraConfig = geometry.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
 	return cameraConfig

@@ -83,7 +83,7 @@ func (ms *MockScene) Preprocess() error                 { return nil }
 func TestSampleLightEmission(t *testing.T) {
 	// Test with no lights
 	emptyScene := NewMockScene([]Light{})
-	_, found := SampleLightEmission(emptyScene, NewRandomSampler(rand.New(rand.NewSource(42))))
+	_, found := SampleLightEmission(emptyScene.lights, emptyScene.lightSampler, NewRandomSampler(rand.New(rand.NewSource(42))))
 	if found {
 		t.Error("Expected no sample from empty light list")
 	}
@@ -94,7 +94,7 @@ func TestSampleLightEmission(t *testing.T) {
 	singleLightScene := NewMockScene([]Light{mockLight})
 
 	random := rand.New(rand.NewSource(42))
-	sample, found := SampleLightEmission(singleLightScene, NewRandomSampler(random))
+	sample, found := SampleLightEmission(singleLightScene.lights, singleLightScene.lightSampler, NewRandomSampler(random))
 
 	if !found {
 		t.Error("Expected to find sample from single light")
@@ -115,7 +115,7 @@ func TestSampleLightEmission(t *testing.T) {
 	mockLight2 := &MockLight{emission: NewVec3(3.0, 3.0, 3.0), pdf: 0.8}
 	multiLightScene := NewMockScene([]Light{mockLight, mockLight2})
 
-	sample2, found2 := SampleLightEmission(multiLightScene, NewRandomSampler(random))
+	sample2, found2 := SampleLightEmission(multiLightScene.lights, multiLightScene.lightSampler, NewRandomSampler(random))
 	if !found2 {
 		t.Error("Expected to find sample from multiple lights")
 	}

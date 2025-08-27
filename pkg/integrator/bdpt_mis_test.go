@@ -7,6 +7,7 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // ============================================================================
@@ -157,7 +158,7 @@ func TestCalculateMISWeight(t *testing.T) {
 		expectedWeight float64
 		tolerance      float64
 		description    string
-		customScene    func() core.Scene // Optional custom scene factory
+		customScene    func() *scene.Scene // Optional custom scene factory
 	}{
 		// Basic case - test the trivial s+t==2 early return
 		{
@@ -381,7 +382,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			expectedWeight: 0.087650, // Actual weight with weighted sampler (0.2, 0.8 weights)
 			tolerance:      0.001,    // Very tight tolerance (0.1%)
 			description:    "Path tracing hitting light with weighted sampler - verifies MIS uses actual sampler weights",
-			customScene: func() core.Scene {
+			customScene: func() *scene.Scene {
 				// Create two lights with different emissions to test weighted sampling
 				light1 := geometry.NewQuadLight(
 					core.NewVec3(-1.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0), material.NewEmissive(core.NewVec3(2.0, 2.0, 2.0)))
@@ -396,9 +397,11 @@ func TestCalculateMISWeight(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var scene core.Scene
+			var scene *scene.Scene
 			if tt.customScene != nil {
 				scene = tt.customScene()
+				scene.Preprocess()
+
 			} else {
 				scene = createSimpleTestScene()
 			}
@@ -884,7 +887,7 @@ func TestPdfPropagation(t *testing.T) {
 			var path Path
 
 			if tt.pathType == "camera" {
-				var scene core.Scene
+				var scene *scene.Scene
 				var ray core.Ray
 
 				if tt.sceneName == "cornell" {

@@ -4,7 +4,8 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/integrator"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // TileTask represents a tile rendering task for the worker pool
@@ -45,7 +46,7 @@ type Worker struct {
 }
 
 // NewWorkerPool creates a worker pool with the specified number of workers
-func NewWorkerPool(scene core.Scene, integratorInst core.Integrator, width, height, tileSize int, numWorkers int) *WorkerPool {
+func NewWorkerPool(scene *scene.Scene, integratorInst integrator.Integrator, width, height, tileSize int, numWorkers int) *WorkerPool {
 	if numWorkers <= 0 {
 		numWorkers = runtime.NumCPU()
 	}

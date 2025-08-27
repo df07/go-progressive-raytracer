@@ -4,11 +4,12 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // calculateMISWeightPBRT implements PBRT's MIS weighting for BDPT strategies
 // This compares forward vs reverse PDFs to properly weight different path construction strategies
-func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene *scene.Scene) float64 {
 	disableMISWeight := false
 	if disableMISWeight {
 		return 1.0 / float64(s+t-1)
@@ -163,7 +164,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, 
 
 // calculateMISWeight implements zero-allocation MIS weighting using on-demand PDF calculation
 // Directly copies calculateMISWeightAlt2 logic but eliminates intermediate arrays
-func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene *scene.Scene) float64 {
 	disableMISWeight := false
 	if disableMISWeight {
 		//return 1.0 / float64(s+t-1)
@@ -211,7 +212,7 @@ func (bdpt *BDPTIntegrator) calculateMISWeight(cameraPath, lightPath *Path, samp
 
 // calculateMISCameraVertexPdfs returns PDF values for a camera path vertex at index i
 // Returns (forwardPdf, reversePdf, isConnectible) where isConnectible includes predecessor checks
-func (bdpt *BDPTIntegrator) calculateMISCameraVertexPdfs(cameraIdx int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) (float64, float64, bool) {
+func (bdpt *BDPTIntegrator) calculateMISCameraVertexPdfs(cameraIdx int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene *scene.Scene) (float64, float64, bool) {
 	// Camera path vertex at index i
 	vertex := &cameraPath.Vertices[cameraIdx]
 	forwardPdf := vertex.AreaPdfForward
@@ -273,7 +274,7 @@ func (bdpt *BDPTIntegrator) calculateMISCameraVertexPdfs(cameraIdx int, cameraPa
 
 // calculateMISLightVertexPdfs returns PDF values for a light path vertex at lightIdx
 // Returns (forwardPdf, reversePdf, isConnectible) where isConnectible includes predecessor checks
-func (bdpt *BDPTIntegrator) calculateMISLightVertexPdfs(lightIdx int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene core.Scene) (float64, float64, bool) {
+func (bdpt *BDPTIntegrator) calculateMISLightVertexPdfs(lightIdx int, cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene *scene.Scene) (float64, float64, bool) {
 	// Light path vertex at index lightIdx
 	vertex := &lightPath.Vertices[lightIdx]
 	forwardPdf := vertex.AreaPdfForward
@@ -336,7 +337,7 @@ func (bdpt *BDPTIntegrator) calculateMISLightVertexPdfs(lightIdx int, cameraPath
 // Helper functions for PBRT MIS calculations
 
 // calculateVertexPdf implements PBRT's Vertex::Pdf
-func (bdpt *BDPTIntegrator) calculateVertexPdf(curr *Vertex, prev *Vertex, next *Vertex, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateVertexPdf(curr *Vertex, prev *Vertex, next *Vertex, scene *scene.Scene) float64 {
 	if curr.IsLight {
 		return bdpt.calculateLightPdf(curr, next, scene)
 	}
@@ -367,7 +368,7 @@ func (bdpt *BDPTIntegrator) calculateVertexPdf(curr *Vertex, prev *Vertex, next 
 		// ei.camera->Pdf_We(ei.SpawnRay(wn), &unused, &pdf);
 		// Use our camera PDF implementation
 		ray := core.NewRay(curr.Point, wn)
-		_, pdf = scene.GetCamera().CalculateRayPDFs(ray)
+		_, pdf = scene.Camera.CalculateRayPDFs(ray)
 		if pdf == 0 {
 			return 0
 		}
@@ -389,7 +390,7 @@ func (bdpt *BDPTIntegrator) calculateVertexPdf(curr *Vertex, prev *Vertex, next 
 }
 
 // calculateLightPdf implements PBRT's Vertex::PdfLight
-func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene *scene.Scene) float64 {
 	w := to.Point.Subtract(curr.Point)
 	invDist2 := 1.0 / w.LengthSquared()
 	w = w.Multiply(math.Sqrt(invDist2))
@@ -399,7 +400,7 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 		// Handle infinite area lights (background)
 		if curr.IsInfiniteLight {
 			// PBRT: Compute planar sampling density for infinite light sources
-			worldRadius := scene.GetBVH().Radius
+			worldRadius := scene.BVH.Radius
 
 			// Handle zero radius case (scene with no finite geometry)
 			if worldRadius == 0.0 {
@@ -432,7 +433,7 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene co
 }
 
 // calculateLightOriginPdf implements PBRT's Vertex::PdfLightOrigin
-func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Vertex, scene core.Scene) float64 {
+func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Vertex, scene *scene.Scene) float64 {
 	w := to.Point.Subtract(lightVertex.Point)
 	if w.LengthSquared() == 0 {
 		return 0
@@ -452,13 +453,13 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Ver
 	}
 
 	// Compute the discrete probability of sampling this light
-	lights := scene.GetLights()
+	lights := scene.Lights
 	if len(lights) == 0 {
 		return 0
 	}
 
 	// Use the actual light selection probability from the light sampler
-	lightSampler := scene.GetLightSampler()
+	lightSampler := scene.LightSampler
 	pdfChoice := lightSampler.GetLightProbability(lightVertex.LightIndex, lightVertex.Point, lightVertex.Normal)
 
 	// Get position PDF from the light's EmissionPDF
@@ -471,14 +472,14 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Ver
 // calculateInfiniteLightDensity implements PBRT's InfiniteLightDensity function
 // Sums the directional PDFs of all infinite lights in the given direction, weighted by selection probability
 // Uses cosine-weighted hemisphere PDF for consistency with direct lighting sampling
-func (bdpt *BDPTIntegrator) calculateInfiniteLightDensity(point, normal, direction core.Vec3, scene core.Scene) float64 {
-	lights := scene.GetLights()
+func (bdpt *BDPTIntegrator) calculateInfiniteLightDensity(point, normal, direction core.Vec3, scene *scene.Scene) float64 {
+	lights := scene.Lights
 	if len(lights) == 0 {
 		return 0
 	}
 
 	var totalPdf float64
-	lightSampler := scene.GetLightSampler()
+	lightSampler := scene.LightSampler
 
 	// Sum PDFs of all infinite lights in this direction
 	for i, light := range lights {

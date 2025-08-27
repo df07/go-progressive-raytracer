@@ -110,7 +110,7 @@ type InspectResult struct {
 // inspectPixel casts a ray through the specified pixel coordinates and returns information about the first object hit
 func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) InspectResult {
 	// Get camera and create a ray for the pixel center (no jitter for inspection)
-	camera := sceneObj.GetCamera()
+	camera := sceneObj.Camera
 
 	// Preprocess scene to build the bvh
 	if err := sceneObj.Preprocess(); err != nil {
@@ -123,14 +123,14 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 	ray := camera.GetRay(pixelX, pixelY, sampler.Get2D(), sampler.Get2D())
 
 	// Cast the ray and find the first intersection using scene's BVH
-	hit, isHit := sceneObj.GetBVH().Hit(ray, 0.001, math.Inf(1))
+	hit, isHit := sceneObj.BVH.Hit(ray, 0.001, math.Inf(1))
 	if !isHit {
 		return InspectResult{Hit: false}
 	}
 
 	// Find the specific shape that was hit by testing all shapes
 	// (BVH doesn't return the shape, just the hit record)
-	shapes := sceneObj.GetShapes()
+	shapes := sceneObj.Shapes
 	for _, shape := range shapes {
 		if shapeHit, shapeIsHit := shape.Hit(ray, 0.001, hit.T+0.001); shapeIsHit {
 			if shapeHit.T == hit.T { // Same intersection

@@ -6,13 +6,6 @@ type SplatRay struct {
 	Color Vec3 // Color contribution
 }
 
-// Integrator defines the interface for light transport algorithms
-type Integrator interface {
-	// RayColor computes color for a ray, with support for ray-based splatting
-	// Returns (pixel color, splat rays)
-	RayColor(ray Ray, scene Scene, sampler Sampler) (Vec3, []SplatRay)
-}
-
 // Shape interface for objects that can be hit by rays
 type Shape interface {
 	Hit(ray Ray, tMin, tMax float64) (*HitRecord, bool)
@@ -39,7 +32,7 @@ type Emitter interface {
 
 // Preprocessor interface for objects that need scene preprocessing
 type Preprocessor interface {
-	Preprocess(scene Scene) error
+	Preprocess(bvh *BVH) error
 }
 
 type LightType string
@@ -167,15 +160,7 @@ type SceneStruct struct {
 }
 
 // Scene interface for scene management
-type Scene interface {
-	GetCamera() Camera
-	GetShapes() []Shape
-	GetLights() []Light
-	GetLightSampler() LightSampler // For light sampling
-	GetSamplingConfig() SamplingConfig
-	GetBVH() *BVH      // For integrators to access acceleration structure
-	Preprocess() error // Preprocess scene objects that need it
-}
+// Scene interface removed - use scene.Scene struct directly
 
 // Logger interface for raytracer logging
 type Logger interface {

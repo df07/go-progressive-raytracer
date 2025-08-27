@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // PathTracingIntegrator implements unidirectional path tracing
@@ -22,13 +23,13 @@ func NewPathTracingIntegrator(config core.SamplingConfig) *PathTracingIntegrator
 }
 
 // RayColor computes the color for a single ray using unidirectional path tracing
-func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
+func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
 	depth := pt.config.MaxDepth
 	throughput := core.Vec3{X: 1.0, Y: 1.0, Z: 1.0}
 	return pt.rayColorRecursive(ray, scene, sampler, depth, throughput), nil
 }
 
-func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scene, sampler core.Sampler, depth int, throughput core.Vec3) core.Vec3 {
+func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene *scene.Scene, sampler core.Sampler, depth int, throughput core.Vec3) core.Vec3 {
 	// If we've exceeded the ray bounce limit, no more light is gathered
 	if depth <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
@@ -41,10 +42,10 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 	}
 
 	// Check for intersections with objects using scene's BVH
-	hit, isHit := scene.GetBVH().Hit(ray, 0.001, math.Inf(1))
+	hit, isHit := scene.BVH.Hit(ray, 0.001, math.Inf(1))
 	if !isHit {
 		// Check for infinite light emission
-		lights := scene.GetLights()
+		lights := scene.Lights
 		var totalEmission core.Vec3
 		for _, light := range lights {
 			if light.Type() == core.LightTypeInfinite {
@@ -81,7 +82,7 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene core.Scen
 }
 
 // calculateSpecularColor handles specular material scattering with the provided random generator
-func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResult, scene core.Scene, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
+func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResult, scene *scene.Scene, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
 	// Update throughput with material attenuation
 	newThroughput := throughput.MultiplyVec(scatter.Attenuation)
 	incomingLight := pt.rayColorRecursive(scatter.Scattered, scene, sampler, depth-1, newThroughput)
@@ -93,7 +94,7 @@ func (pt *PathTracingIntegrator) calculateSpecularColor(scatter core.ScatterResu
 }
 
 // calculateDiffuseColor handles diffuse material scattering with throughput tracking
-func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, scene core.Scene, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
+func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter core.ScatterResult, hit *core.HitRecord, scene *scene.Scene, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
 	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
 	directLight := pt.CalculateDirectLighting(scene, scatter, hit, sampler, depth)
 	indirectLight := pt.CalculateIndirectLighting(scene, scatter, hit, depth, throughput, sampler)
@@ -109,16 +110,16 @@ func (pt *PathTracingIntegrator) GetEmittedLight(ray core.Ray, hit *core.HitReco
 }
 
 // calculateDirectLighting samples lights directly for direct illumination with the provided random generator
-func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, sampler core.Sampler, depth int) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, scatter core.ScatterResult, hit *core.HitRecord, sampler core.Sampler, depth int) core.Vec3 {
 	// Sample a light
-	lightSample, _, hasLight := core.SampleLight(scene, hit.Point, hit.Normal, sampler)
+	lightSample, _, hasLight := core.SampleLight(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, sampler)
 	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
 	// Check if light is visible (shadow ray)
 	shadowRay := core.NewRay(hit.Point, lightSample.Direction)
-	_, blocked := scene.GetBVH().Hit(shadowRay, 0.001, lightSample.Distance-0.001)
+	_, blocked := scene.BVH.Hit(shadowRay, 0.001, lightSample.Distance-0.001)
 	if blocked {
 		// Light is blocked, no direct contribution
 		return core.Vec3{X: 0, Y: 0, Z: 0}
@@ -153,7 +154,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene core.Scene, scatt
 }
 
 // calculateIndirectLighting handles indirect illumination via material sampling with throughput tracking
-func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene *scene.Scene, scatter core.ScatterResult, hit *core.HitRecord, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
 	if scatter.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -165,7 +166,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene core.Scene, sca
 	}
 
 	// Get light PDF for this direction (for MIS)
-	lightPDF := core.CalculateLightPDF(scene, hit.Point, hit.Normal, scatterDirection)
+	lightPDF := core.CalculateLightPDF(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, scatterDirection)
 
 	// Calculate MIS weight
 	misWeight := core.PowerHeuristic(1, scatter.PDF, 1, lightPDF)

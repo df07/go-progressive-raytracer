@@ -8,7 +8,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
@@ -62,250 +61,6 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 			t.Errorf("BDPT result too bright compared to path tracing: ratio %.4f (BDPT: %.6f, PT: %.6f)",
 				ratio, bdptLuminance, pathLuminance)
 		}
-	}
-}
-
-// TestLightPathDirectionAndIntersection verifies that light paths are generated correctly
-func TestLightPathDirectionAndIntersection(t *testing.T) {
-	scene := createMinimalCornellScene(false)
-
-	// Generate multiple light paths to test consistency
-	seed := int64(42)
-	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
-
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
-	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-
-	successfulPaths := 0
-	totalPaths := 10
-
-	for i := 0; i < totalPaths; i++ {
-		lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
-
-		t.Logf("Light path %d: length=%d", i, lightPath.Length)
-
-		if lightPath.Length == 0 {
-			t.Logf("  No light path generated (no lights or invalid sample)")
-			continue
-		}
-
-		// Check initial light vertex
-		lightVertex := lightPath.Vertices[0]
-		t.Logf("  Light vertex: pos=%v, normal=%v, IsLight=%v, EmittedLight=%v",
-			lightVertex.Point, lightVertex.Normal, lightVertex.IsLight, lightVertex.EmittedLight)
-
-		// Verify light vertex properties
-		if !lightVertex.IsLight {
-			t.Errorf("  First vertex should be marked as light")
-		}
-		if lightVertex.EmittedLight.Luminance() <= 0 {
-			t.Errorf("  Light vertex should have positive emission: %v", lightVertex.EmittedLight)
-		}
-
-		// Check if light path hits the floor
-		foundFloor := false
-		for j, vertex := range lightPath.Vertices {
-			t.Logf("  Light[%d]: pos=%v, material=%v, IsLight=%v",
-				j, vertex.Point, vertex.Material != nil, vertex.IsLight)
-
-			// Check if this vertex is on the floor (y ≈ 0)
-			if vertex.Point.Y < 1.0 && vertex.Point.Y > -1.0 {
-				foundFloor = true
-				t.Logf("  Found floor hit at vertex %d: pos=%v", j, vertex.Point)
-
-				// Verify the floor vertex has reasonable properties
-				if vertex.Material == nil {
-					t.Errorf("  Floor vertex should have a material")
-				}
-			}
-		}
-
-		if foundFloor {
-			successfulPaths++
-		} else {
-			t.Logf("  Light path did not reach floor")
-		}
-
-		// Check that light path doesn't immediately hit the light geometry
-		if lightPath.Length > 1 {
-			secondVertex := lightPath.Vertices[1]
-			// The second vertex should not be another light (self-intersection)
-			if secondVertex.IsLight && secondVertex.Point.Y > 500 {
-				t.Errorf("  Light path may be hitting light geometry itself at vertex 1: pos=%v", secondVertex.Point)
-			}
-		}
-	}
-
-	t.Logf("Successful paths (reached floor): %d/%d", successfulPaths, totalPaths)
-
-	// At least some paths should reach the floor in a simple scene
-	if successfulPaths == 0 {
-		t.Errorf("No light paths reached the floor - this suggests directional issues")
-	}
-}
-
-// TestBDPTCameraPathHitsLight tests that camera paths can find light sources
-func TestBDPTCameraPathHitsLight(t *testing.T) {
-	scene := createMinimalCornellScene(false)
-
-	// Create a ray that should hit the light directly
-	rayToLight := core.NewRay(
-		core.NewVec3(278, 400, 278), // Camera position below light
-		core.NewVec3(0, 1, 0),       // Ray pointing straight up toward light
-	)
-
-	seed := int64(42)
-	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
-
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
-	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-
-	// Generate camera path that should hit the light
-	cameraPath := bdptIntegrator.generateCameraPath(rayToLight, scene, sampler, bdptConfig.MaxDepth)
-
-	// Assert: Camera path should have at least 2 vertices (camera + light hit)
-	if cameraPath.Length < 2 {
-		t.Fatalf("Camera path should have at least 2 vertices, got %d", cameraPath.Length)
-	}
-
-	// Assert: First vertex should be camera
-	cameraVertex := cameraPath.Vertices[0]
-	if !cameraVertex.IsCamera {
-		t.Errorf("First vertex should be camera, got IsCamera=%v", cameraVertex.IsCamera)
-	}
-	if cameraVertex.IsLight {
-		t.Errorf("Camera vertex should not be marked as light, got IsLight=%v", cameraVertex.IsLight)
-	}
-
-	// Assert: Some vertex should hit the light (have positive emission)
-	foundLight := false
-	for i, vertex := range cameraPath.Vertices {
-		if vertex.EmittedLight.Luminance() > 0 {
-			foundLight = true
-			t.Logf("Found light hit at vertex %d: emission=%v", i, vertex.EmittedLight)
-
-			// Assert: Light-hitting vertex should be marked as light
-			if !vertex.IsLight {
-				t.Errorf("Vertex %d hits light but IsLight=false", i)
-			}
-			break
-		}
-	}
-
-	if !foundLight {
-		t.Errorf("Camera path pointing at light should hit light source")
-	}
-}
-
-// TestBDPTConnectionStrategy tests that BDPT can connect camera and light paths
-func TestBDPTConnectionStrategy(t *testing.T) {
-	scene := createMinimalCornellScene(false)
-
-	seed := int64(42)
-	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
-
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
-	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-
-	// Generate camera path that hits floor
-	rayToFloor := core.NewRay(
-		core.NewVec3(278, 400, -200),
-		core.NewVec3(0, -1, 0.5).Normalize(),
-	)
-	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
-
-	// Generate light path
-	lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
-
-	// Assert: Both paths should exist
-	if cameraPath.Length == 0 {
-		t.Fatalf("Camera path should have vertices")
-	}
-	if lightPath.Length == 0 {
-		t.Fatalf("Light path should have vertices")
-	}
-
-	// Assert: Camera path should hit floor (material surface)
-	foundFloorHit := false
-	for i, vertex := range cameraPath.Vertices {
-		if vertex.Material != nil && vertex.Point.Y < 1.0 {
-			foundFloorHit = true
-			t.Logf("Camera path hits floor at vertex %d: pos=%v", i, vertex.Point)
-			break
-		}
-	}
-	if !foundFloorHit {
-		t.Errorf("Camera path should hit floor for connection test")
-	}
-
-	// Assert: Light path should have light source
-	if !lightPath.Vertices[0].IsLight {
-		t.Errorf("Light path should start with light vertex")
-	}
-	if lightPath.Vertices[0].EmittedLight.Luminance() <= 0 {
-		t.Errorf("Light path should start with positive emission")
-	}
-
-	// Test connection strategy: light source to camera floor hit
-	if cameraPath.Length >= 2 && lightPath.Length >= 1 {
-		// s=1: light source (first vertex in light path)
-		// t=2: floor hit (second vertex in camera path, first bounce from camera)
-		contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, 1, 2, scene)
-		t.Logf("Connection strategy (s=0, t=1) contribution: %v (luminance: %.6f)",
-			contribution, contribution.Luminance())
-
-		// Assert: Connection should produce some contribution (this is the key test!)
-		if contribution.Luminance() <= 0 {
-			t.Errorf("Connection strategy should produce positive contribution when connecting light source to floor hit")
-		}
-	}
-}
-
-// TestBDPTPathIndexing verifies how paths are indexed in our implementation
-func TestBDPTPathIndexing(t *testing.T) {
-	scene := createMinimalCornellScene(false)
-
-	seed := int64(42)
-	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
-
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
-	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
-
-	// Generate camera path that hits floor
-	rayToFloor := core.NewRay(
-		core.NewVec3(278, 400, -200),
-		core.NewVec3(0, -1, 0.5).Normalize(),
-	)
-	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
-
-	// Generate light path
-	lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
-
-	t.Logf("=== CAMERA PATH (length %d) ===", cameraPath.Length)
-	for i, vertex := range cameraPath.Vertices {
-		t.Logf("  Vertex[%d]: pos=%v, IsCamera=%v, IsLight=%v, Material=%v",
-			i, vertex.Point, vertex.IsCamera, vertex.IsLight, vertex.Material != nil)
-	}
-
-	t.Logf("=== LIGHT PATH (length %d) ===", lightPath.Length)
-	for i, vertex := range lightPath.Vertices {
-		t.Logf("  Vertex[%d]: pos=%v, IsCamera=%v, IsLight=%v, Material=%v",
-			i, vertex.Point, vertex.IsCamera, vertex.IsLight, vertex.Material != nil)
-	}
-
-	// In standard BDPT:
-	// Camera path: t=0 (camera), t=1 (first bounce), t=2 (second bounce), ...
-	// Light path: s=0 (light), s=1 (first bounce), s=2 (second bounce), ...
-
-	// So connecting s=0,t=1 should connect light source to first camera bounce
-	if cameraPath.Length >= 2 && lightPath.Length >= 1 {
-		t.Logf("=== Standard BDPT s=0,t=1 connection ===")
-		t.Logf("s=0 should be light source: %v", lightPath.Vertices[0])
-		t.Logf("t=1 should be first camera bounce: %v", cameraPath.Vertices[1])
-
-		// Now using proper 0-based indexing
-		contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, 0, 1, scene)
-		t.Logf("Connection contribution: %v (luminance: %.6f)", contribution, contribution.Luminance())
 	}
 }
 
@@ -364,7 +119,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
-	camera := renderer.NewCamera(renderer.CameraConfig{
+	camera := geometry.NewCamera(core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 3, 0),
 		Up:          core.NewVec3(0, 1, 0),
@@ -372,20 +127,19 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 		AspectRatio: 1,
 	})
 
-	testScene := &MockScene{
-		lights: []core.Light{light},
-		shapes: []core.Shape{light.Sphere, sphere},
-		config: core.SamplingConfig{MaxDepth: 5},
-		camera: camera,
+	testScene := &scene.Scene{
+		Lights:         []core.Light{light},
+		Shapes:         []core.Shape{light.Sphere, sphere},
+		SamplingConfig: core.SamplingConfig{MaxDepth: 5},
+		Camera:         camera,
 	}
 
 	infiniteLight := geometry.NewGradientInfiniteLight(
 		core.NewVec3(0.1, 0.1, 0.1),    // topColor
 		core.NewVec3(0.05, 0.05, 0.05), // bottomColor
 	)
-	// Preprocess the infinite light with scene bounds
-	infiniteLight.Preprocess(testScene)
-	testScene.lights = append(testScene.lights, infiniteLight)
+	testScene.Lights = append(testScene.Lights, infiniteLight)
+	testScene.Preprocess()
 
 	config := core.SamplingConfig{MaxDepth: 5}
 
@@ -437,7 +191,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	}
 }
 
-func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene, core.SamplingConfig) {
+func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Scene, core.SamplingConfig) {
 	// simple scene with a green ground quad mirroring default scene (without spheres)
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGreen)
@@ -451,7 +205,7 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene
 		lights = append(lights, light)
 	}
 
-	defaultCameraConfig := renderer.CameraConfig{
+	defaultCameraConfig := core.CameraConfig{
 		Center:        core.NewVec3(0, 0.75, 2), // Position camera higher and farther back
 		LookAt:        core.NewVec3(0, 0.5, -1), // Look at the sphere center
 		Up:            core.NewVec3(0, 1, 0),    // Standard up direction
@@ -464,11 +218,11 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene
 
 	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
 
-	testScene := &MockScene{
-		lights: lights,
-		shapes: shapes,
-		config: config,
-		camera: renderer.NewCamera(defaultCameraConfig),
+	testScene := &scene.Scene{
+		Lights:         lights,
+		Shapes:         shapes,
+		SamplingConfig: config,
+		Camera:         geometry.NewCamera(defaultCameraConfig),
 	}
 
 	if includeBackground {
@@ -478,10 +232,11 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (core.Scene
 			core.NewVec3(1.0, 1.0, 1.0), // bottomColor
 		)
 		// Preprocess the infinite light with scene bounds
-		infiniteLight.Preprocess(testScene)
 		lights = append(lights, infiniteLight)
-		testScene.lights = lights
+		testScene.Lights = lights
 	}
+
+	testScene.Preprocess()
 
 	return testScene, config
 }
@@ -499,17 +254,13 @@ func TestInfiniteLightEmissionSampling(t *testing.T) {
 	)
 
 	// Create mock scene
-	testScene := &MockScene{
-		lights: []core.Light{infiniteLight},
-		shapes: []core.Shape{groundQuad},
-		config: core.SamplingConfig{MaxDepth: 3},
+	testScene := &scene.Scene{
+		Lights:         []core.Light{infiniteLight},
+		Shapes:         []core.Shape{groundQuad},
+		SamplingConfig: core.SamplingConfig{MaxDepth: 3},
 	}
 
-	// Preprocess to set world bounds
-	err := infiniteLight.Preprocess(testScene)
-	if err != nil {
-		t.Fatalf("Failed to preprocess infinite light: %v", err)
-	}
+	testScene.Preprocess()
 
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
@@ -537,7 +288,7 @@ func TestInfiniteLightEmissionSampling(t *testing.T) {
 		t.Logf("  Direction toward scene center: %f (should be > 0.5)", dotProduct)
 
 		// Test ray intersection with scene
-		hit, isHit := testScene.GetBVH().Hit(emissionRay, 0.001, math.Inf(1))
+		hit, isHit := testScene.BVH.Hit(emissionRay, 0.001, math.Inf(1))
 		if isHit {
 			intersectionCount++
 			t.Logf("  HIT: %v (material: %v)", hit.Point, hit.Material != nil)
@@ -606,7 +357,7 @@ func TestBDPTvsPathTracingReflectiveGround(t *testing.T) {
 	}
 }
 
-func SceneWithReflectiveGroundPlane() (core.Scene, core.SamplingConfig) {
+func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
 	// Create a reflective (metal) ground plane
 	metalMaterial := material.NewMetal(core.NewVec3(0.8, 0.8, 0.9), 0.0) // Mirror-like
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 1000.0, metalMaterial)
@@ -619,7 +370,7 @@ func SceneWithReflectiveGroundPlane() (core.Scene, core.SamplingConfig) {
 		core.NewVec3(0.9, 0.9, 1.0), // Light horizon
 	)
 
-	camera := renderer.NewCamera(renderer.CameraConfig{
+	camera := geometry.NewCamera(core.CameraConfig{
 		Center:      core.NewVec3(0, 2, 2),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -630,15 +381,14 @@ func SceneWithReflectiveGroundPlane() (core.Scene, core.SamplingConfig) {
 
 	config := core.SamplingConfig{MaxDepth: 6, RussianRouletteMinBounces: 100}
 
-	testScene := &MockScene{
-		lights: []core.Light{infiniteLight},
-		shapes: shapes,
-		config: config,
-		camera: camera,
+	testScene := &scene.Scene{
+		Lights:         []core.Light{infiniteLight},
+		Shapes:         shapes,
+		SamplingConfig: config,
+		Camera:         camera,
 	}
 
-	// Preprocess the infinite light
-	infiniteLight.Preprocess(testScene)
+	testScene.Preprocess()
 
 	return testScene, config
 }

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/integrator"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // DefaultLogger implements core.Logger by writing to stdout
@@ -45,26 +47,26 @@ func DefaultProgressiveConfig() ProgressiveConfig {
 
 // ProgressiveRaytracer manages progressive rendering with multiple passes
 type ProgressiveRaytracer struct {
-	scene       core.Scene
+	scene       *scene.Scene
 	config      ProgressiveConfig
-	tiles       []*Tile         // Tile management
-	currentPass int             // Progressive state
-	pixelStats  [][]PixelStats  // Shared pixel statistics array (global image coordinates)
-	splatQueue  *SplatQueue     // Shared splat queue for BDPT t=1 strategies
-	integrator  core.Integrator // Light transport integrator for actual rendering
-	workerPool  *WorkerPool     // Worker pool for parallel processing
-	logger      core.Logger     // Logger for rendering output
+	tiles       []*Tile               // Tile management
+	currentPass int                   // Progressive state
+	pixelStats  [][]PixelStats        // Shared pixel statistics array (global image coordinates)
+	splatQueue  *SplatQueue           // Shared splat queue for BDPT t=1 strategies
+	integrator  integrator.Integrator // Light transport integrator for actual rendering
+	workerPool  *WorkerPool           // Worker pool for parallel processing
+	logger      core.Logger           // Logger for rendering output
 }
 
 // NewProgressiveRaytracer creates a new progressive raytracer with a specific integrator
-func NewProgressiveRaytracer(scene core.Scene, config ProgressiveConfig, integratorInst core.Integrator, logger core.Logger) (*ProgressiveRaytracer, error) {
+func NewProgressiveRaytracer(scene *scene.Scene, config ProgressiveConfig, integratorInst integrator.Integrator, logger core.Logger) (*ProgressiveRaytracer, error) {
 	// Preprocess the scene before creating the raytracer
 	if err := scene.Preprocess(); err != nil {
 		return nil, fmt.Errorf("failed to preprocess scene: %w", err)
 	}
 	// Create tile grid
-	width := scene.GetSamplingConfig().Width
-	height := scene.GetSamplingConfig().Height
+	width := scene.SamplingConfig.Width
+	height := scene.SamplingConfig.Height
 	tiles := NewTileGrid(width, height, config.TileSize)
 
 	// Initialize shared pixel statistics array (global image coordinates)
@@ -391,8 +393,8 @@ func (pr *ProgressiveRaytracer) processSplats() {
 // assembleCurrentImage creates an image from the current state of the shared pixel stats
 // and calculates render statistics in a single pass
 func (pr *ProgressiveRaytracer) assembleCurrentImage(targetSamples int) (*image.RGBA, RenderStats) {
-	width := pr.scene.GetSamplingConfig().Width
-	height := pr.scene.GetSamplingConfig().Height
+	width := pr.scene.SamplingConfig.Width
+	height := pr.scene.SamplingConfig.Height
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
 	// Initialize statistics

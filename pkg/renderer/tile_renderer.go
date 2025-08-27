@@ -5,16 +5,18 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/integrator"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // TileRenderer handles the actual rendering of individual tiles using an integrator
 type TileRenderer struct {
-	scene      core.Scene
-	integrator core.Integrator
+	scene      *scene.Scene
+	integrator integrator.Integrator
 }
 
 // NewTileRenderer creates a new tile renderer with the given scene and integrator
-func NewTileRenderer(scene core.Scene, integratorInst core.Integrator) *TileRenderer {
+func NewTileRenderer(scene *scene.Scene, integratorInst integrator.Integrator) *TileRenderer {
 	return &TileRenderer{
 		scene:      scene,
 		integrator: integratorInst,
@@ -23,8 +25,8 @@ func NewTileRenderer(scene core.Scene, integratorInst core.Integrator) *TileRend
 
 // RenderTileBounds renders pixels within the specified bounds using the integrator
 func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]PixelStats, splatQueue *SplatQueue, sampler core.Sampler, targetSamples int) RenderStats {
-	camera := tr.scene.GetCamera()
-	samplingConfig := tr.scene.GetSamplingConfig()
+	camera := tr.scene.Camera
+	samplingConfig := tr.scene.SamplingConfig
 
 	// Initialize statistics tracking for this specific bounds
 	stats := tr.initRenderStatsForBounds(bounds, targetSamples)

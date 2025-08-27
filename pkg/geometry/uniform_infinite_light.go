@@ -118,8 +118,7 @@ func (uil *UniformInfiniteLight) Emit(ray core.Ray) core.Vec3 {
 }
 
 // Preprocess implements the Preprocessor interface - sets world bounds from scene
-func (uil *UniformInfiniteLight) Preprocess(scene core.Scene) error {
-	bvh := scene.GetBVH()
+func (uil *UniformInfiniteLight) Preprocess(bvh *core.BVH) error {
 	uil.worldCenter = bvh.Center
 	uil.worldRadius = bvh.Radius
 	return nil

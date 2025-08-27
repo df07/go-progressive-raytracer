@@ -10,6 +10,7 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/integrator"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // MockIntegrator for testing
@@ -18,69 +19,13 @@ type MockIntegrator struct {
 	callCount   int
 }
 
-func (m *MockIntegrator) RayColor(ray core.Ray, scene core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
+func (m *MockIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
 	m.callCount++
 	return m.returnColor, nil
 }
 
-// MockScene for tile renderer testing
-type MockScene struct {
-	width        int
-	height       int
-	shapes       []core.Shape
-	lights       []core.Light
-	camera       core.Camera
-	config       core.SamplingConfig
-	bvh          *core.BVH
-	lightSampler core.LightSampler
-}
-
-func (m *MockScene) GetWidth() int                          { return m.width }
-func (m *MockScene) GetHeight() int                         { return m.height }
-func (m *MockScene) GetCamera() core.Camera                 { return m.camera }
-func (m *MockScene) GetShapes() []core.Shape                { return m.shapes }
-func (m *MockScene) GetLights() []core.Light                { return m.lights }
-func (m *MockScene) GetSamplingConfig() core.SamplingConfig { return m.config }
-func (m *MockScene) GetBVH() *core.BVH {
-	if m.bvh == nil {
-		m.bvh = core.NewBVH(m.shapes)
-	}
-	return m.bvh
-}
-
-func (m *MockScene) GetLightSampler() core.LightSampler {
-	if m.lightSampler == nil {
-		sceneRadius := 10.0 // Default radius for testing
-		if m.bvh != nil {
-			sceneRadius = m.bvh.Radius
-		}
-		m.lightSampler = core.NewUniformLightSampler(m.lights, sceneRadius)
-	}
-	return m.lightSampler
-}
-
-func (m *MockScene) Preprocess() error {
-	// Simple preprocessing for tests - just preprocess lights that need it
-	for _, light := range m.lights {
-		if preprocessor, ok := light.(core.Preprocessor); ok {
-			if err := preprocessor.Preprocess(m); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Create light sampler
-	sceneRadius := 10.0 // Default radius for testing
-	if m.bvh != nil {
-		sceneRadius = m.bvh.Radius
-	}
-	m.lightSampler = core.NewUniformLightSampler(m.lights, sceneRadius)
-
-	return nil
-}
-
 // createMockScene creates a simple test scene
-func createMockScene() *MockScene {
+func createMockScene() *scene.Scene {
 	// Simple camera
 	cameraConfig := CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
@@ -97,16 +42,20 @@ func createMockScene() *MockScene {
 	lambertian := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
-	return &MockScene{
-		shapes: []core.Shape{sphere},
-		lights: []core.Light{},
-		camera: camera,
-		config: core.SamplingConfig{
+	scene := &scene.Scene{
+		Shapes: []core.Shape{sphere},
+		Lights: []core.Light{},
+		Camera: camera,
+		SamplingConfig: core.SamplingConfig{
 			MaxDepth:           10,
 			AdaptiveMinSamples: 0.1,
 			AdaptiveThreshold:  0.05,
 		},
 	}
+
+	scene.Preprocess()
+
+	return scene
 }
 
 // TestTileRendererCreation tests basic tile renderer creation
@@ -185,8 +134,8 @@ func TestTileRendererAdaptiveSampling(t *testing.T) {
 	scene := createMockScene()
 
 	// Configure for very low adaptive threshold to test convergence
-	scene.config.AdaptiveMinSamples = 0.1  // 10% minimum
-	scene.config.AdaptiveThreshold = 0.001 // Very low threshold
+	scene.SamplingConfig.AdaptiveMinSamples = 0.1  // 10% minimum
+	scene.SamplingConfig.AdaptiveThreshold = 0.001 // Very low threshold
 
 	// Integrator that returns consistent color (should converge quickly)
 	consistentIntegrator := &MockIntegrator{returnColor: core.NewVec3(0.5, 0.5, 0.5)}
@@ -215,7 +164,7 @@ func TestTileRendererAdaptiveSampling(t *testing.T) {
 	}
 
 	// Should have taken at least minimum samples
-	minSamples := int(float64(targetSamples) * scene.config.AdaptiveMinSamples)
+	minSamples := int(float64(targetSamples) * scene.SamplingConfig.AdaptiveMinSamples)
 	if actualSamples < minSamples {
 		t.Errorf("Expected at least %d samples (minimum), got %d", minSamples, actualSamples)
 	}
@@ -274,7 +223,7 @@ func TestTileRendererDeterministic(t *testing.T) {
 	scene := createMockScene()
 
 	// Use real integrator for more realistic test
-	pathIntegrator := integrator.NewPathTracingIntegrator(scene.GetSamplingConfig())
+	pathIntegrator := integrator.NewPathTracingIntegrator(scene.SamplingConfig)
 	renderer := NewTileRenderer(scene, pathIntegrator)
 
 	bounds := image.Rect(0, 0, 2, 2)

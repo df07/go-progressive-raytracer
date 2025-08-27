@@ -6,7 +6,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
 // TriangleMeshGeometryType represents the type of geometry to use in the triangle mesh scene
@@ -17,15 +16,15 @@ const (
 )
 
 // NewTriangleMeshScene creates a scene showcasing triangle mesh geometry
-func NewTriangleMeshScene(complexity int, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewTriangleMeshScene(complexity int, cameraOverrides ...core.CameraConfig) *Scene {
 	return NewTriangleMeshSceneWithComplexity(complexity, cameraOverrides...)
 }
 
 // NewTriangleMeshSceneWithComplexity creates a scene with configurable sphere complexity
-func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...core.CameraConfig) *Scene {
 	// Setup camera and basic scene configuration
 	cameraConfig := setupTriangleMeshCamera(cameraOverrides...)
-	camera := renderer.NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	s := &Scene{
 		Camera:         camera,
@@ -48,8 +47,8 @@ func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...rende
 }
 
 // setupTriangleMeshCamera configures the camera for the triangle mesh scene
-func setupTriangleMeshCamera(cameraOverrides ...renderer.CameraConfig) renderer.CameraConfig {
-	defaultCameraConfig := renderer.CameraConfig{
+func setupTriangleMeshCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
+	defaultCameraConfig := core.CameraConfig{
 		Center:        core.NewVec3(0, 2, 6), // Position camera to see the meshes
 		LookAt:        core.NewVec3(0, 1, 0), // Look at the center of the scene
 		Up:            core.NewVec3(0, 1, 0), // Standard up direction
@@ -63,7 +62,7 @@ func setupTriangleMeshCamera(cameraOverrides ...renderer.CameraConfig) renderer.
 	// Apply any overrides using the reusable merge function
 	cameraConfig := defaultCameraConfig
 	if len(cameraOverrides) > 0 {
-		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
+		cameraConfig = geometry.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
 	return cameraConfig

@@ -8,16 +8,15 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/loaders"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
 // NewDragonScene creates a scene with the dragon PLY mesh
 // If loadMesh is false, creates the scene structure without loading the PLY file
 // This is useful for getting scene configuration without the expensive mesh loading
-func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, cameraOverrides ...core.CameraConfig) *Scene {
 	// Setup camera for dragon viewing
 	cameraConfig := setupDragonCamera(cameraOverrides...)
-	camera := renderer.NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	s := &Scene{
 		Camera:         camera,
@@ -45,9 +44,9 @@ func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, ca
 }
 
 // setupDragonCamera configures the camera for viewing the dragon (based on PBRT scene)
-func setupDragonCamera(cameraOverrides ...renderer.CameraConfig) renderer.CameraConfig {
+func setupDragonCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
 	// Use exact PBRT scene coordinates: LookAt 277 -240 250  0 60 -30 0 0 1
-	defaultCameraConfig := renderer.CameraConfig{
+	defaultCameraConfig := core.CameraConfig{
 		Center:        core.NewVec3(277, -240, 250), // Exact PBRT camera position
 		LookAt:        core.NewVec3(0, 60, -30),     // Exact PBRT look at point
 		Up:            core.NewVec3(0, 0, 1),        // Z-up coordinate system from PBRT
@@ -61,7 +60,7 @@ func setupDragonCamera(cameraOverrides ...renderer.CameraConfig) renderer.Camera
 	// Apply any overrides
 	cameraConfig := defaultCameraConfig
 	if len(cameraOverrides) > 0 {
-		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
+		cameraConfig = geometry.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
 	return cameraConfig

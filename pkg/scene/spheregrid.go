@@ -6,7 +6,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
 // oklchToRGB converts OKLCH color values to RGB
@@ -47,9 +46,9 @@ func oklchToRGB(l, c, h float64) core.Vec3 {
 }
 
 // NewSphereGridScene creates a scene with a configurable grid of spheres
-func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...core.CameraConfig) *Scene {
 	// Default camera configuration for sphere grid
-	defaultCameraConfig := renderer.CameraConfig{
+	defaultCameraConfig := core.CameraConfig{
 		Center:        core.NewVec3(4.5, 6, 18),    // Position camera farther back and slightly lower
 		LookAt:        core.NewVec3(4.5, 0.8, 4.5), // Look at center of grid, slightly lower
 		Up:            core.NewVec3(0, 1, 0),       // Standard up direction
@@ -63,7 +62,7 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 	// Apply any overrides using the reusable merge function
 	cameraConfig := defaultCameraConfig
 	if len(cameraOverrides) > 0 {
-		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
+		cameraConfig = geometry.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
 	samplingConfig := core.SamplingConfig{
@@ -74,7 +73,7 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 		AdaptiveThreshold:         0.015, // 1.5% relative error threshold
 	}
 
-	camera := renderer.NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	// Create the scene
 	s := &Scene{

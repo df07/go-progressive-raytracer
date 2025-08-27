@@ -9,12 +9,13 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/integrator"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // MockIntegratorWithSplats creates splat rays to test the splat system
 type MockIntegratorWithSplats struct{}
 
-func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj core.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
+func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
 	// Regular pixel color (simple test pattern)
 	pixelColor := core.Vec3{X: 0.2, Y: 0.4, Z: 0.6}
 
@@ -51,9 +52,9 @@ func TestTileRendererWithSplats(t *testing.T) {
 		MaxDepth:        3,
 	}
 
-	sceneObj := &MockScene{
-		camera: camera,
-		config: samplingConfig,
+	sceneObj := &scene.Scene{
+		Camera:         camera,
+		SamplingConfig: samplingConfig,
 	}
 
 	// Create mock integrator that generates splats
@@ -187,13 +188,11 @@ func TestSplatSystemIntegration(t *testing.T) {
 	lights = append(lights, lightQuad)
 
 	// Create scene with geometry
-	sceneObj := &MockScene{
-		camera: camera,
-		config: config,
-		shapes: shapes,
-		lights: lights,
-		width:  config.Width,
-		height: config.Height,
+	sceneObj := &scene.Scene{
+		Camera:         camera,
+		SamplingConfig: config,
+		Shapes:         shapes,
+		Lights:         lights,
 	}
 
 	// Create progressive raytracer

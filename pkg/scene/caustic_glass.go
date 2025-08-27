@@ -8,16 +8,15 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/loaders"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
 // NewCausticGlassScene creates a scene with glass caustic geometry
 // Based on the glass.pbrt scene configuration
 // If loadMesh is false, creates the scene structure without loading the PLY files
-func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.Logger, cameraOverrides ...renderer.CameraConfig) *Scene {
+func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.Logger, cameraOverrides ...core.CameraConfig) *Scene {
 	// Setup camera based on PBRT scene configuration
 	cameraConfig := setupCausticGlassCamera(cameraOverrides...)
-	camera := renderer.NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	s := &Scene{
 		Camera:         camera,
@@ -45,8 +44,8 @@ func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.L
 // Camera "perspective" "float fov" [ 30 ]
 // Film resolution 1050x1500 with scale 1.5
 // PBRT scale parameter affects the effective field of view - scale > 1 means zoom out
-func setupCausticGlassCamera(cameraOverrides ...renderer.CameraConfig) renderer.CameraConfig {
-	defaultCameraConfig := renderer.CameraConfig{
+func setupCausticGlassCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
+	defaultCameraConfig := core.CameraConfig{
 		Center:        core.NewVec3(-5.5, 7, -5.5),  // PBRT camera position
 		LookAt:        core.NewVec3(-4.75, 2.25, 0), // PBRT look at point
 		Up:            core.NewVec3(0, 1, 0),        // Y-up coordinate system
@@ -60,7 +59,7 @@ func setupCausticGlassCamera(cameraOverrides ...renderer.CameraConfig) renderer.
 	// Apply any overrides
 	cameraConfig := defaultCameraConfig
 	if len(cameraOverrides) > 0 {
-		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
+		cameraConfig = geometry.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
 	return cameraConfig

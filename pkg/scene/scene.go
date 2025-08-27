@@ -4,7 +4,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
-	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 )
 
 // NewGroundQuad creates a large quad to replace infinite ground planes
@@ -24,10 +23,10 @@ type Scene struct {
 	Camera         core.Camera
 	Shapes         []core.Shape      // Objects in the scene
 	Lights         []core.Light      // Lights in the scene
-	lightSampler   core.LightSampler // Light sampler
+	LightSampler   core.LightSampler // Light sampler
 	SamplingConfig core.SamplingConfig
 	CameraConfig   core.CameraConfig
-	bvh            *core.BVH // Acceleration structure for ray-object intersection
+	BVH            *core.BVH // Acceleration structure for ray-object intersection
 }
 
 // NewDefaultScene creates a default scene with spheres, ground, and camera
@@ -47,10 +46,10 @@ func NewDefaultScene(cameraOverrides ...core.CameraConfig) *Scene {
 	// Apply any overrides using the reusable merge function
 	cameraConfig := defaultCameraConfig
 	if len(cameraOverrides) > 0 {
-		cameraConfig = renderer.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
+		cameraConfig = geometry.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
-	camera := renderer.NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	samplingConfig := core.SamplingConfig{
 		SamplesPerPixel:           200,
@@ -117,61 +116,36 @@ func NewDefaultScene(cameraOverrides ...core.CameraConfig) *Scene {
 	return s
 }
 
-// GetCamera returns the scene's camera
-func (s *Scene) GetCamera() core.Camera {
-	return s.Camera
-}
-
-// GetShapes returns all shapes in the scene
-func (s *Scene) GetShapes() []core.Shape {
-	return s.Shapes
-}
-
-// GetLights returns all lights in the scene
-func (s *Scene) GetLights() []core.Light {
-	return s.Lights
-}
-
-// GetLightSampler returns the scene's light importance sampler
-func (s *Scene) GetLightSampler() core.LightSampler {
-	return s.lightSampler
-}
-
-// GetSamplingConfig returns the scene's sampling configuration
-func (s *Scene) GetSamplingConfig() core.SamplingConfig {
-	return s.SamplingConfig
-}
-
-// GetBVH returns the scene's BVH acceleration structure, building it lazily if needed
-func (s *Scene) GetBVH() *core.BVH {
-	return s.bvh
-}
+// Interface methods removed - access fields directly: s.Camera, s.Lights, s.BVH, etc.
 
 // Preprocess prepares the scene for rendering by preprocessing all objects that need it
 func (s *Scene) Preprocess() error {
 	// Create the BVH
-	s.bvh = core.NewBVH(s.Shapes)
+	s.BVH = core.NewBVH(s.Shapes)
 
 	// Preprocess all lights that implement the Preprocessor interface
 	for _, light := range s.Lights {
 		if preprocessor, ok := light.(core.Preprocessor); ok {
-			if err := preprocessor.Preprocess(s); err != nil {
+			if err := preprocessor.Preprocess(s.BVH); err != nil {
 				return err
 			}
 		}
 	}
 
 	// Create the light sampler after lights are preprocessed
-	sceneRadius := s.bvh.Radius
+	sceneRadius := s.BVH.Radius
+
 	// Use uniform light sampling
-	s.lightSampler = core.NewUniformLightSampler(s.Lights, sceneRadius)
+	if s.LightSampler == nil {
+		s.LightSampler = core.NewUniformLightSampler(s.Lights, sceneRadius)
+	}
 	// Alternative: weighted sampling
-	//s.lightSampler = core.NewWeightedLightSampler(s.Lights, []float64{0.9, 0.1}, sceneRadius)
+	//s.LightSampler = core.NewWeightedLightSampler(s.Lights, []float64{0.9, 0.1}, sceneRadius)
 
 	// Could also preprocess shapes here in the future if needed
 	for _, shape := range s.Shapes {
 		if preprocessor, ok := shape.(core.Preprocessor); ok {
-			if err := preprocessor.Preprocess(s); err != nil {
+			if err := preprocessor.Preprocess(s.BVH); err != nil {
 				return err
 			}
 		}

@@ -97,13 +97,10 @@ func SphereConePDF(distance, radius float64) float64 {
 }
 
 // CalculateLightPDF calculates the combined PDF for a given direction toward multiple lights
-func CalculateLightPDF(scene Scene, point, normal, direction Vec3) float64 {
-	lights := scene.GetLights()
+func CalculateLightPDF(lights []Light, lightSampler LightSampler, point, normal, direction Vec3) float64 {
 	if len(lights) == 0 {
 		return 0.0
 	}
-
-	lightSampler := scene.GetLightSampler()
 	totalPDF := 0.0
 
 	// For each light, calculate the PDF weighted by its selection probability
@@ -117,14 +114,10 @@ func CalculateLightPDF(scene Scene, point, normal, direction Vec3) float64 {
 }
 
 // SampleLight selects and samples a light from the scene using importance sampling
-func SampleLight(scene Scene, point Vec3, normal Vec3, sampler Sampler) (LightSample, Light, bool) {
-	lights := scene.GetLights()
+func SampleLight(lights []Light, lightSampler LightSampler, point Vec3, normal Vec3, sampler Sampler) (LightSample, Light, bool) {
 	if len(lights) == 0 {
 		return LightSample{}, nil, false
 	}
-
-	// Use importance-based light sampler that considers surface point and normal
-	lightSampler := scene.GetLightSampler()
 	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLight(point, normal, sampler.Get1D())
 
 	sample := selectedLight.Sample(point, normal, sampler.Get2D())
@@ -135,14 +128,10 @@ func SampleLight(scene Scene, point Vec3, normal Vec3, sampler Sampler) (LightSa
 
 // SampleLightEmission selects and samples emission from a light using uniform sampling
 // For emission sampling, we don't have a specific surface point, so use uniform distribution
-func SampleLightEmission(scene Scene, sampler Sampler) (EmissionSample, bool) {
-	lights := scene.GetLights()
+func SampleLightEmission(lights []Light, lightSampler LightSampler, sampler Sampler) (EmissionSample, bool) {
 	if len(lights) == 0 {
 		return EmissionSample{}, false
 	}
-
-	// Use uniform sampling for emission since we don't have a specific surface point
-	lightSampler := scene.GetLightSampler()
 	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLightEmission(sampler.Get1D())
 
 	sample := selectedLight.SampleEmission(sampler.Get2D(), sampler.Get2D())

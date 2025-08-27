@@ -8,6 +8,7 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // MockScene implements core.Scene for testing
@@ -48,7 +49,7 @@ func (m *MockScene) Preprocess() error {
 	// Simple preprocessing for tests - just preprocess lights that need it
 	for _, light := range m.lights {
 		if preprocessor, ok := light.(core.Preprocessor); ok {
-			if err := preprocessor.Preprocess(m); err != nil {
+			if err := preprocessor.Preprocess(m.GetBVH()); err != nil {
 				return err
 			}
 		}
@@ -91,7 +92,7 @@ func (m *MockCamera) MapRayToPixel(ray core.Ray) (int, int, bool) {
 func (m *MockCamera) SetVerbose(verbose bool) {}
 
 // createTestScene creates a simple scene with a sphere for testing
-func createTestScene() *MockScene {
+func createTestScene() *scene.Scene {
 	// Create a simple lambertian sphere
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.3, 0.3))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
@@ -102,17 +103,21 @@ func createTestScene() *MockScene {
 	)
 
 	// Create a simple mock camera
-	camera := &MockCamera{}
+	camera := &geometry.CameraImpl{}
 
-	return &MockScene{
-		shapes: []core.Shape{sphere},
-		lights: []core.Light{infiniteLight},
-		camera: camera,
-		config: core.SamplingConfig{
+	scene := &scene.Scene{
+		Shapes: []core.Shape{sphere},
+		Lights: []core.Light{infiniteLight},
+		Camera: camera,
+		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
 		},
 	}
+
+	// Initialize BVH and preprocess lights
+	scene.Preprocess()
+	return scene
 }
 
 // TestPathTracingDepthTermination tests that ray depth is properly limited
@@ -199,17 +204,20 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white ground)
 	)
 
-	scene := &MockScene{
-		shapes: []core.Shape{sphere},
-		lights: []core.Light{infiniteLight},
-		camera: camera,
-		config: core.SamplingConfig{
+	scene := &scene.Scene{
+		Shapes: []core.Shape{sphere},
+		Lights: []core.Light{infiniteLight},
+		Camera: camera,
+		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  5,
 			RussianRouletteMinBounces: 5,
 		},
 	}
 
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
+	// Initialize BVH and preprocess lights
+	scene.Preprocess()
+
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Ray hitting the metallic sphere
@@ -236,16 +244,19 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, emissive)
 	camera := &MockCamera{}
 
-	scene := &MockScene{
-		shapes: []core.Shape{sphere},
-		lights: []core.Light{},
-		camera: camera,
-		config: core.SamplingConfig{
+	scene := &scene.Scene{
+		Shapes: []core.Shape{sphere},
+		Lights: []core.Light{},
+		Camera: camera,
+		SamplingConfig: core.SamplingConfig{
 			MaxDepth: 10,
 		},
 	}
 
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
+	// Initialize BVH and preprocess lights
+	scene.Preprocess()
+
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Ray hitting the emissive sphere
@@ -267,7 +278,7 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 // TestPathTracingMissedRay tests background handling for rays that miss all objects
 func TestPathTracingMissedRay(t *testing.T) {
 	scene := createTestScene()
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Ray that misses the sphere (pointing up)
@@ -281,7 +292,7 @@ func TestPathTracingMissedRay(t *testing.T) {
 	}
 
 	// Should be similar to what infinite light returns
-	expectedBg := scene.GetLights()[0].Emit(ray)
+	expectedBg := scene.Lights[0].Emit(ray)
 	tolerance := 0.01
 	if math.Abs(color.X-expectedBg.X) > tolerance ||
 		math.Abs(color.Y-expectedBg.Y) > tolerance ||
@@ -293,7 +304,7 @@ func TestPathTracingMissedRay(t *testing.T) {
 // TestPathTracingDeterministic tests that identical inputs produce identical outputs
 func TestPathTracingDeterministic(t *testing.T) {
 	scene := createTestScene()
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig)
 
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
 

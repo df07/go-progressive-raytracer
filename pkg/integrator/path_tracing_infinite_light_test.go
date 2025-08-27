@@ -8,22 +8,23 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // createSceneWithInfiniteLight creates a test scene with an infinite light instead of background gradient
-func createSceneWithInfiniteLight() *MockScene {
+func createSceneWithInfiniteLight() *scene.Scene {
 	// Create a simple lambertian sphere
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.3, 0.3))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
 	// Create a simple mock camera
-	camera := &MockCamera{}
+	camera := &geometry.CameraImpl{}
 
-	scene := &MockScene{
-		shapes: []core.Shape{sphere},
-		lights: []core.Light{},
-		camera: camera,
-		config: core.SamplingConfig{
+	scene := &scene.Scene{
+		Shapes: []core.Shape{sphere},
+		Lights: []core.Light{},
+		Camera: camera,
+		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
 		},
@@ -34,7 +35,9 @@ func createSceneWithInfiniteLight() *MockScene {
 		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
 		core.NewVec3(1.0, 0.8, 0.6), // bottomColor (warm ground)
 	)
-	scene.lights = append(scene.lights, infiniteLight)
+	scene.Lights = append(scene.Lights, infiniteLight)
+
+	scene.Preprocess()
 
 	return scene
 }
@@ -42,7 +45,7 @@ func createSceneWithInfiniteLight() *MockScene {
 // TestPathTracingInfiniteLight tests that path tracing correctly samples infinite lights
 func TestPathTracingInfiniteLight(t *testing.T) {
 	scene := createSceneWithInfiniteLight()
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Ray that misses the sphere and should hit the infinite light (pointing up)
@@ -70,7 +73,7 @@ func TestPathTracingInfiniteLight(t *testing.T) {
 // TestPathTracingInfiniteLight_GradientVariation tests that different directions get different colors
 func TestPathTracingInfiniteLight_GradientVariation(t *testing.T) {
 	scene := createSceneWithInfiniteLight()
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Test rays in different directions
@@ -101,13 +104,13 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 	// Create scene with uniform infinite light
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.3, 0.3))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
-	camera := &MockCamera{}
+	camera := &geometry.CameraImpl{}
 
-	scene := &MockScene{
-		shapes: []core.Shape{sphere},
-		lights: []core.Light{},
-		camera: camera,
-		config: core.SamplingConfig{
+	scene := &scene.Scene{
+		Shapes: []core.Shape{sphere},
+		Lights: []core.Light{},
+		Camera: camera,
+		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
 		},
@@ -115,9 +118,11 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 
 	// Add uniform infinite light
 	uniformLight := geometry.NewUniformInfiniteLight(core.NewVec3(0.8, 0.6, 0.4))
-	scene.lights = append(scene.lights, uniformLight)
+	scene.Lights = append(scene.Lights, uniformLight)
 
-	integrator := NewPathTracingIntegrator(scene.GetSamplingConfig())
+	scene.Preprocess()
+
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig)
 
 	// Test rays in different directions - should all get the same uniform color
 	directions := []core.Vec3{

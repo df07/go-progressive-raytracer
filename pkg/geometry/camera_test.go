@@ -1,4 +1,4 @@
-package renderer
+package geometry
 
 import (
 	"math"
@@ -9,7 +9,7 @@ import (
 )
 
 func TestCameraGetCameraForward(t *testing.T) {
-	config := CameraConfig{
+	config := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -30,7 +30,7 @@ func TestCameraGetCameraForward(t *testing.T) {
 }
 
 func TestCameraCalculateRayPDFs_AreaPDF(t *testing.T) {
-	config := CameraConfig{
+	config := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -64,7 +64,7 @@ func TestCameraCalculateRayPDFs_AreaPDF(t *testing.T) {
 }
 
 func TestCameraCalculateRayPDFs_DirectionPDF(t *testing.T) {
-	config := CameraConfig{
+	config := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -93,7 +93,7 @@ func TestCameraCalculateRayPDFs_DirectionPDF(t *testing.T) {
 }
 
 func TestCameraCalculateRayPDFs_InvalidRay(t *testing.T) {
-	config := CameraConfig{
+	config := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -114,7 +114,7 @@ func TestCameraCalculateRayPDFs_InvalidRay(t *testing.T) {
 
 func TestCameraCalculateRayPDFs_CornellBoxRealistic(t *testing.T) {
 	// Test with realistic Cornell box camera settings
-	config := CameraConfig{
+	config := core.CameraConfig{
 		Center:        core.NewVec3(278, 278, -800),
 		LookAt:        core.NewVec3(278, 278, 0),
 		Up:            core.NewVec3(0, 1, 0),
@@ -156,7 +156,7 @@ func TestCameraCalculateRayPDFs_CornellBoxRealistic(t *testing.T) {
 
 func TestCameraCalculateRayPDFs_ConsistencyWithGeneration(t *testing.T) {
 	// Test that PDF calculations are consistent with ray generation
-	config := CameraConfig{
+	config := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -198,7 +198,7 @@ func TestCameraCalculateRayPDFs_ConsistencyWithGeneration(t *testing.T) {
 
 func TestCameraCalculateRayPDFs_ScaleConsistency(t *testing.T) {
 	// Test that PDF scales are consistent with expected BDPT usage
-	config := CameraConfig{
+	config := core.CameraConfig{
 		Center:        core.NewVec3(278, 278, -800),
 		LookAt:        core.NewVec3(278, 278, 0),
 		Up:            core.NewVec3(0, 1, 0),

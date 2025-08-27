@@ -133,8 +133,7 @@ func (gil *GradientInfiniteLight) Emit(ray core.Ray) core.Vec3 {
 }
 
 // Preprocess implements the Preprocessor interface - sets world bounds from scene
-func (gil *GradientInfiniteLight) Preprocess(scene core.Scene) error {
-	bvh := scene.GetBVH()
+func (gil *GradientInfiniteLight) Preprocess(bvh *core.BVH) error {
 	gil.worldCenter = bvh.Center
 	gil.worldRadius = bvh.Radius
 	return nil

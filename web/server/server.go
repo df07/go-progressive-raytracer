@@ -258,7 +258,7 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 	defaultHeight := int(float64(defaultWidth) / sceneObj.CameraConfig.AspectRatio)
 
 	// Return the scene's sampling configuration with validation limits
-	config := sceneObj.GetSamplingConfig()
+	config := sceneObj.SamplingConfig
 
 	// Set web-specific defaults for samples and passes
 	webMaxSamples := config.SamplesPerPixel

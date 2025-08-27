@@ -179,17 +179,17 @@ func renderProgressive(config Config, sceneObj *scene.Scene) RenderResult {
 	progressiveConfig.NumWorkers = config.NumWorkers
 
 	// Create the appropriate integrator based on config
-	var selectedIntegrator core.Integrator
+	var selectedIntegrator integrator.Integrator
 	switch config.IntegratorType {
 	case "bdpt":
 		fmt.Println("Using BDPT integrator...")
-		selectedIntegrator = integrator.NewBDPTIntegrator(sceneObj.GetSamplingConfig())
+		selectedIntegrator = integrator.NewBDPTIntegrator(sceneObj.SamplingConfig)
 	case "path-tracing":
 		fmt.Println("Using path tracing integrator...")
-		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.SamplingConfig)
 	default:
 		fmt.Printf("Unknown integrator type: %s. Using path tracing.\n", config.IntegratorType)
-		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.GetSamplingConfig())
+		selectedIntegrator = integrator.NewPathTracingIntegrator(sceneObj.SamplingConfig)
 	}
 
 	progressiveRT, err := renderer.NewProgressiveRaytracer(sceneObj, progressiveConfig, selectedIntegrator, renderer.NewDefaultLogger())

@@ -1,8 +1,6 @@
 package geometry
 
-import (
-	"github.com/df07/go-progressive-raytracer/pkg/core"
-)
+import "github.com/df07/go-progressive-raytracer/pkg/core"
 
 // Box represents a rectangular box made up of 6 quads with optional rotation
 type Box struct {
