@@ -7,22 +7,8 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
-// CameraConfig contains all camera configuration parameters
-type CameraConfig struct {
-	// Camera positioning
-	Center core.Vec3 // Camera position
-	LookAt core.Vec3 // Point the camera is looking at
-	Up     core.Vec3 // Up direction (usually (0,1,0))
-
-	// Image properties
-	Width       int     // Image width in pixels
-	AspectRatio float64 // Aspect ratio (width/height)
-	VFov        float64 // Vertical field of view in degrees
-
-	// Focus properties
-	Aperture      float64 // Angle of defocus blur (0 = no blur)
-	FocusDistance float64 // Distance to focus plane (0 = auto-calculate from LookAt)
-}
+// CameraConfig is now defined in core package to avoid circular imports
+type CameraConfig = core.CameraConfig
 
 // Camera generates rays for rendering with configurable positioning and depth of field
 type Camera struct {
