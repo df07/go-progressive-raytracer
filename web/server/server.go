@@ -189,9 +189,9 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 		logger = renderer.NewDefaultLogger()
 	}
 	// Create camera override config (empty if width/height are 0, which means use defaults)
-	var cameraOverride renderer.CameraConfig
+	var cameraOverride core.CameraConfig
 	if req.Width > 0 && req.Height > 0 {
-		cameraOverride = renderer.CameraConfig{
+		cameraOverride = core.CameraConfig{
 			Width:       req.Width,
 			AspectRatio: float64(req.Width) / float64(req.Height),
 		}
