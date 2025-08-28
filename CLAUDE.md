@@ -40,13 +40,33 @@ This is a sophisticated progressive raytracer with a clean modular architecture:
 
 ### Core Design Philosophy
 - **Progressive Rendering**: Multi-pass rendering with immediate visual feedback via tile-based parallel processing
-- **Interface-Based Design**: Clean separation between core interfaces (in `pkg/core/`) and implementations
+- **Direct Struct Access**: Clean separation with concrete types for better performance (no interface overhead)
 - **Deterministic Parallelism**: Tile-specific random seeds ensure identical results regardless of worker count
 - **Zero External Dependencies**: Uses only Go standard library
 
+### Dependency Hierarchy
+
+The codebase follows a strict hierarchical dependency structure to avoid circular imports and maintain clean separation of concerns:
+
+```
+renderer → integrator → scene → {geometry, material, core}
+                              ↘ 
+web → renderer                  core (foundation types only)
+```
+
+**Dependency Rules:**
+- `core/`: Foundation types (Vec3, Ray, interfaces) - no dependencies on other packages
+- `geometry/`, `material/`: Primitive types and implementations - depend only on `core/`  
+- `scene/`: Scene management and presets - depends on `core/`, `geometry/`, `material/`
+- `integrator/`: Rendering algorithms - depends on `core/`, `geometry/`, `material/`, `scene/`
+- `renderer/`: Progressive rendering engine - depends on all lower levels
+- `web/`: Web interface - depends on `renderer/` and lower levels
+
+This hierarchy was established during a major refactor to eliminate interface overhead and enable direct field access (e.g., `scene.Camera`, `scene.Lights`) for better performance.
+
 ### Package Structure
 ```
-pkg/core/          # Foundation types and interfaces (Vec3, Ray, Shape, Material)
+pkg/core/          # Foundation types and minimal interfaces (Vec3, Ray, Shape, Material)
 pkg/geometry/      # Shape primitives with BVH acceleration
 pkg/material/      # Physically-based materials (lambertian, metal, glass, emissive)
 pkg/renderer/      # Progressive raytracing engine with worker pools
