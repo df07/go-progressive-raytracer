@@ -24,8 +24,8 @@ func (m *MockIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core
 	return m.returnColor, nil
 }
 
-// createMockScene creates a simple test scene
-func createMockScene() *scene.Scene {
+// createTestScene creates a simple test scene
+func createTestScene() *scene.Scene {
 	// Simple camera
 	cameraConfig := CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
@@ -60,7 +60,7 @@ func createMockScene() *scene.Scene {
 
 // TestTileRendererCreation tests basic tile renderer creation
 func TestTileRendererCreation(t *testing.T) {
-	scene := createMockScene()
+	scene := createTestScene()
 	mockIntegrator := &MockIntegrator{returnColor: core.NewVec3(0.5, 0.5, 0.5)}
 
 	renderer := NewTileRenderer(scene, mockIntegrator)
@@ -81,7 +81,7 @@ func TestTileRendererCreation(t *testing.T) {
 
 // TestTileRendererPixelSampling tests that the tile renderer calls the integrator
 func TestTileRendererPixelSampling(t *testing.T) {
-	scene := createMockScene()
+	scene := createTestScene()
 	mockIntegrator := &MockIntegrator{returnColor: core.NewVec3(0.7, 0.3, 0.1)}
 	renderer := NewTileRenderer(scene, mockIntegrator)
 
@@ -131,7 +131,7 @@ func TestTileRendererPixelSampling(t *testing.T) {
 
 // TestTileRendererAdaptiveSampling tests adaptive sampling behavior
 func TestTileRendererAdaptiveSampling(t *testing.T) {
-	scene := createMockScene()
+	scene := createTestScene()
 
 	// Configure for very low adaptive threshold to test convergence
 	scene.SamplingConfig.AdaptiveMinSamples = 0.1  // 10% minimum
@@ -172,7 +172,7 @@ func TestTileRendererAdaptiveSampling(t *testing.T) {
 
 // TestTileRendererStatistics tests that render statistics are calculated correctly
 func TestTileRendererStatistics(t *testing.T) {
-	scene := createMockScene()
+	scene := createTestScene()
 	mockIntegrator := &MockIntegrator{returnColor: core.NewVec3(0.4, 0.6, 0.2)}
 	renderer := NewTileRenderer(scene, mockIntegrator)
 
@@ -220,7 +220,7 @@ func TestTileRendererStatistics(t *testing.T) {
 
 // TestTileRendererDeterministic tests that identical seeds produce identical results
 func TestTileRendererDeterministic(t *testing.T) {
-	scene := createMockScene()
+	scene := createTestScene()
 
 	// Use real integrator for more realistic test
 	pathIntegrator := integrator.NewPathTracingIntegrator(scene.SamplingConfig)
@@ -266,7 +266,7 @@ func TestTileRendererDeterministic(t *testing.T) {
 
 // TestTileRendererBoundsClipping tests that rendering respects tile bounds
 func TestTileRendererBoundsClipping(t *testing.T) {
-	scene := createMockScene()
+	scene := createTestScene()
 	mockIntegrator := &MockIntegrator{returnColor: core.NewVec3(1.0, 0.0, 0.0)}
 	renderer := NewTileRenderer(scene, mockIntegrator)
 

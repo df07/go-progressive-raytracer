@@ -343,19 +343,19 @@ func createSceneWithLightsAndWeights(lights []core.Light, weights []float64) *sc
 	}
 	camera := geometry.NewCamera(cameraConfig)
 
-	mockScene := &scene.Scene{
+	scene := &scene.Scene{
 		Shapes: shapes,
 		Lights: lights, LightSampler: core.NewUniformLightSampler(lights, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
 
 	if len(weights) > 0 {
-		mockScene.LightSampler = core.NewWeightedLightSampler(lights, weights, 10.0)
+		scene.LightSampler = core.NewWeightedLightSampler(lights, weights, 10.0)
 	}
 
 	// Initialize BVH and preprocess lights
-	mockScene.Preprocess()
-	return mockScene
+	scene.Preprocess()
+	return scene
 }
 
 // Helper function to create a simple scene with a specific light (backwards compatibility)

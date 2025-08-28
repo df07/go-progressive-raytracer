@@ -11,60 +11,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
-// MockScene implements core.Scene for testing
-type MockScene struct {
-	width        int
-	height       int
-	shapes       []core.Shape
-	lights       []core.Light
-	camera       core.Camera
-	config       core.SamplingConfig
-	bvh          *core.BVH
-	lightSampler core.LightSampler
-}
-
-func (m *MockScene) GetCamera() core.Camera                 { return m.camera }
-func (m *MockScene) GetShapes() []core.Shape                { return m.shapes }
-func (m *MockScene) GetLights() []core.Light                { return m.lights }
-func (m *MockScene) GetSamplingConfig() core.SamplingConfig { return m.config }
-func (m *MockScene) GetBVH() *core.BVH {
-	if m.bvh == nil {
-		m.bvh = core.NewBVH(m.shapes)
-	}
-	return m.bvh
-}
-
-func (m *MockScene) GetLightSampler() core.LightSampler {
-	if m.lightSampler == nil {
-		sceneRadius := 10.0 // Default radius for testing
-		if m.bvh != nil {
-			sceneRadius = m.bvh.Radius
-		}
-		m.lightSampler = core.NewUniformLightSampler(m.lights, sceneRadius)
-	}
-	return m.lightSampler
-}
-
-func (m *MockScene) Preprocess() error {
-	// Simple preprocessing for tests - just preprocess lights that need it
-	for _, light := range m.lights {
-		if preprocessor, ok := light.(core.Preprocessor); ok {
-			if err := preprocessor.Preprocess(m.GetBVH()); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Create light sampler
-	sceneRadius := 10.0 // Default radius for testing
-	if m.bvh != nil {
-		sceneRadius = m.bvh.Radius
-	}
-	m.lightSampler = core.NewUniformLightSampler(m.lights, sceneRadius)
-
-	return nil
-}
-
 // MockCamera implements core.Camera for testing
 type MockCamera struct{}
 
