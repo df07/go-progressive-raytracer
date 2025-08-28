@@ -11,32 +11,6 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
-// MockCamera implements core.Camera for testing
-type MockCamera struct{}
-
-func (m *MockCamera) GetRay(i, j int, samplePoint, sampleDirect core.Vec2) core.Ray {
-	// Simple ray pointing forward
-	return core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
-}
-
-func (m *MockCamera) CalculateRayPDFs(ray core.Ray) (float64, float64) {
-	return 1.0, 1.0
-}
-
-func (m *MockCamera) GetCameraForward() core.Vec3 {
-	return core.NewVec3(0, 0, -1)
-}
-
-func (m *MockCamera) SampleCameraFromPoint(point core.Vec3, sample core.Vec2) *core.CameraSample {
-	return nil
-}
-
-func (m *MockCamera) MapRayToPixel(ray core.Ray) (int, int, bool) {
-	return 0, 0, true
-}
-
-func (m *MockCamera) SetVerbose(verbose bool) {}
-
 // createTestScene creates a simple scene with a sphere for testing
 func createTestScene() *scene.Scene {
 	// Create a simple lambertian sphere
@@ -49,7 +23,7 @@ func createTestScene() *scene.Scene {
 	)
 
 	// Create a simple mock camera
-	camera := &geometry.CameraImpl{}
+	camera := &geometry.Camera{}
 
 	scene := &scene.Scene{
 		Shapes: []core.Shape{sphere},
@@ -143,7 +117,16 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 	// Create scene with metallic sphere
 	metal := material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0) // Perfect mirror
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, metal)
-	camera := &MockCamera{}
+
+	cameraConfig := core.CameraConfig{
+		Center:      core.NewVec3(0, 0, 0),
+		LookAt:      core.NewVec3(0, 0, -1),
+		Up:          core.NewVec3(0, 1, 0),
+		Width:       100,
+		AspectRatio: 1.0,
+		VFov:        45.0,
+	}
+	camera := geometry.NewCamera(cameraConfig)
 
 	infiniteLight := geometry.NewGradientInfiniteLight(
 		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
@@ -188,7 +171,16 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 	emission := core.NewVec3(2.0, 1.0, 0.5) // Bright orange light
 	emissive := material.NewEmissive(emission)
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, emissive)
-	camera := &MockCamera{}
+
+	cameraConfig := core.CameraConfig{
+		Center:      core.NewVec3(0, 0, 0),
+		LookAt:      core.NewVec3(0, 0, -1),
+		Up:          core.NewVec3(0, 1, 0),
+		Width:       100,
+		AspectRatio: 1.0,
+		VFov:        45.0,
+	}
+	camera := geometry.NewCamera(cameraConfig)
 
 	scene := &scene.Scene{
 		Shapes: []core.Shape{sphere},

@@ -110,27 +110,6 @@ type CameraSample struct {
 	PDF    float64 // Probability density for this sample
 }
 
-// Camera interface for cameras to avoid circular imports
-type Camera interface {
-	GetRay(i, j int, samplePoint Vec2, sampleJitter Vec2) Ray
-
-	// BDPT support: calculate area and direction PDFs for a camera ray
-	CalculateRayPDFs(ray Ray) (areaPDF, directionPDF float64)
-
-	// Get camera forward direction for BDPT calculations
-	GetCameraForward() Vec3
-
-	// Sample camera from a reference point for t=1 strategies
-	// Camera handles lens sampling internally, returns complete sample
-	SampleCameraFromPoint(refPoint Vec3, samplePoint Vec2) *CameraSample
-
-	// Map ray back to pixel coordinates (for splat placement)
-	MapRayToPixel(ray Ray) (x, y int, ok bool)
-
-	// Verbose logging bool
-	SetVerbose(verbose bool)
-}
-
 // CameraConfig contains all camera configuration parameters
 type CameraConfig struct {
 	// Camera positioning
@@ -146,17 +125,6 @@ type CameraConfig struct {
 	// Focus properties
 	Aperture      float64 // Angle of defocus blur (0 = no blur)
 	FocusDistance float64 // Distance to focus plane (0 = auto-calculate from LookAt)
-}
-
-// SceneStruct contains all the elements needed for rendering - will eventually replace Scene interface
-type SceneStruct struct {
-	Camera         Camera
-	Shapes         []Shape
-	Lights         []Light
-	LightSampler   LightSampler
-	SamplingConfig SamplingConfig
-	CameraConfig   CameraConfig
-	BVH            *BVH
 }
 
 // Scene interface for scene management

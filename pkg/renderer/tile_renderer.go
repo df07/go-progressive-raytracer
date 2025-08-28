@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/integrator"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -47,7 +48,7 @@ func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]
 }
 
 // adaptiveSamplePixelWithSplats uses adaptive sampling with the integrator and handles splat contributions
-func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera core.Camera, i, j int, ps *PixelStats, splatQueue *SplatQueue, sampler core.Sampler, maxSamples int, samplingConfig core.SamplingConfig) int {
+func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera *geometry.Camera, i, j int, ps *PixelStats, splatQueue *SplatQueue, sampler core.Sampler, maxSamples int, samplingConfig core.SamplingConfig) int {
 	initialSampleCount := ps.SampleCount
 
 	// Take samples until we reach convergence or max samples

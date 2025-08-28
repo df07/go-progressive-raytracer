@@ -20,7 +20,7 @@ func NewGroundQuad(center core.Vec3, size float64, material core.Material) *geom
 
 // Scene contains all the elements needed for rendering
 type Scene struct {
-	Camera         core.Camera
+	Camera         *geometry.Camera
 	Shapes         []core.Shape      // Objects in the scene
 	Lights         []core.Light      // Lights in the scene
 	LightSampler   core.LightSampler // Light sampler

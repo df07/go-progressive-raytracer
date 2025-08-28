@@ -35,7 +35,7 @@ func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj *scene.Scene,
 
 func TestTileRendererWithSplats(t *testing.T) {
 	// Create a simple test scene
-	cameraConfig := CameraConfig{
+	cameraConfig := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -43,7 +43,7 @@ func TestTileRendererWithSplats(t *testing.T) {
 		AspectRatio: 1.0,
 		VFov:        45.0,
 	}
-	camera := NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	samplingConfig := core.SamplingConfig{
 		Width:           10,
@@ -150,7 +150,7 @@ func TestSplatSystemIntegration(t *testing.T) {
 	bdptIntegrator := integrator.NewBDPTIntegrator(config)
 
 	// Create scene with actual geometry and lighting for meaningful BDPT testing
-	cameraConfig := CameraConfig{
+	cameraConfig := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 5),
 		LookAt:      core.NewVec3(0, 0, 0),
 		Up:          core.NewVec3(0, 1, 0),
@@ -158,7 +158,7 @@ func TestSplatSystemIntegration(t *testing.T) {
 		AspectRatio: 1.0,
 		VFov:        45.0,
 	}
-	camera := NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	// Create materials
 	lambertian := material.NewLambertian(core.Vec3{X: 0.7, Y: 0.3, Z: 0.3})

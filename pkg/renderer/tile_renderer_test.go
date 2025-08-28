@@ -27,7 +27,7 @@ func (m *MockIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core
 // createTestScene creates a simple test scene
 func createTestScene() *scene.Scene {
 	// Simple camera
-	cameraConfig := CameraConfig{
+	cameraConfig := core.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -36,7 +36,7 @@ func createTestScene() *scene.Scene {
 		VFov:        45.0,
 		Aperture:    0.0,
 	}
-	camera := NewCamera(cameraConfig)
+	camera := geometry.NewCamera(cameraConfig)
 
 	// Simple sphere
 	lambertian := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))

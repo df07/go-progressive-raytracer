@@ -9,8 +9,8 @@ import (
 
 // core.CameraConfig is defined in core/interfaces.go
 
-// CameraImpl generates rays for rendering with configurable positioning and depth of field
-type CameraImpl struct {
+// Camera generates rays for rendering with configurable positioning and depth of field
+type Camera struct {
 	center       core.Vec3 // Camera position
 	pixel00Loc   core.Vec3 // Location of pixel (0,0)
 	pixelDeltaU  core.Vec3 // Offset to pixel to the right
@@ -45,7 +45,7 @@ type CameraImpl struct {
 }
 
 // NewCamera creates a camera with the given configuration
-func NewCamera(config core.CameraConfig) *CameraImpl {
+func NewCamera(config core.CameraConfig) *Camera {
 	// Calculate camera coordinate system
 	w := config.Center.Subtract(config.LookAt).Normalize() // Camera looks along -w
 	u := w.Cross(config.Up).Normalize()                    // Right vector (fixed: was config.Up.Cross(w))
@@ -119,7 +119,7 @@ func NewCamera(config core.CameraConfig) *CameraImpl {
 	cosTotalWidth := cornerDirection.Dot(forwardDirection)
 	cosTotalHeight := cosTotalWidth // Same for both since we check corners
 
-	return &CameraImpl{
+	return &Camera{
 		center:          config.Center,
 		pixel00Loc:      pixel00Loc,
 		pixelDeltaU:     pixelDeltaU,
@@ -148,7 +148,7 @@ func NewCamera(config core.CameraConfig) *CameraImpl {
 }
 
 // GetRay generates a ray for pixel coordinates (i, j) with sub-pixel sampling using the provided random generator
-func (c *CameraImpl) GetRay(i, j int, samplePoint core.Vec2, sampleJitter core.Vec2) core.Ray {
+func (c *Camera) GetRay(i, j int, samplePoint core.Vec2, sampleJitter core.Vec2) core.Ray {
 	// Add random offset for anti-aliasing
 	jitter := core.NewVec3(sampleJitter.X-0.5, sampleJitter.Y-0.5, 0)
 	pixelSample := c.pixel00Loc.
@@ -169,7 +169,7 @@ func (c *CameraImpl) GetRay(i, j int, samplePoint core.Vec2, sampleJitter core.V
 
 // CalculateRayPDFs calculates the area and direction PDFs for a camera ray
 // This is needed for BDPT to properly balance camera and light path PDFs
-func (c *CameraImpl) CalculateRayPDFs(ray core.Ray) (areaPDF, dirPDF float64) {
+func (c *Camera) CalculateRayPDFs(ray core.Ray) (areaPDF, dirPDF float64) {
 
 	// Cosine of angle between ray and camera forward direction
 	cosTheta := ray.Direction.Dot(c.cameraForward)
@@ -177,7 +177,7 @@ func (c *CameraImpl) CalculateRayPDFs(ray core.Ray) (areaPDF, dirPDF float64) {
 		return 0, 0
 	}
 
-	// Check if ray hits within image bounds using existing Mapcore.RayToPixel
+	// Check if ray hits within image bounds using existing MapRayToPixel
 	_, _, inBounds := c.MapRayToPixel(ray)
 	if !inBounds {
 		return 0, 0
@@ -194,14 +194,14 @@ func (c *CameraImpl) CalculateRayPDFs(ray core.Ray) (areaPDF, dirPDF float64) {
 }
 
 // GetCameraForward returns the camera's forward direction (toward LookAt)
-func (c *CameraImpl) GetCameraForward() core.Vec3 {
+func (c *Camera) GetCameraForward() core.Vec3 {
 	return c.cameraForward
 }
 
 // SampleCameraFromPoint samples the camera from a reference point for t=1 strategies
 // Camera handles lens sampling internally, returns complete sample
 // Equivalent to pbrt PerspectiveCamera::SampleWi
-func (c *CameraImpl) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *core.CameraSample {
+func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *core.CameraSample {
 	// Sample lens coordinates using concentric disk sampling
 	lensCoords := core.RandomInUnitDisk(sample).Multiply(c.lensRadius)
 
@@ -238,7 +238,7 @@ func (c *CameraImpl) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2)
 
 // EvaluateRayImportance calculates the camera importance function for a ray
 // This is the We function in PBRT - represents camera sensor responsivity
-func (c *CameraImpl) EvaluateRayImportance(ray core.Ray) core.Vec3 {
+func (c *Camera) EvaluateRayImportance(ray core.Ray) core.Vec3 {
 	// Check if ray is forward-facing with respect to the camera
 	cosTheta := ray.Direction.Dot(c.cameraForward)
 
@@ -254,8 +254,8 @@ func (c *CameraImpl) EvaluateRayImportance(ray core.Ray) core.Vec3 {
 	return core.Vec3{X: importance, Y: importance, Z: importance}
 }
 
-// Mapcore.RayToPixel maps a ray back to pixel coordinates (for splat placement)
-func (c *CameraImpl) MapRayToPixel(ray core.Ray) (int, int, bool) {
+// MapRayToPixel maps a ray back to pixel coordinates (for splat placement)
+func (c *Camera) MapRayToPixel(ray core.Ray) (int, int, bool) {
 	// Find intersection with image plane
 	// core.Ray: origin + t * direction
 	// Image plane: center - w * focusDistance
@@ -266,7 +266,7 @@ func (c *CameraImpl) MapRayToPixel(ray core.Ray) (int, int, bool) {
 	t := toPlane.Dot(c.w) / ray.Direction.Dot(c.w)
 
 	if t <= 0 {
-		return 0, 0, false // core.Ray going wrong direction
+		return 0, 0, false // Ray going wrong direction
 	}
 
 	// Find hit point on image plane
@@ -293,7 +293,7 @@ func (c *CameraImpl) MapRayToPixel(ray core.Ray) (int, int, bool) {
 	return 0, 0, false
 }
 
-// Mergecore.CameraConfig merges camera configuration overrides with defaults
+// MergeCameraConfig merges camera configuration overrides with defaults
 // Only non-zero values in the override will replace the default values
 func MergeCameraConfig(defaultConfig core.CameraConfig, override core.CameraConfig) core.CameraConfig {
 	result := defaultConfig
@@ -327,11 +327,11 @@ func MergeCameraConfig(defaultConfig core.CameraConfig, override core.CameraConf
 }
 
 // SetVerbose sets the verbose logging bool
-func (c *CameraImpl) SetVerbose(verbose bool) {
+func (c *Camera) SetVerbose(verbose bool) {
 	c.verbose = verbose
 }
 
-func (c *CameraImpl) logf(format string, a ...interface{}) {
+func (c *Camera) logf(format string, a ...interface{}) {
 	if c.verbose {
 		fmt.Printf(format, a...)
 	}

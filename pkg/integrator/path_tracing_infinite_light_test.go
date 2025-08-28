@@ -18,7 +18,7 @@ func createSceneWithInfiniteLight() *scene.Scene {
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
 	// Create a simple mock camera
-	camera := &geometry.CameraImpl{}
+	camera := &geometry.Camera{}
 
 	scene := &scene.Scene{
 		Shapes: []core.Shape{sphere},
@@ -104,7 +104,7 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 	// Create scene with uniform infinite light
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.3, 0.3))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
-	camera := &geometry.CameraImpl{}
+	camera := &geometry.Camera{}
 
 	scene := &scene.Scene{
 		Shapes: []core.Shape{sphere},
