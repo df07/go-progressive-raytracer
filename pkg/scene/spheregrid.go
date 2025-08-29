@@ -46,9 +46,9 @@ func oklchToRGB(l, c, h float64) core.Vec3 {
 }
 
 // NewSphereGridScene creates a scene with a configurable grid of spheres
-func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...core.CameraConfig) *Scene {
+func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Default camera configuration for sphere grid
-	defaultCameraConfig := core.CameraConfig{
+	defaultCameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(4.5, 6, 18),    // Position camera farther back and slightly lower
 		LookAt:        core.NewVec3(4.5, 0.8, 4.5), // Look at center of grid, slightly lower
 		Up:            core.NewVec3(0, 1, 0),       // Standard up direction

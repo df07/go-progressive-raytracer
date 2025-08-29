@@ -15,16 +15,16 @@ import (
 // MockIntegratorWithSplats creates splat rays to test the splat system
 type MockIntegratorWithSplats struct{}
 
-func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
+func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj *scene.Scene, sampler core.Sampler) (core.Vec3, []integrator.SplatRay) {
 	// Regular pixel color (simple test pattern)
 	pixelColor := core.Vec3{X: 0.2, Y: 0.4, Z: 0.6}
 
 	// Create some test splat rays
-	var splats []core.SplatRay
+	var splats []integrator.SplatRay
 
 	// Add a splat ray for testing - ray pointing slightly off from original
 	splatDirection := ray.Direction.Add(core.Vec3{X: 0.1, Y: 0.0, Z: 0.0}).Normalize()
-	splatRay := core.SplatRay{
+	splatRay := integrator.SplatRay{
 		Ray:   core.NewRay(ray.Origin, splatDirection),
 		Color: core.Vec3{X: 0.8, Y: 0.2, Z: 0.1}, // Distinct color for splats
 	}
@@ -35,7 +35,7 @@ func (m *MockIntegratorWithSplats) RayColor(ray core.Ray, sceneObj *scene.Scene,
 
 func TestTileRendererWithSplats(t *testing.T) {
 	// Create a simple test scene
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -150,7 +150,7 @@ func TestSplatSystemIntegration(t *testing.T) {
 	bdptIntegrator := integrator.NewBDPTIntegrator(config)
 
 	// Create scene with actual geometry and lighting for meaningful BDPT testing
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center:      core.NewVec3(0, 0, 5),
 		LookAt:      core.NewVec3(0, 0, 0),
 		Up:          core.NewVec3(0, 1, 0),

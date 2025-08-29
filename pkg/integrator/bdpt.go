@@ -69,7 +69,7 @@ func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
 
 // RayColor computes color with support for ray-based splatting
 // Returns (pixel color, splat rays)
-func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
+func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []SplatRay) {
 
 	// Generate random camera and light paths
 	cameraPath := bdpt.generateCameraPath(ray, scene, sampler, bdpt.config.MaxDepth)
@@ -77,7 +77,7 @@ func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler c
 
 	// Evaluate all combinations of camera and light paths with MIS weighting
 	var totalLight core.Vec3
-	var totalSplats []core.SplatRay
+	var totalSplats []SplatRay
 
 	for s := 0; s <= lightPath.Length; s++ { // s is the number of vertices from the light path
 		for t := 1; t <= cameraPath.Length; t++ { // t is the number of vertices from the camera path
@@ -288,10 +288,10 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 }
 
 // evaluateBDPTStrategy evaluates a single BDPT strategy
-func (bdpt *BDPTIntegrator) evaluateBDPTStrategy(cameraPath, lightPath Path, s, t int, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay, *Vertex) {
+func (bdpt *BDPTIntegrator) evaluateBDPTStrategy(cameraPath, lightPath Path, s, t int, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []SplatRay, *Vertex) {
 	var light core.Vec3
 	var sample *Vertex         // needed for MIS weight calculation for strategies that sample a new vertex
-	var splats []core.SplatRay // returned by light tracing strategy
+	var splats []SplatRay // returned by light tracing strategy
 
 	switch {
 	case s == 1 && t == 1:
@@ -388,7 +388,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 // evaluateLightTracingStrategy evaluates light tracing (light path hits camera)
 // Returns (direct contribution, splat rays, sampled camera vertex)
-func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, scene *scene.Scene, sampler core.Sampler) ([]core.SplatRay, *Vertex) {
+func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, scene *scene.Scene, sampler core.Sampler) ([]SplatRay, *Vertex) {
 	if s <= 1 || s > lightPath.Length {
 		return nil, nil
 	}
@@ -460,14 +460,14 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	}
 
 	// Create splat ray for this contribution
-	splatRay := core.SplatRay{
+	splatRay := SplatRay{
 		Ray:   cameraSample.Ray,
 		Color: lightContribution,
 	}
 
 	// bdpt.logf(" (s=%d,t=1) evaluateLightTracingStrategy: L=%v => brdf=%v * cameraBeta=%v * lightVertex.Beta=%v * cosine=%f\n", s, lightContribution, brdf, cameraBeta, lightVertex.Beta, cosine)
 
-	return []core.SplatRay{splatRay}, sampledCameraVertex
+	return []SplatRay{splatRay}, sampledCameraVertex
 }
 
 // evaluateConnection computes the contribution from connecting two specific vertices.

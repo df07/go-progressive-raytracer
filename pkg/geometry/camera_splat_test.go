@@ -11,7 +11,7 @@ import (
 // TestSampleCameraFromPoint tests the camera sampling for t=1 strategies
 func TestSampleCameraFromPoint(t *testing.T) {
 	// Create a simple perspective camera
-	config := core.CameraConfig{
+	config := CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
 		LookAt:        core.NewVec3(0, 0, -1),
 		Up:            core.NewVec3(0, 1, 0),
@@ -58,7 +58,7 @@ func TestSampleCameraFromPoint(t *testing.T) {
 
 // TestSampleCameraFromPointBehindCamera tests sampling from behind the camera
 func TestSampleCameraFromPointBehindCamera(t *testing.T) {
-	config := core.CameraConfig{
+	config := CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
 		LookAt:        core.NewVec3(0, 0, -1),
 		Up:            core.NewVec3(0, 1, 0),
@@ -84,7 +84,7 @@ func TestSampleCameraFromPointBehindCamera(t *testing.T) {
 
 // TestMapRayToPixel tests the ray-to-pixel mapping
 func TestMapRayToPixel(t *testing.T) {
-	config := core.CameraConfig{
+	config := CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
 		LookAt:        core.NewVec3(0, 0, -1),
 		Up:            core.NewVec3(0, 1, 0),
@@ -146,7 +146,7 @@ func TestMapRayToPixel(t *testing.T) {
 
 // TestMapRayToPixelOutOfBounds tests rays that don't hit the image plane
 func TestMapRayToPixelOutOfBounds(t *testing.T) {
-	config := core.CameraConfig{
+	config := CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
 		LookAt:        core.NewVec3(0, 0, -1),
 		Up:            core.NewVec3(0, 1, 0),
@@ -177,7 +177,7 @@ func TestMapRayToPixelOutOfBounds(t *testing.T) {
 
 // TestWeFunction tests the camera importance function
 func TestWeFunction(t *testing.T) {
-	config := core.CameraConfig{
+	config := CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
 		LookAt:        core.NewVec3(0, 0, -1),
 		Up:            core.NewVec3(0, 1, 0),
@@ -263,7 +263,7 @@ func TestWeFunction(t *testing.T) {
 
 // TestCameraSamplingConsistency tests that camera sampling and ray generation are consistent
 func TestCameraSamplingConsistency(t *testing.T) {
-	config := core.CameraConfig{
+	config := CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
 		LookAt:        core.NewVec3(0, 0, -1),
 		Up:            core.NewVec3(0, 1, 0),

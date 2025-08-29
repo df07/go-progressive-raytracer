@@ -13,7 +13,7 @@ import (
 // NewDragonScene creates a scene with the dragon PLY mesh
 // If loadMesh is false, creates the scene structure without loading the PLY file
 // This is useful for getting scene configuration without the expensive mesh loading
-func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, cameraOverrides ...core.CameraConfig) *Scene {
+func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Setup camera for dragon viewing
 	cameraConfig := setupDragonCamera(cameraOverrides...)
 	camera := geometry.NewCamera(cameraConfig)
@@ -44,9 +44,9 @@ func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, ca
 }
 
 // setupDragonCamera configures the camera for viewing the dragon (based on PBRT scene)
-func setupDragonCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
+func setupDragonCamera(cameraOverrides ...geometry.CameraConfig) geometry.CameraConfig {
 	// Use exact PBRT scene coordinates: LookAt 277 -240 250  0 60 -30 0 0 1
-	defaultCameraConfig := core.CameraConfig{
+	defaultCameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(277, -240, 250), // Exact PBRT camera position
 		LookAt:        core.NewVec3(0, 60, -30),     // Exact PBRT look at point
 		Up:            core.NewVec3(0, 0, 1),        // Z-up coordinate system from PBRT

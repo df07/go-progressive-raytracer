@@ -118,7 +118,7 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 	metal := material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0) // Perfect mirror
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, metal)
 
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
@@ -172,7 +172,7 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 	emissive := material.NewEmissive(emission)
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, emissive)
 
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),

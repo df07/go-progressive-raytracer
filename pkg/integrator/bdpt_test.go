@@ -292,7 +292,7 @@ func createSimpleTestScene() *scene.Scene {
 	)
 
 	// Use a real camera from the renderer package
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
 		LookAt:        core.NewVec3(0, 0, -1),
 		Up:            core.NewVec3(0, 1, 0),
@@ -337,7 +337,7 @@ func createSceneWithLightsAndWeights(lights []core.Light, weights []float64) *sc
 	}
 
 	// Simple camera
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center: core.NewVec3(0, 0, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 1, 0),
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
@@ -381,7 +381,7 @@ func createGlancingTestSceneWithMaterial(mat core.Material) *scene.Scene {
 	)
 
 	// Camera setup that matches createSimpleTestScene - at origin looking toward -Z
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center: core.NewVec3(0, 0, 0), LookAt: core.NewVec3(0, 0, -1), Up: core.NewVec3(0, 1, 0),
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
@@ -427,7 +427,7 @@ func createLightSceneWithMaterial(mat core.Material) *scene.Scene {
 		emissiveMaterial,
 	)
 
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center: core.NewVec3(3, 0, 0), LookAt: core.NewVec3(0, 0, 0), Up: core.NewVec3(0, 1, 0),
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
@@ -844,7 +844,7 @@ func createPathWithInfiniteLight() Path {
 // createMinimalCornellScene creates a Cornell scene with walls, floor and quad light
 func createMinimalCornellScene(includeBoxes bool) *scene.Scene {
 	// Create a basic scene
-	config := core.CameraConfig{
+	config := geometry.CameraConfig{
 		Center:        core.NewVec3(278, 278, -800), // Cornell box camera position
 		LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
 		Up:            core.NewVec3(0, 1, 0),        // Standard up direction

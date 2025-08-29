@@ -25,14 +25,14 @@ type Scene struct {
 	Lights         []core.Light      // Lights in the scene
 	LightSampler   core.LightSampler // Light sampler
 	SamplingConfig core.SamplingConfig
-	CameraConfig   core.CameraConfig
+	CameraConfig   geometry.CameraConfig
 	BVH            *core.BVH // Acceleration structure for ray-object intersection
 }
 
 // NewDefaultScene creates a default scene with spheres, ground, and camera
-func NewDefaultScene(cameraOverrides ...core.CameraConfig) *Scene {
+func NewDefaultScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Default camera configuration
-	defaultCameraConfig := core.CameraConfig{
+	defaultCameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(0, 0.75, 2), // Position camera higher and farther back
 		LookAt:        core.NewVec3(0, 0.5, -1), // Look at the sphere center
 		Up:            core.NewVec3(0, 1, 0),    // Standard up direction

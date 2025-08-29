@@ -119,7 +119,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
-	camera := geometry.NewCamera(core.CameraConfig{
+	camera := geometry.NewCamera(geometry.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 3, 0),
 		Up:          core.NewVec3(0, 1, 0),
@@ -205,7 +205,7 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Sce
 		lights = append(lights, light)
 	}
 
-	defaultCameraConfig := core.CameraConfig{
+	defaultCameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(0, 0.75, 2), // Position camera higher and farther back
 		LookAt:        core.NewVec3(0, 0.5, -1), // Look at the sphere center
 		Up:            core.NewVec3(0, 1, 0),    // Standard up direction
@@ -370,7 +370,7 @@ func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
 		core.NewVec3(0.9, 0.9, 1.0), // Light horizon
 	)
 
-	camera := geometry.NewCamera(core.CameraConfig{
+	camera := geometry.NewCamera(geometry.CameraConfig{
 		Center:      core.NewVec3(0, 2, 2),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),

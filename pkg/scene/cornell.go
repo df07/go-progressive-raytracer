@@ -18,7 +18,7 @@ const (
 )
 
 // NewCornellScene creates a classic Cornell box scene with quad walls and area lighting
-func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...core.CameraConfig) *Scene {
+func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Setup camera and basic scene configuration
 	cameraConfig := setupCornellCamera(cameraOverrides...)
 	camera := geometry.NewCamera(cameraConfig)
@@ -44,8 +44,8 @@ func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...core.C
 }
 
 // setupCornellCamera configures the camera for the Cornell box scene
-func setupCornellCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
-	defaultCameraConfig := core.CameraConfig{
+func setupCornellCamera(cameraOverrides ...geometry.CameraConfig) geometry.CameraConfig {
+	defaultCameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(278, 278, -800), // Centered camera position
 		LookAt:        core.NewVec3(278, 278, 0),    // Look at the center of the box
 		Up:            core.NewVec3(0, 1, 0),        // Standard up direction

@@ -16,12 +16,12 @@ const (
 )
 
 // NewTriangleMeshScene creates a scene showcasing triangle mesh geometry
-func NewTriangleMeshScene(complexity int, cameraOverrides ...core.CameraConfig) *Scene {
+func NewTriangleMeshScene(complexity int, cameraOverrides ...geometry.CameraConfig) *Scene {
 	return NewTriangleMeshSceneWithComplexity(complexity, cameraOverrides...)
 }
 
 // NewTriangleMeshSceneWithComplexity creates a scene with configurable sphere complexity
-func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...core.CameraConfig) *Scene {
+func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Setup camera and basic scene configuration
 	cameraConfig := setupTriangleMeshCamera(cameraOverrides...)
 	camera := geometry.NewCamera(cameraConfig)
@@ -47,8 +47,8 @@ func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...core.
 }
 
 // setupTriangleMeshCamera configures the camera for the triangle mesh scene
-func setupTriangleMeshCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
-	defaultCameraConfig := core.CameraConfig{
+func setupTriangleMeshCamera(cameraOverrides ...geometry.CameraConfig) geometry.CameraConfig {
+	defaultCameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(0, 2, 6), // Position camera to see the meshes
 		LookAt:        core.NewVec3(0, 1, 0), // Look at the center of the scene
 		Up:            core.NewVec3(0, 1, 0), // Standard up direction

@@ -7,7 +7,29 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
-// core.CameraConfig is defined in core/interfaces.go
+// CameraSample represents camera sampling result for t=1 strategies
+type CameraSample struct {
+	Ray    core.Ray  // Ray from camera toward reference point
+	Weight core.Vec3 // Camera importance weight (We function result)
+	PDF    float64   // Probability density for this sample
+}
+
+// CameraConfig contains all camera configuration parameters
+type CameraConfig struct {
+	// Camera positioning
+	Center core.Vec3 // Camera position
+	LookAt core.Vec3 // Point the camera is looking at
+	Up     core.Vec3 // Up direction (usually (0,1,0))
+
+	// Image properties
+	Width       int     // Image width in pixels
+	AspectRatio float64 // Aspect ratio (width/height)
+	VFov        float64 // Vertical field of view in degrees
+
+	// Focus properties
+	Aperture      float64 // Angle of defocus blur (0 = no blur)
+	FocusDistance float64 // Distance to focus plane (0 = auto-calculate from LookAt)
+}
 
 // Camera generates rays for rendering with configurable positioning and depth of field
 type Camera struct {
@@ -38,14 +60,14 @@ type Camera struct {
 	cosTotalHeight  float64 // Cosine of half the field of view height
 
 	// Store configuration for reference
-	config core.CameraConfig
+	config CameraConfig
 
 	// Verbose logging bool
 	verbose bool
 }
 
 // NewCamera creates a camera with the given configuration
-func NewCamera(config core.CameraConfig) *Camera {
+func NewCamera(config CameraConfig) *Camera {
 	// Calculate camera coordinate system
 	w := config.Center.Subtract(config.LookAt).Normalize() // Camera looks along -w
 	u := w.Cross(config.Up).Normalize()                    // Right vector (fixed: was config.Up.Cross(w))
@@ -201,7 +223,7 @@ func (c *Camera) GetCameraForward() core.Vec3 {
 // SampleCameraFromPoint samples the camera from a reference point for t=1 strategies
 // Camera handles lens sampling internally, returns complete sample
 // Equivalent to pbrt PerspectiveCamera::SampleWi
-func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *core.CameraSample {
+func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *CameraSample {
 	// Sample lens coordinates using concentric disk sampling
 	lensCoords := core.RandomInUnitDisk(sample).Multiply(c.lensRadius)
 
@@ -229,7 +251,7 @@ func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *co
 		return nil // Ray doesn't contribute
 	}
 
-	return &core.CameraSample{
+	return &CameraSample{
 		Ray:    ray,
 		Weight: importance,
 		PDF:    pdf,
@@ -295,7 +317,7 @@ func (c *Camera) MapRayToPixel(ray core.Ray) (int, int, bool) {
 
 // MergeCameraConfig merges camera configuration overrides with defaults
 // Only non-zero values in the override will replace the default values
-func MergeCameraConfig(defaultConfig core.CameraConfig, override core.CameraConfig) core.CameraConfig {
+func MergeCameraConfig(defaultConfig CameraConfig, override CameraConfig) CameraConfig {
 	result := defaultConfig
 
 	if override.Width != 0 {

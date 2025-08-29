@@ -23,7 +23,7 @@ func NewPathTracingIntegrator(config core.SamplingConfig) *PathTracingIntegrator
 }
 
 // RayColor computes the color for a single ray using unidirectional path tracing
-func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
+func (pt *PathTracingIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []SplatRay) {
 	depth := pt.config.MaxDepth
 	throughput := core.Vec3{X: 1.0, Y: 1.0, Z: 1.0}
 	return pt.rayColorRecursive(ray, scene, sampler, depth, throughput), nil

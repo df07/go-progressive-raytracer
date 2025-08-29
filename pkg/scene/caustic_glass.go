@@ -13,7 +13,7 @@ import (
 // NewCausticGlassScene creates a scene with glass caustic geometry
 // Based on the glass.pbrt scene configuration
 // If loadMesh is false, creates the scene structure without loading the PLY files
-func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.Logger, cameraOverrides ...core.CameraConfig) *Scene {
+func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.Logger, cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Setup camera based on PBRT scene configuration
 	cameraConfig := setupCausticGlassCamera(cameraOverrides...)
 	camera := geometry.NewCamera(cameraConfig)
@@ -44,8 +44,8 @@ func NewCausticGlassScene(loadMesh bool, lightType core.LightType, logger core.L
 // Camera "perspective" "float fov" [ 30 ]
 // Film resolution 1050x1500 with scale 1.5
 // PBRT scale parameter affects the effective field of view - scale > 1 means zoom out
-func setupCausticGlassCamera(cameraOverrides ...core.CameraConfig) core.CameraConfig {
-	defaultCameraConfig := core.CameraConfig{
+func setupCausticGlassCamera(cameraOverrides ...geometry.CameraConfig) geometry.CameraConfig {
+	defaultCameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(-5.5, 7, -5.5),  // PBRT camera position
 		LookAt:        core.NewVec3(-4.75, 2.25, 0), // PBRT look at point
 		Up:            core.NewVec3(0, 1, 0),        // Y-up coordinate system

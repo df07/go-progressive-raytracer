@@ -1,11 +1,5 @@
 package core
 
-// SplatRay represents a ray-based color contribution that needs to be mapped to pixels
-type SplatRay struct {
-	Ray   Ray  // Ray that should contribute to some pixel
-	Color Vec3 // Color contribution
-}
-
 // Shape interface for objects that can be hit by rays
 type Shape interface {
 	Hit(ray Ray, tMin, tMax float64) (*HitRecord, bool)
@@ -101,30 +95,6 @@ type LightSampler interface {
 
 	// GetLightCount returns the number of lights in this sampler
 	GetLightCount() int
-}
-
-// CameraSample represents camera sampling result for t=1 strategies
-type CameraSample struct {
-	Ray    Ray     // Ray from camera toward reference point
-	Weight Vec3    // Camera importance weight (We function result)
-	PDF    float64 // Probability density for this sample
-}
-
-// CameraConfig contains all camera configuration parameters
-type CameraConfig struct {
-	// Camera positioning
-	Center Vec3 // Camera position
-	LookAt Vec3 // Point the camera is looking at
-	Up     Vec3 // Up direction (usually (0,1,0))
-
-	// Image properties
-	Width       int     // Image width in pixels
-	AspectRatio float64 // Aspect ratio (width/height)
-	VFov        float64 // Vertical field of view in degrees
-
-	// Focus properties
-	Aperture      float64 // Angle of defocus blur (0 = no blur)
-	FocusDistance float64 // Distance to focus plane (0 = auto-calculate from LookAt)
 }
 
 // Scene interface for scene management

@@ -19,7 +19,7 @@ type MockIntegrator struct {
 	callCount   int
 }
 
-func (m *MockIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []core.SplatRay) {
+func (m *MockIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []integrator.SplatRay) {
 	m.callCount++
 	return m.returnColor, nil
 }
@@ -27,7 +27,7 @@ func (m *MockIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core
 // createTestScene creates a simple test scene
 func createTestScene() *scene.Scene {
 	// Simple camera
-	cameraConfig := core.CameraConfig{
+	cameraConfig := geometry.CameraConfig{
 		Center:      core.NewVec3(0, 0, 0),
 		LookAt:      core.NewVec3(0, 0, -1),
 		Up:          core.NewVec3(0, 1, 0),
