@@ -97,76 +97,76 @@ func SphereConePDF(distance, radius float64) float64 {
 }
 
 // CalculateLightPDF calculates the combined PDF for a given direction toward multiple lights
-func CalculateLightPDF(lights []Light, lightSampler LightSampler, point, normal, direction Vec3) float64 {
-	if len(lights) == 0 {
-		return 0.0
-	}
-	totalPDF := 0.0
-
-	// For each light, calculate the PDF weighted by its selection probability
-	for i, light := range lights {
-		lightPDF := light.PDF(point, normal, direction)
-		lightSelectionPdf := lightSampler.GetLightProbability(i, point, normal)
-		totalPDF += lightPDF * lightSelectionPdf
-	}
-
-	return totalPDF
-}
+// func CalculateLightPDF(lights []Light, lightSampler LightSampler, point, normal, direction Vec3) float64 {
+// 	if len(lights) == 0 {
+// 		return 0.0
+// 	}
+// 	totalPDF := 0.0
+// 
+// 	// For each light, calculate the PDF weighted by its selection probability
+// 	for i, light := range lights {
+// 		lightPDF := light.PDF(point, normal, direction)
+// 		lightSelectionPdf := lightSampler.GetLightProbability(i, point, normal)
+// 		totalPDF += lightPDF * lightSelectionPdf
+// 	}
+// 
+// 	return totalPDF
+// }
 
 // SampleLight selects and samples a light from the scene using importance sampling
-func SampleLight(lights []Light, lightSampler LightSampler, point Vec3, normal Vec3, sampler Sampler) (LightSample, Light, bool) {
-	if len(lights) == 0 {
-		return LightSample{}, nil, false
-	}
-	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLight(point, normal, sampler.Get1D())
-
-	sample := selectedLight.Sample(point, normal, sampler.Get2D())
-	sample.PDF *= lightSelectionPdf // Combined PDF for MIS calculations
-
-	return sample, selectedLight, true
-}
+// func SampleLight(lights []Light, lightSampler LightSampler, point Vec3, normal Vec3, sampler Sampler) (LightSample, Light, bool) {
+// 	if len(lights) == 0 {
+// 		return LightSample{}, nil, false
+// 	}
+// 	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLight(point, normal, sampler.Get1D())
+// 
+// 	sample := selectedLight.Sample(point, normal, sampler.Get2D())
+// 	sample.PDF *= lightSelectionPdf // Combined PDF for MIS calculations
+// 
+// 	return sample, selectedLight, true
+// }
 
 // SampleLightEmission selects and samples emission from a light using uniform sampling
 // For emission sampling, we don't have a specific surface point, so use uniform distribution
-func SampleLightEmission(lights []Light, lightSampler LightSampler, sampler Sampler) (EmissionSample, bool) {
-	if len(lights) == 0 {
-		return EmissionSample{}, false
-	}
-	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLightEmission(sampler.Get1D())
-
-	sample := selectedLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
-	// Apply light selection probability to area PDF only (combined effect when multiplied)
-	sample.AreaPDF *= lightSelectionPdf
-	// Don't modify DirectionPDF - it's independent of light selection
-
-	return sample, true
-}
-
-// SampleEmissionDirection samples a cosine-weighted emission direction from a surface
-// and returns both the direction and the emission sample with separate area and direction PDFs
-func SampleEmissionDirection(point Vec3, normal Vec3, areaPDF float64, material Material, sample Vec2) EmissionSample {
-	// Sample emission direction (cosine-weighted hemisphere)
-	emissionDir := RandomCosineDirection(normal, sample)
-
-	// Calculate direction PDF separately (cosine-weighted)
-	cosTheta := emissionDir.Dot(normal)
-	directionPDF := cosTheta / math.Pi
-
-	// Get emission from material
-	var emission Vec3
-	if emitter, ok := material.(Emitter); ok {
-		emission = emitter.Emit(NewRay(point, emissionDir))
-	}
-
-	return EmissionSample{
-		Point:        point,
-		Normal:       normal,
-		Direction:    emissionDir,
-		Emission:     emission,
-		AreaPDF:      areaPDF,
-		DirectionPDF: directionPDF,
-	}
-}
+// // func SampleLightEmission(lights []Light, lightSampler LightSampler, sampler Sampler) (EmissionSample, bool) {
+// // 	if len(lights) == 0 {
+// // 		return EmissionSample{}, false
+// // 	}
+// // 	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLightEmission(sampler.Get1D())
+// // 
+// // 	sample := selectedLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
+// // 	// Apply light selection probability to area PDF only (combined effect when multiplied)
+// // 	sample.AreaPDF *= lightSelectionPdf
+// // 	// Don't modify DirectionPDF - it's independent of light selection
+// // 
+// // 	return sample, true
+// // }
+// 
+// // SampleEmissionDirection samples a cosine-weighted emission direction from a surface
+// // and returns both the direction and the emission sample with separate area and direction PDFs
+// func SampleEmissionDirection(point Vec3, normal Vec3, areaPDF float64, material Material, sample Vec2) EmissionSample {
+// 	// Sample emission direction (cosine-weighted hemisphere)
+// 	emissionDir := RandomCosineDirection(normal, sample)
+// 
+// 	// Calculate direction PDF separately (cosine-weighted)
+// 	cosTheta := emissionDir.Dot(normal)
+// 	directionPDF := cosTheta / math.Pi
+// 
+// 	// Get emission from material
+// 	var emission Vec3
+// 	if emitter, ok := material.(Emitter); ok {
+// 		emission = emitter.Emit(NewRay(point, emissionDir))
+// 	}
+// 
+// 	return EmissionSample{
+// 		Point:        point,
+// 		Normal:       normal,
+// 		Direction:    emissionDir,
+// 		Emission:     emission,
+// 		AreaPDF:      areaPDF,
+// 		DirectionPDF: directionPDF,
+// 	}
+// }
 
 // UniformConePDF calculates the PDF for uniform sampling within a cone
 func UniformConePDF(cosTotalWidth float64) float64 {

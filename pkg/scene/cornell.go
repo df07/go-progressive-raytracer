@@ -26,7 +26,7 @@ func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...geomet
 	s := &Scene{
 		Camera:         camera,
 		Shapes:         make([]core.Shape, 0),
-		Lights:         make([]core.Light, 0),
+		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: createCornellSamplingConfig(),
 		CameraConfig:   cameraConfig,
 	}

@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
@@ -145,10 +146,10 @@ func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, 
 		if i > 0 {
 			// PBRT: Check if predecessor is delta (either specular material or delta light)
 			predecessor := &lightPath.Vertices[i-1]
-			deltaLightVertex = predecessor.IsSpecular || (predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == core.LightTypePoint)
+			deltaLightVertex = predecessor.IsSpecular || (predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == geometry.LightTypePoint)
 		} else {
 			// PBRT: Check if current vertex is a delta light
-			deltaLightVertex = vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == core.LightTypePoint
+			deltaLightVertex = vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == geometry.LightTypePoint
 		}
 
 		if !vertex.IsSpecular && !deltaLightVertex {
@@ -281,13 +282,13 @@ func (bdpt *BDPTIntegrator) calculateMISLightVertexPdfs(lightIdx int, cameraPath
 	reversePdf := vertex.AreaPdfReverse
 
 	// Light vertices: connectible if not specular AND not delta light (point light)
-	isDeltaLight := vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == core.LightTypePoint
+	isDeltaLight := vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == geometry.LightTypePoint
 	isConnectible := !vertex.IsSpecular && !isDeltaLight
 
 	// Check predecessor connectibility for light path
 	if lightIdx > 0 {
 		predecessor := &lightPath.Vertices[lightIdx-1]
-		predecessorIsDeltaLight := predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == core.LightTypePoint
+		predecessorIsDeltaLight := predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == geometry.LightTypePoint
 		predecessorConnectible := !predecessor.IsSpecular && !predecessorIsDeltaLight
 		isConnectible = isConnectible && predecessorConnectible
 	}
@@ -483,7 +484,7 @@ func (bdpt *BDPTIntegrator) calculateInfiniteLightDensity(point, normal, directi
 
 	// Sum PDFs of all infinite lights in this direction
 	for i, light := range lights {
-		if light.Type() == core.LightTypeInfinite {
+		if light.Type() == geometry.LightTypeInfinite {
 			// Use cosine-weighted hemisphere PDF (matches light.Sample behavior)
 			// This corresponds to PBRT's light.PDF_Li(Interaction(), direction)
 			directionalPdf := light.PDF(point, normal, direction)

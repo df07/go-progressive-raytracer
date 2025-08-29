@@ -13,7 +13,7 @@ func TestGradientInfiniteLight_Type(t *testing.T) {
 		core.NewVec3(1, 1, 1), // white
 	)
 
-	if light.Type() != core.LightTypeInfinite {
+	if light.Type() != LightTypeInfinite {
 		t.Errorf("Expected LightTypeInfinite, got %v", light.Type())
 	}
 }

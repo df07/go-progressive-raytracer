@@ -10,7 +10,7 @@ import (
 func TestUniformInfiniteLight_Type(t *testing.T) {
 	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
 
-	if light.Type() != core.LightTypeInfinite {
+	if light.Type() != LightTypeInfinite {
 		t.Errorf("Expected LightTypeInfinite, got %v", light.Type())
 	}
 }

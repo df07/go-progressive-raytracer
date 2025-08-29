@@ -49,7 +49,7 @@ type RenderRequest struct {
 	MaterialFinish       string         `json:"materialFinish"`       // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
 	SphereComplexity     int            `json:"sphereComplexity"`     // Triangle mesh sphere complexity
 	DragonMaterialFinish string         `json:"dragonMaterialFinish"` // Dragon material finish: "gold", "plastic", "matte", "mirror", "glass", "copper"
-	LightType            core.LightType `json:"lightType"`            // Light type: "area", "point"
+	LightType            geometry.LightType `json:"lightType"`            // Light type: "area", "point"
 }
 
 // Stats represents render statistics
@@ -162,11 +162,11 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 	sLightType := r.URL.Query().Get("lightType")
 	switch sLightType {
 	case "area":
-		req.LightType = core.LightTypeArea
+		req.LightType = geometry.LightTypeArea
 	case "point":
-		req.LightType = core.LightTypePoint
+		req.LightType = geometry.LightTypePoint
 	default:
-		req.LightType = core.LightTypeArea // Default
+		req.LightType = geometry.LightTypeArea // Default
 	}
 
 	// Parse sphere complexity parameter

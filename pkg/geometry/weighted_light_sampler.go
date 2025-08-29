@@ -1,7 +1,9 @@
-package core
+package geometry
 
 import (
 	"fmt"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
 // WeightedLightSampler implements light sampling with user-specified weights
@@ -77,7 +79,7 @@ func NewUniformLightSampler(lights []Light, sceneRadius float64) *WeightedLightS
 
 // SampleLight selects a light using the fixed weights (independent of surface point)
 // Returns the selected light, its selection probability, and its index
-func (fls *WeightedLightSampler) SampleLight(point Vec3, normal Vec3, u float64) (Light, float64, int) {
+func (fls *WeightedLightSampler) SampleLight(point core.Vec3, normal core.Vec3, u float64) (Light, float64, int) {
 	if len(fls.lights) == 0 {
 		return nil, 0.0, -1
 	}
@@ -118,7 +120,7 @@ func (fls *WeightedLightSampler) SampleLightEmission(u float64) (Light, float64,
 }
 
 // GetLightProbability returns the fixed probability for the light at the given index
-func (fls *WeightedLightSampler) GetLightProbability(lightIndex int, point Vec3, normal Vec3) float64 {
+func (fls *WeightedLightSampler) GetLightProbability(lightIndex int, point core.Vec3, normal core.Vec3) float64 {
 	if lightIndex < 0 || lightIndex >= len(fls.weights) {
 		return 0.0
 	}

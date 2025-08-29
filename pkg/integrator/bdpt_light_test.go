@@ -163,7 +163,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 	tests := []struct {
 		name                   string
 		cameraVertex           Vertex
-		light                  core.Light
+		light                  geometry.Light
 		sampler                *TestSampler
 		expectedLightPoint     core.Vec3
 		expectedContribution   core.Vec3

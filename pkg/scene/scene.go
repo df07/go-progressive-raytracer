@@ -22,8 +22,8 @@ func NewGroundQuad(center core.Vec3, size float64, material core.Material) *geom
 type Scene struct {
 	Camera         *geometry.Camera
 	Shapes         []core.Shape      // Objects in the scene
-	Lights         []core.Light      // Lights in the scene
-	LightSampler   core.LightSampler // Light sampler
+	Lights         []geometry.Light      // Lights in the scene
+	LightSampler   geometry.LightSampler // Light sampler
 	SamplingConfig core.SamplingConfig
 	CameraConfig   geometry.CameraConfig
 	BVH            *core.BVH // Acceleration structure for ray-object intersection
@@ -62,7 +62,7 @@ func NewDefaultScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 	s := &Scene{
 		Camera:         camera,
 		Shapes:         make([]core.Shape, 0),
-		Lights:         make([]core.Light, 0),
+		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: samplingConfig,
 		CameraConfig:   cameraConfig,
 	}
@@ -137,7 +137,7 @@ func (s *Scene) Preprocess() error {
 
 	// Use uniform light sampling
 	if s.LightSampler == nil {
-		s.LightSampler = core.NewUniformLightSampler(s.Lights, sceneRadius)
+		s.LightSampler = geometry.NewUniformLightSampler(s.Lights, sceneRadius)
 	}
 	// Alternative: weighted sampling
 	//s.LightSampler = core.NewWeightedLightSampler(s.Lights, []float64{0.9, 0.1}, sceneRadius)

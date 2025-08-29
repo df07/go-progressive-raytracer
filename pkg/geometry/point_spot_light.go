@@ -37,12 +37,12 @@ func NewPointSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDelta
 	}
 }
 
-func (sl *PointSpotLight) Type() core.LightType {
-	return core.LightTypePoint
+func (sl *PointSpotLight) Type() LightType {
+	return LightTypePoint
 }
 
 // Sample implements the Light interface - samples a point on the light for direct lighting
-func (sl *PointSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
+func (sl *PointSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
 	// For a point light, the sample point is always the light position
 	samplePoint := sl.position
 
@@ -52,7 +52,7 @@ func (sl *PointSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.
 
 	if distance == 0 {
 		// Avoid division by zero if point is exactly at light position
-		return core.LightSample{
+		return LightSample{
 			Point:     samplePoint,
 			Normal:    core.NewVec3(0, 1, 0), // Arbitrary normal
 			Direction: core.NewVec3(0, 1, 0), // Arbitrary direction
@@ -80,7 +80,7 @@ func (sl *PointSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.
 	// For point lights, PDF is delta function (represented as 1.0)
 	pdf := 1.0
 
-	return core.LightSample{
+	return LightSample{
 		Point:     samplePoint,
 		Normal:    toLight,
 		Direction: toLight,
@@ -155,7 +155,7 @@ func (sl *PointSpotLight) GetIntensityAt(point core.Vec3) core.Vec3 {
 }
 
 // SampleEmission implements the Light interface - samples emission from the point spot light
-func (sl *PointSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+func (sl *PointSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
 	// For point lights, there's only one surface point (the light position)
 	point := sl.position
 
@@ -175,7 +175,7 @@ func (sl *PointSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection 
 	// Normal for a point light is somewhat arbitrary - use emission direction
 	normal := emissionDir
 
-	return core.EmissionSample{
+	return EmissionSample{
 		Point:        point,
 		Normal:       normal,
 		Direction:    emissionDir,

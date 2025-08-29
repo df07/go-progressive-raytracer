@@ -128,7 +128,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	})
 
 	testScene := &scene.Scene{
-		Lights:         []core.Light{light},
+		Lights:         []geometry.Light{light},
 		Shapes:         []core.Shape{light.Sphere, sphere},
 		SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 		Camera:         camera,
@@ -197,7 +197,7 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Sce
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGreen)
 
 	shapes := []core.Shape{groundQuad}
-	lights := []core.Light{}
+	lights := []geometry.Light{}
 	if includeLight {
 		emissiveMaterial := material.NewEmissive(core.NewVec3(15.0, 14.0, 13.0))
 		light := geometry.NewSphereLight(core.NewVec3(30, 30.5, 15), 10, emissiveMaterial)
@@ -255,7 +255,7 @@ func TestInfiniteLightEmissionSampling(t *testing.T) {
 
 	// Create mock scene
 	testScene := &scene.Scene{
-		Lights:         []core.Light{infiniteLight},
+		Lights:         []geometry.Light{infiniteLight},
 		Shapes:         []core.Shape{groundQuad},
 		SamplingConfig: core.SamplingConfig{MaxDepth: 3},
 	}
@@ -382,7 +382,7 @@ func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
 	config := core.SamplingConfig{MaxDepth: 6, RussianRouletteMinBounces: 100}
 
 	testScene := &scene.Scene{
-		Lights:         []core.Light{infiniteLight},
+		Lights:         []geometry.Light{infiniteLight},
 		Shapes:         shapes,
 		SamplingConfig: config,
 		Camera:         camera,

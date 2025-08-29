@@ -18,12 +18,12 @@ func NewSphereLight(center core.Vec3, radius float64, material core.Material) *S
 	}
 }
 
-func (sl *SphereLight) Type() core.LightType {
-	return core.LightTypeArea
+func (sl *SphereLight) Type() LightType {
+	return LightTypeArea
 }
 
 // Sample implements the Light interface - samples a point on the sphere for direct lighting
-func (sl *SphereLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
+func (sl *SphereLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
 	// Vector from shading point to sphere center
 	toCenter := sl.Center.Subtract(point)
 	distanceToCenter := toCenter.Length()
@@ -38,7 +38,7 @@ func (sl *SphereLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec
 }
 
 // sampleUniform samples uniformly on the entire sphere surface
-func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) core.LightSample {
+func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) LightSample {
 	// Generate uniform direction on unit sphere
 	z := 1.0 - 2.0*sample.X // z ∈ [-1, 1]
 	r := math.Sqrt(math.Max(0, 1.0-z*z))
@@ -64,7 +64,7 @@ func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) core.Lig
 	// Get emission from this light
 	emission := sl.Emit(core.NewRay(point, dirNormalized))
 
-	return core.LightSample{
+	return LightSample{
 		Point:     samplePoint,
 		Normal:    normal,
 		Direction: dirNormalized,
@@ -75,7 +75,7 @@ func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) core.Lig
 }
 
 // sampleVisible samples only the visible hemisphere of the sphere as seen from the shading point
-func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) core.LightSample {
+func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) LightSample {
 	// Vector from shading point to sphere center
 	toCenter := sl.Center.Subtract(point)
 	distanceToCenter := toCenter.Length()
@@ -127,7 +127,7 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) core.Lig
 	// Get emission from this light
 	emission := sl.Emit(ray)
 
-	return core.LightSample{
+	return LightSample{
 		Point:     hitRecord.Point,
 		Normal:    hitRecord.Normal,
 		Direction: direction,
@@ -163,7 +163,7 @@ func (sl *SphereLight) PDF(point, normal, direction core.Vec3) float64 {
 }
 
 // SampleEmission implements the Light interface - samples emission from the sphere surface
-func (sl *SphereLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+func (sl *SphereLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
 	// Sample point uniformly on ENTIRE sphere surface
 	z := 1.0 - 2.0*samplePoint.X // z ∈ [-1, 1]
 	r := math.Sqrt(math.Max(0, 1.0-z*z))
@@ -177,7 +177,7 @@ func (sl *SphereLight) SampleEmission(samplePoint core.Vec2, sampleDirection cor
 
 	// Use shared emission sampling function
 	areaPDF := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
-	return core.SampleEmissionDirection(point, normal, areaPDF, sl.Material, sampleDirection)
+	return SampleEmissionDirection(point, normal, areaPDF, sl.Material, sampleDirection)
 }
 
 // EmissionPDF implements the Light interface - calculates PDF for emission sampling

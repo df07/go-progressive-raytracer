@@ -51,8 +51,8 @@ func NewUniformInfiniteLight(emission core.Vec3) *UniformInfiniteLight {
 	}
 }
 
-func (uil *UniformInfiniteLight) Type() core.LightType {
-	return core.LightTypeInfinite
+func (uil *UniformInfiniteLight) Type() LightType {
+	return LightTypeInfinite
 }
 
 // GetMaterial returns the material for emission calculations
@@ -61,13 +61,13 @@ func (uil *UniformInfiniteLight) GetMaterial() core.Material {
 }
 
 // Sample implements the Light interface - samples the infinite light for direct lighting
-func (uil *UniformInfiniteLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
+func (uil *UniformInfiniteLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
 	// For infinite lights, sample the visible hemisphere using cosine-weighted sampling
 	// This provides better importance sampling since cosine terms cancel in the rendering equation
 	direction := core.RandomCosineDirection(normal, sample)
 	cosTheta := direction.Dot(normal)
 
-	return core.LightSample{
+	return LightSample{
 		Point:     point.Add(direction.Multiply(1e10)), // Far away point
 		Normal:    direction.Multiply(-1),              // Points toward scene
 		Direction: direction,
@@ -88,11 +88,11 @@ func (uil *UniformInfiniteLight) PDF(point, normal, direction core.Vec3) float64
 }
 
 // SampleEmission implements the Light interface - samples emission for BDPT light path generation
-func (uil *UniformInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+func (uil *UniformInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
 	// Use PBRT's disk sampling approach from shared function
 	emissionRay, areaPDF, directionPDF := core.SampleInfiniteLight(uil.worldCenter, uil.worldRadius, samplePoint, sampleDirection)
 
-	return core.EmissionSample{
+	return EmissionSample{
 		Point:        emissionRay.Origin,
 		Normal:       emissionRay.Direction.Multiply(-1), // Points toward scene
 		Direction:    emissionRay.Direction,              // Ray direction (parallel rays)

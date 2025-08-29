@@ -1,14 +1,61 @@
-package core
+package geometry
 
 import (
 	"math"
 	"testing"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
+
+// MockLight implements the Light interface for testing
+type MockLight struct {
+	emission core.Vec3
+	pdf      float64
+}
+
+func (ml *MockLight) Type() LightType {
+	return LightTypeArea
+}
+
+func (ml *MockLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
+	return LightSample{
+		Point:     core.Vec3{X: 0, Y: 1, Z: 0},
+		Normal:    core.Vec3{X: 0, Y: -1, Z: 0},
+		Direction: core.Vec3{X: 0, Y: 1, Z: 0},
+		Distance:  1.0,
+		Emission:  ml.emission,
+		PDF:       ml.pdf,
+	}
+}
+
+func (ml *MockLight) PDF(point, normal, direction core.Vec3) float64 {
+	return ml.pdf
+}
+
+func (ml *MockLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
+	return EmissionSample{
+		Point:        core.Vec3{X: 0, Y: 1, Z: 0},
+		Normal:       core.Vec3{X: 0, Y: -1, Z: 0},
+		Direction:    core.Vec3{X: 0, Y: -1, Z: 0},
+		Emission:     ml.emission,
+		AreaPDF:      ml.pdf,
+		DirectionPDF: 1.0 / math.Pi, // cosine-weighted
+	}
+}
+
+func (ml *MockLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
+	return ml.pdf
+}
+
+func (ml *MockLight) Emit(ray core.Ray) core.Vec3 {
+	// Mock light doesn't emit in arbitrary directions (finite light)
+	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
 
 func TestNewWeightedLightSampler(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
 	}
 	weights := []float64{0.3, 0.7}
 	sceneRadius := 10.0
@@ -36,8 +83,8 @@ func TestNewWeightedLightSampler(t *testing.T) {
 
 func TestNewWeightedLightSampler_Normalization(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
 	}
 	// Non-normalized weights
 	weights := []float64{1.0, 3.0} // Should normalize to 0.25, 0.75
@@ -54,8 +101,8 @@ func TestNewWeightedLightSampler_Normalization(t *testing.T) {
 
 func TestNewWeightedLightSampler_ZeroWeights(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
 	}
 	// All zero weights should fallback to uniform
 	weights := []float64{0.0, 0.0}
@@ -72,7 +119,7 @@ func TestNewWeightedLightSampler_ZeroWeights(t *testing.T) {
 
 func TestNewWeightedLightSampler_MismatchedLength(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
 	}
 	weights := []float64{0.3, 0.7} // Mismatched length
 
@@ -87,9 +134,9 @@ func TestNewWeightedLightSampler_MismatchedLength(t *testing.T) {
 
 func TestNewUniformLightSampler(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
-		&MockLight{emission: Vec3{X: 3, Y: 3, Z: 3}, pdf: 0.2},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 3, Y: 3, Z: 3}, pdf: 0.2},
 	}
 
 	sampler := NewUniformLightSampler(lights, 10.0)
@@ -117,14 +164,14 @@ func TestNewUniformLightSampler_EmptyLights(t *testing.T) {
 
 func TestWeightedLightSampler_SampleLight(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
 	}
 	weights := []float64{0.3, 0.7}
 	sampler := NewWeightedLightSampler(lights, weights, 10.0)
 
-	point := Vec3{X: 0, Y: 0, Z: 0}
-	normal := Vec3{X: 0, Y: 1, Z: 0}
+	point := core.Vec3{X: 0, Y: 0, Z: 0}
+	normal := core.Vec3{X: 0, Y: 1, Z: 0}
 
 	// Test sampling with different u values
 	testCases := []struct {
@@ -155,8 +202,8 @@ func TestWeightedLightSampler_SampleLight(t *testing.T) {
 
 func TestWeightedLightSampler_SampleLightEmission(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
 	}
 	weights := []float64{0.4, 0.6}
 	sampler := NewWeightedLightSampler(lights, weights, 10.0)
@@ -190,14 +237,14 @@ func TestWeightedLightSampler_SampleLightEmission(t *testing.T) {
 
 func TestWeightedLightSampler_GetLightProbability(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
 	}
 	weights := []float64{0.2, 0.8}
 	sampler := NewWeightedLightSampler(lights, weights, 10.0)
 
-	point := Vec3{X: 0, Y: 0, Z: 0}
-	normal := Vec3{X: 0, Y: 1, Z: 0}
+	point := core.Vec3{X: 0, Y: 0, Z: 0}
+	normal := core.Vec3{X: 0, Y: 1, Z: 0}
 
 	// Test valid indices
 	prob0 := sampler.GetLightProbability(0, point, normal)
@@ -224,9 +271,9 @@ func TestWeightedLightSampler_GetLightProbability(t *testing.T) {
 
 func TestWeightedLightSampler_GetLightCount(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
-		&MockLight{emission: Vec3{X: 3, Y: 3, Z: 3}, pdf: 0.2},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 3, Y: 3, Z: 3}, pdf: 0.2},
 	}
 	weights := []float64{0.33, 0.33, 0.34}
 	sampler := NewWeightedLightSampler(lights, weights, 10.0)
@@ -242,8 +289,8 @@ func TestWeightedLightSampler_EmptyLights(t *testing.T) {
 	weights := []float64{}
 	sampler := NewWeightedLightSampler(lights, weights, 10.0)
 
-	point := Vec3{X: 0, Y: 0, Z: 0}
-	normal := Vec3{X: 0, Y: 1, Z: 0}
+	point := core.Vec3{X: 0, Y: 0, Z: 0}
+	normal := core.Vec3{X: 0, Y: 1, Z: 0}
 
 	// SampleLight should return nil
 	light, prob, lightIndex := sampler.SampleLight(point, normal, 0.5)
@@ -278,9 +325,9 @@ func TestWeightedLightSampler_EmptyLights(t *testing.T) {
 
 func TestWeightedLightSampler_ProbabilitiesSum(t *testing.T) {
 	lights := []Light{
-		&MockLight{emission: Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
-		&MockLight{emission: Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
-		&MockLight{emission: Vec3{X: 3, Y: 3, Z: 3}, pdf: 0.2},
+		&MockLight{emission: core.Vec3{X: 1, Y: 1, Z: 1}, pdf: 0.5},
+		&MockLight{emission: core.Vec3{X: 2, Y: 2, Z: 2}, pdf: 0.3},
+		&MockLight{emission: core.Vec3{X: 3, Y: 3, Z: 3}, pdf: 0.2},
 	}
 	weights := []float64{0.15, 0.35, 0.5}
 	sampler := NewWeightedLightSampler(lights, weights, 10.0)

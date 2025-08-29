@@ -99,12 +99,12 @@ func NewDiscSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaA
 	}
 }
 
-func (dsl *DiscSpotLight) Type() core.LightType {
-	return core.LightTypeArea
+func (dsl *DiscSpotLight) Type() LightType {
+	return LightTypeArea
 }
 
 // Sample implements the Light interface - samples a point on the disc for direct lighting
-func (dsl *DiscSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
+func (dsl *DiscSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
 	// Sample the underlying disc light
 	lightSample := dsl.discLight.Sample(point, normal, sample)
 
@@ -183,7 +183,7 @@ func (dsl *DiscSpotLight) GetDisc() *Disc {
 }
 
 // SampleEmission implements the Light interface - samples emission from the disc spot light surface
-func (dsl *DiscSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+func (dsl *DiscSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
 	// Sample a point on the disc
 	point, normal := dsl.discLight.Disc.SampleUniform(samplePoint)
 
@@ -201,7 +201,7 @@ func (dsl *DiscSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection 
 	// Apply spot attenuation to emission
 	emission := dsl.emission.Multiply(spotAttenuation)
 
-	return core.EmissionSample{
+	return EmissionSample{
 		Point:        point,
 		Normal:       normal,
 		Direction:    emissionDir,

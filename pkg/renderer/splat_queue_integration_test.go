@@ -167,7 +167,7 @@ func TestSplatSystemIntegration(t *testing.T) {
 
 	// Create shapes
 	var shapes []core.Shape
-	var lights []core.Light
+	var lights []geometry.Light
 
 	// Add a sphere with lambertian material
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, 0), 1.0, lambertian)

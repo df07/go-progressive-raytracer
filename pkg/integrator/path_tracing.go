@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
@@ -48,7 +49,7 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene *scene.Sc
 		lights := scene.Lights
 		var totalEmission core.Vec3
 		for _, light := range lights {
-			if light.Type() == core.LightTypeInfinite {
+			if light.Type() == geometry.LightTypeInfinite {
 				totalEmission = totalEmission.Add(light.Emit(ray))
 			}
 		}
@@ -112,7 +113,7 @@ func (pt *PathTracingIntegrator) GetEmittedLight(ray core.Ray, hit *core.HitReco
 // calculateDirectLighting samples lights directly for direct illumination with the provided random generator
 func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, scatter core.ScatterResult, hit *core.HitRecord, sampler core.Sampler, depth int) core.Vec3 {
 	// Sample a light
-	lightSample, _, hasLight := core.SampleLight(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, sampler)
+	lightSample, _, hasLight := geometry.SampleLight(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, sampler)
 	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
@@ -166,7 +167,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene *scene.Scene, s
 	}
 
 	// Get light PDF for this direction (for MIS)
-	lightPDF := core.CalculateLightPDF(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, scatterDirection)
+	lightPDF := geometry.CalculateLightPDF(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, scatterDirection)
 
 	// Calculate MIS weight
 	misWeight := core.PowerHeuristic(1, scatter.PDF, 1, lightPDF)

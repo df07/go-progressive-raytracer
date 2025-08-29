@@ -44,7 +44,7 @@ func createTestScene() *scene.Scene {
 
 	scene := &scene.Scene{
 		Shapes: []core.Shape{sphere},
-		Lights: []core.Light{},
+		Lights: []geometry.Light{},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
 			MaxDepth:           10,

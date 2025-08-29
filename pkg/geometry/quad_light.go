@@ -25,12 +25,12 @@ func NewQuadLight(corner, u, v core.Vec3, material core.Material) *QuadLight {
 	}
 }
 
-func (ql *QuadLight) Type() core.LightType {
-	return core.LightTypeArea
+func (ql *QuadLight) Type() LightType {
+	return LightTypeArea
 }
 
 // Sample implements the Light interface - samples a point on the quad for direct lighting
-func (ql *QuadLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
+func (ql *QuadLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
 	// Sample uniformly on the quad surface
 	samplePoint := ql.Corner.Add(ql.U.Multiply(sample.X)).Add(ql.V.Multiply(sample.Y))
 
@@ -48,7 +48,7 @@ func (ql *QuadLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 	cosTheta := math.Abs(ql.Normal.Dot(direction.Multiply(-1)))
 	if cosTheta < 1e-8 {
 		// Light is edge-on, no contribution
-		return core.LightSample{
+		return LightSample{
 			Point:     samplePoint,
 			Normal:    ql.Normal,
 			Direction: direction,
@@ -63,7 +63,7 @@ func (ql *QuadLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 	// Get emission from this light
 	emission := ql.Emit(core.NewRay(point, direction))
 
-	return core.LightSample{
+	return LightSample{
 		Point:     samplePoint,
 		Normal:    ql.Normal,
 		Direction: direction,
@@ -97,7 +97,7 @@ func (ql *QuadLight) PDF(point, normal, direction core.Vec3) float64 {
 
 // SampleEmission implements the Light interface - samples emission from the quad surface
 // Used for BDPT light path generation
-func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
 	// Sample point uniformly on quad surface
 	point := ql.Corner.Add(ql.U.Multiply(samplePoint.X)).Add(ql.V.Multiply(samplePoint.Y))
 
@@ -118,7 +118,7 @@ func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	// Get emission from this light
 	emission := ql.Emit(core.NewRay(point, emissionDir))
 
-	return core.EmissionSample{
+	return EmissionSample{
 		Point:        point,
 		Normal:       ql.Normal,
 		Direction:    emissionDir,

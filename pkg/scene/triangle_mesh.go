@@ -29,7 +29,7 @@ func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...geome
 	s := &Scene{
 		Camera:         camera,
 		Shapes:         make([]core.Shape, 0),
-		Lights:         make([]core.Light, 0),
+		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: createTriangleMeshSamplingConfig(),
 		CameraConfig:   cameraConfig,
 	}

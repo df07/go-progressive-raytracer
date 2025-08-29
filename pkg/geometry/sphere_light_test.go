@@ -159,7 +159,7 @@ func TestSphereLight_Sample_MultipleDirections(t *testing.T) {
 
 	// Generate multiple samples
 	numSamples := 100
-	samples := make([]core.LightSample, numSamples)
+	samples := make([]LightSample, numSamples)
 	for i := 0; i < numSamples; i++ {
 		samples[i] = light.Sample(outsidePoint, core.NewVec3(0, 1, 0), sampler.Get2D())
 	}

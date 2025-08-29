@@ -390,7 +390,7 @@ func TestCalculateMISWeight(t *testing.T) {
 					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0), material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
 
 				// Use weighted sampling: 20% weight to first light, 80% to second light
-				return createSceneWithLightsAndWeights([]core.Light{light1, light2}, []float64{0.2, 0.8})
+				return createSceneWithLightsAndWeights([]geometry.Light{light1, light2}, []float64{0.2, 0.8})
 			},
 		},
 	}

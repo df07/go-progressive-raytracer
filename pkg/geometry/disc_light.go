@@ -18,12 +18,12 @@ func NewDiscLight(center, normal core.Vec3, radius float64, material core.Materi
 	}
 }
 
-func (dl *DiscLight) Type() core.LightType {
-	return core.LightTypeArea
+func (dl *DiscLight) Type() LightType {
+	return LightTypeArea
 }
 
 // Sample implements the Light interface - samples a point on the disc for direct lighting
-func (dl *DiscLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) core.LightSample {
+func (dl *DiscLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
 	// Sample a point on the disc
 	samplePoint, normal := dl.Disc.SampleUniform(sample)
 
@@ -34,7 +34,7 @@ func (dl *DiscLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 
 	// Check for degenerate case
 	if distance == 0 {
-		return core.LightSample{
+		return LightSample{
 			Point:     samplePoint,
 			Normal:    normal,
 			Direction: core.NewVec3(0, 1, 0),
@@ -61,7 +61,7 @@ func (dl *DiscLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 	// Get emission from this light
 	emission := dl.Emit(core.NewRay(point, dirNormalized))
 
-	return core.LightSample{
+	return LightSample{
 		Point:     samplePoint,
 		Normal:    normal,
 		Direction: dirNormalized,
@@ -96,13 +96,13 @@ func (dl *DiscLight) PDF(point, normal, direction core.Vec3) float64 {
 }
 
 // SampleEmission implements the Light interface - samples emission from the disc surface
-func (dl *DiscLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) core.EmissionSample {
+func (dl *DiscLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
 	// Sample point uniformly on disc surface
 	point, normal := dl.Disc.SampleUniform(samplePoint)
 
 	// Use shared emission sampling function
 	areaPDF := 1.0 / (math.Pi * dl.Radius * dl.Radius)
-	return core.SampleEmissionDirection(point, normal, areaPDF, dl.Material, sampleDirection)
+	return SampleEmissionDirection(point, normal, areaPDF, dl.Material, sampleDirection)
 }
 
 // EmissionPDF implements the Light interface - calculates PDF for emission sampling
