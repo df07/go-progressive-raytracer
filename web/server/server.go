@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -189,9 +190,9 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 		logger = renderer.NewDefaultLogger()
 	}
 	// Create camera override config (empty if width/height are 0, which means use defaults)
-	var cameraOverride core.CameraConfig
+	var cameraOverride geometry.CameraConfig
 	if req.Width > 0 && req.Height > 0 {
-		cameraOverride = core.CameraConfig{
+		cameraOverride = geometry.CameraConfig{
 			Width:       req.Width,
 			AspectRatio: float64(req.Width) / float64(req.Height),
 		}
