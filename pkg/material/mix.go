@@ -8,13 +8,13 @@ import (
 
 // Mix represents a material that probabilistically chooses between two materials
 type Mix struct {
-	Material1 core.Material
-	Material2 core.Material
+	Material1 Material
+	Material2 Material
 	Ratio     float64 // 0.0 = all material1, 1.0 = all material2
 }
 
 // NewMix creates a new mix material
-func NewMix(material1, material2 core.Material, ratio float64) *Mix {
+func NewMix(material1, material2 Material, ratio float64) *Mix {
 	// Clamp ratio to valid range
 	ratio = math.Max(0.0, math.Min(ratio, 1.0))
 
@@ -26,7 +26,7 @@ func NewMix(material1, material2 core.Material, ratio float64) *Mix {
 }
 
 // Scatter implements the Material interface for mix material
-func (m *Mix) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
+func (m *Mix) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
 	// Choose material based on ratio
 	if sampler.Get1D() < m.Ratio {
 		return m.Material2.Scatter(rayIn, hit, sampler)

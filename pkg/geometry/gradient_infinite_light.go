@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // gradientInfiniteLightMaterial implements gradient emission for infinite lights
@@ -13,8 +14,8 @@ type gradientInfiniteLightMaterial struct {
 }
 
 // Scatter implements the Material interface (infinite lights don't scatter, only emit)
-func (gilm *gradientInfiniteLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
-	return core.ScatterResult{}, false // No scattering, only emission
+func (gilm *gradientInfiniteLightMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
+	return material.ScatterResult{}, false // No scattering, only emission
 }
 
 // Emit implements the Emitter interface with gradient emission based on ray direction
@@ -39,11 +40,11 @@ func (gilm *gradientInfiniteLightMaterial) PDF(incomingDir, normal core.Vec3, ou
 
 // GradientInfiniteLight represents a gradient infinite area light (like current background gradients)
 type GradientInfiniteLight struct {
-	topColor    core.Vec3     // Top gradient color
-	bottomColor core.Vec3     // Bottom gradient color
-	worldCenter core.Vec3     // Finite scene center from BVH (consistent with uniform)
-	worldRadius float64       // Finite scene radius from BVH (consistent with uniform)
-	material    core.Material // Material for emission
+	topColor    core.Vec3         // Top gradient color
+	bottomColor core.Vec3         // Bottom gradient color
+	worldCenter core.Vec3         // Finite scene center from BVH (consistent with uniform)
+	worldRadius float64           // Finite scene radius from BVH (consistent with uniform)
+	material    material.Material // Material for emission
 }
 
 // NewGradientInfiniteLight creates a new gradient infinite light
@@ -61,7 +62,7 @@ func (gil *GradientInfiniteLight) Type() LightType {
 }
 
 // GetMaterial returns the material for emission calculations
-func (gil *GradientInfiniteLight) GetMaterial() core.Material {
+func (gil *GradientInfiniteLight) GetMaterial() material.Material {
 	return gil.material
 }
 
@@ -133,8 +134,8 @@ func (gil *GradientInfiniteLight) Emit(ray core.Ray) core.Vec3 {
 }
 
 // Preprocess implements the Preprocessor interface - sets world bounds from scene
-func (gil *GradientInfiniteLight) Preprocess(bvh *core.BVH) error {
-	gil.worldCenter = bvh.Center
-	gil.worldRadius = bvh.Radius
+func (gil *GradientInfiniteLight) Preprocess(worldCenter core.Vec3, worldRadius float64) error {
+	gil.worldCenter = worldCenter
+	gil.worldRadius = worldRadius
 	return nil
 }

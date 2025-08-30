@@ -4,23 +4,24 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // TriangleMesh represents a collection of triangles with efficient ray intersection
 // It uses an internal BVH (Bounding Volume Hierarchy) for fast intersection tests
 type TriangleMesh struct {
-	triangles []core.Shape  // Individual triangles as shapes
-	bvh       *core.BVH     // BVH for fast intersection
-	bbox      core.AABB     // Overall bounding box
-	material  core.Material // Default material (can be overridden per triangle)
+	triangles []Shape           // Individual triangles as shapes
+	bvh       *BVH              // BVH for fast intersection
+	bbox      core.AABB         // Overall bounding box
+	material  material.Material // Default material (can be overridden per triangle)
 }
 
 // TriangleMeshOptions contains optional parameters for triangle mesh creation
 type TriangleMeshOptions struct {
-	Normals   []core.Vec3     // Optional custom normals (one per triangle)
-	Materials []core.Material // Optional per-triangle materials
-	Rotation  *core.Vec3      // Optional rotation to apply to vertices
-	Center    *core.Vec3      // Optional center point for rotation
+	Normals   []core.Vec3         // Optional custom normals (one per triangle)
+	Materials []material.Material // Optional per-triangle materials
+	Rotation  *core.Vec3          // Optional rotation to apply to vertices
+	Center    *core.Vec3          // Optional center point for rotation
 }
 
 // NewTriangleMesh creates a new triangle mesh from vertices and face indices
@@ -28,7 +29,7 @@ type TriangleMeshOptions struct {
 // faces: array of triangle indices (each group of 3 indices forms a triangle)
 // material: default material for all triangles
 // options: optional parameters (can be nil for basic mesh)
-func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material, options *TriangleMeshOptions) *TriangleMesh {
+func NewTriangleMesh(vertices []core.Vec3, faces []int, material material.Material, options *TriangleMeshOptions) *TriangleMesh {
 	if len(faces)%3 != 0 {
 		panic("Face indices must be a multiple of 3")
 	}
@@ -62,7 +63,7 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material, 
 		}
 	}
 
-	triangles := make([]core.Shape, numTriangles)
+	triangles := make([]Shape, numTriangles)
 
 	// Create individual triangles
 	for i := 0; i < numTriangles; i++ {
@@ -83,7 +84,7 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material, 
 		}
 
 		// Create triangle with or without custom normal
-		var triangle core.Shape
+		var triangle Shape
 		if options != nil && options.Normals != nil {
 			triangle = NewTriangleWithNormal(workingVertices[i0], workingVertices[i1], workingVertices[i2], options.Normals[i], triangleMaterial)
 		} else {
@@ -93,7 +94,7 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material, 
 	}
 
 	// Build BVH for fast intersection
-	bvh := core.NewBVH(triangles)
+	bvh := NewBVH(triangles)
 
 	// Calculate overall bounding box
 	var bbox core.AABB
@@ -119,7 +120,7 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material core.Material, 
 }
 
 // Hit tests if a ray intersects with any triangle in the mesh
-func (tm *TriangleMesh) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
+func (tm *TriangleMesh) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	// Use the BVH for fast intersection
 	return tm.bvh.Hit(ray, tMin, tMax)
 }
@@ -135,7 +136,7 @@ func (tm *TriangleMesh) GetTriangleCount() int {
 }
 
 // GetTriangles returns the individual triangles (for debugging or special operations)
-func (tm *TriangleMesh) GetTriangles() []core.Shape {
+func (tm *TriangleMesh) GetTriangles() []Shape {
 	return tm.triangles
 }
 

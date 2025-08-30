@@ -26,7 +26,7 @@ func createTestScene() *scene.Scene {
 	camera := &geometry.Camera{}
 
 	scene := &scene.Scene{
-		Shapes: []core.Shape{sphere},
+		Shapes: []geometry.Shape{sphere},
 		Lights: []geometry.Light{infiniteLight},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
@@ -134,7 +134,7 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 	)
 
 	scene := &scene.Scene{
-		Shapes: []core.Shape{sphere},
+		Shapes: []geometry.Shape{sphere},
 		Lights: []geometry.Light{infiniteLight},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
@@ -183,7 +183,7 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 	camera := geometry.NewCamera(cameraConfig)
 
 	scene := &scene.Scene{
-		Shapes: []core.Shape{sphere},
+		Shapes: []geometry.Shape{sphere},
 		Lights: []geometry.Light{},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{

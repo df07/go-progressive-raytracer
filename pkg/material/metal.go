@@ -23,7 +23,7 @@ func NewMetal(albedo core.Vec3, fuzzness float64) *Metal {
 }
 
 // Scatter implements the Material interface for metal scattering
-func (m *Metal) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
+func (m *Metal) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
 	// Calculate perfect reflection direction
 	reflected := reflect(rayIn.Direction.Normalize(), hit.Normal)
 
@@ -38,7 +38,7 @@ func (m *Metal) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler
 	// Only scatter if the ray is above the surface (not absorbed)
 	scatters := scattered.Direction.Dot(hit.Normal) > 0
 
-	return core.ScatterResult{
+	return ScatterResult{
 		Incoming:    rayIn,
 		Scattered:   scattered,
 		Attenuation: m.Albedo, // No π factor for specular

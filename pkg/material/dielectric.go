@@ -17,7 +17,7 @@ func NewDielectric(refractiveIndex float64) *Dielectric {
 }
 
 // Scatter implements the Material interface for dielectric scattering
-func (d *Dielectric) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
+func (d *Dielectric) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
 	// Dielectrics always attenuate by 1.0 (no color absorption for clear glass)
 	attenuation := core.NewVec3(1.0, 1.0, 1.0)
 
@@ -50,7 +50,7 @@ func (d *Dielectric) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sa
 
 	scattered := core.Ray{Origin: hit.Point, Direction: direction}
 
-	return core.ScatterResult{
+	return ScatterResult{
 		Incoming:    rayIn,
 		Scattered:   scattered,
 		Attenuation: attenuation,

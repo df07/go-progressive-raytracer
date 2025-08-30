@@ -20,7 +20,7 @@ func NewCausticGlassScene(loadMesh bool, lightType geometry.LightType, logger co
 
 	s := &Scene{
 		Camera:         camera,
-		Shapes:         make([]core.Shape, 0),
+		Shapes:         make([]geometry.Shape, 0),
 		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: createCausticGlassSamplingConfig(),
 		CameraConfig:   cameraConfig,
@@ -143,7 +143,7 @@ func addCausticGlassMesh(s *Scene, filename, materialType string, refractiveInde
 	}
 
 	// Create material based on type
-	var meshMaterial core.Material
+	var meshMaterial material.Material
 	switch materialType {
 	case "glass":
 		meshMaterial = material.NewDielectric(refractiveIndex)

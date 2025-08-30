@@ -115,7 +115,7 @@ func TestGradientInfiniteLight_SampleEmission(t *testing.T) {
 	worldRadius := 15.0
 
 	light := NewGradientInfiniteLight(topColor, bottomColor)
-	light.Preprocess(&core.BVH{Radius: worldRadius})
+	light.Preprocess(core.Vec3{}, worldRadius)
 
 	samplePoint := core.NewVec2(0.3, 0.7)
 	sampleDirection := core.NewVec2(0.1, 0.9)
@@ -154,7 +154,7 @@ func TestGradientInfiniteLight_EmissionPDF(t *testing.T) {
 		core.NewVec3(0, 0, 1),
 	)
 
-	light.Preprocess(&core.BVH{Radius: worldRadius})
+	light.Preprocess(core.Vec3{}, worldRadius)
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)
@@ -174,7 +174,7 @@ func TestGradientInfiniteLight_EmissionPDF_ZeroRadius(t *testing.T) {
 		core.NewVec3(0, 0, 1),
 	)
 
-	light.Preprocess(&core.BVH{Radius: worldRadius})
+	light.Preprocess(core.Vec3{}, worldRadius)
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)

@@ -1,21 +1,24 @@
-package core
+package geometry
 
 import (
 	"math"
 	"testing"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // MockShape for testing
 type MockShape struct {
-	boundingBox AABB
-	hitFn       func(ray Ray, tMin, tMax float64) (*HitRecord, bool)
+	boundingBox core.AABB
+	hitFn       func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 }
 
-func (m MockShape) Hit(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+func (m MockShape) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	return m.hitFn(ray, tMin, tMax)
 }
 
-func (m MockShape) BoundingBox() AABB {
+func (m MockShape) BoundingBox() core.AABB {
 	return m.boundingBox
 }
 
@@ -26,8 +29,8 @@ func TestBVH_LeafThresholdBoundary(t *testing.T) {
 	shapes := make([]Shape, 8)
 	for i := 0; i < 8; i++ {
 		shapes[i] = MockShape{
-			boundingBox: NewAABB(NewVec3(float64(i), 0, 0), NewVec3(float64(i)+1, 1, 1)),
-			hitFn: func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+			boundingBox: core.NewAABB(core.NewVec3(float64(i), 0, 0), core.NewVec3(float64(i)+1, 1, 1)),
+			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 				return nil, false // Never hit for simplicity
 			},
 		}
@@ -46,8 +49,8 @@ func TestBVH_LeafThresholdBoundary(t *testing.T) {
 
 	// Test with leafThreshold + 1 shapes - should split
 	shapes = append(shapes, MockShape{
-		boundingBox: NewAABB(NewVec3(8, 0, 0), NewVec3(9, 1, 1)),
-		hitFn: func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+		boundingBox: core.NewAABB(core.NewVec3(8, 0, 0), core.NewVec3(9, 1, 1)),
+		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 			return nil, false
 		},
 	})
@@ -71,7 +74,7 @@ func TestBVH_EmptyAndSingleShape(t *testing.T) {
 		t.Error("Expected nil root for empty BVH")
 	}
 
-	ray := NewRay(NewVec3(0, 0, 0), NewVec3(1, 0, 0))
+	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0))
 	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
 	if isHit {
 		t.Error("Expected no hit for empty BVH")
@@ -82,9 +85,9 @@ func TestBVH_EmptyAndSingleShape(t *testing.T) {
 
 	// Test single shape BVH
 	shape := MockShape{
-		boundingBox: NewAABB(NewVec3(0, 0, 0), NewVec3(1, 1, 1)),
-		hitFn: func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
-			return &HitRecord{T: 1.0}, true
+		boundingBox: core.NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(1, 1, 1)),
+		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+			return &material.HitRecord{T: 1.0}, true
 		},
 	}
 
@@ -103,10 +106,10 @@ func TestBVH_MultipleHitsInLeaf(t *testing.T) {
 	// Test that BVH correctly finds closest hit when multiple shapes in leaf hit
 
 	// Helper function to create hit function with specific t value
-	makeHitFn := func(tValue float64) func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
-		return func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+		return func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 			if ray.Direction.X > 0 && tValue >= tMin && tValue <= tMax {
-				return &HitRecord{T: tValue}, true
+				return &material.HitRecord{T: tValue}, true
 			}
 			return nil, false
 		}
@@ -115,21 +118,21 @@ func TestBVH_MultipleHitsInLeaf(t *testing.T) {
 	// Create shapes that will be in same leaf (close together)
 	shapes := []Shape{
 		MockShape{
-			boundingBox: NewAABB(NewVec3(0, 0, 0), NewVec3(1, 1, 1)),
+			boundingBox: core.NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(1, 1, 1)),
 			hitFn:       makeHitFn(2.0), // Hit at t = 2.0
 		},
 		MockShape{
-			boundingBox: NewAABB(NewVec3(0.5, 0, 0), NewVec3(1.5, 1, 1)),
+			boundingBox: core.NewAABB(core.NewVec3(0.5, 0, 0), core.NewVec3(1.5, 1, 1)),
 			hitFn:       makeHitFn(1.0), // Hit at t = 1.0 (closer)
 		},
 		MockShape{
-			boundingBox: NewAABB(NewVec3(1.0, 0, 0), NewVec3(2.0, 1, 1)),
+			boundingBox: core.NewAABB(core.NewVec3(1.0, 0, 0), core.NewVec3(2.0, 1, 1)),
 			hitFn:       makeHitFn(3.0), // Hit at t = 3.0 (farther)
 		},
 	}
 
 	bvh := NewBVH(shapes)
-	ray := NewRay(NewVec3(-1, 0.5, 0.5), NewVec3(1, 0, 0))
+	ray := core.NewRay(core.NewVec3(-1, 0.5, 0.5), core.NewVec3(1, 0, 0))
 
 	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
 	if !isHit {
@@ -146,8 +149,8 @@ func TestBVH_RayHitsBoundingBoxButMissesShapes(t *testing.T) {
 	// Test case where ray hits the bounding box but misses all shapes inside
 
 	shape := MockShape{
-		boundingBox: NewAABB(NewVec3(0, 0, 0), NewVec3(2, 2, 2)),
-		hitFn: func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+		boundingBox: core.NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(2, 2, 2)),
+		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 			// Shape occupies only a small part of its bounding box
 			// Ray hits bounding box but misses actual shape
 			return nil, false
@@ -157,7 +160,7 @@ func TestBVH_RayHitsBoundingBoxButMissesShapes(t *testing.T) {
 	bvh := NewBVH([]Shape{shape})
 
 	// Ray that goes through the bounding box but misses the shape
-	ray := NewRay(NewVec3(-1, 1, 1), NewVec3(1, 0, 0))
+	ray := core.NewRay(core.NewVec3(-1, 1, 1), core.NewVec3(1, 0, 0))
 
 	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
 	if isHit {
@@ -175,8 +178,8 @@ func TestBVH_StatsCollection(t *testing.T) {
 	shapes := make([]Shape, 20)
 	for i := 0; i < 20; i++ {
 		shapes[i] = MockShape{
-			boundingBox: NewAABB(NewVec3(float64(i), 0, 0), NewVec3(float64(i)+1, 1, 1)),
-			hitFn: func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+			boundingBox: core.NewAABB(core.NewVec3(float64(i), 0, 0), core.NewVec3(float64(i)+1, 1, 1)),
+			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 				return nil, false
 			},
 		}
@@ -211,14 +214,14 @@ func TestBVH_StatsCollection(t *testing.T) {
 func TestBVH_IdenticalBoundingBoxes(t *testing.T) {
 	// Test edge case where multiple shapes have identical bounding boxes
 
-	sameBoundingBox := NewAABB(NewVec3(0, 0, 0), NewVec3(1, 1, 1))
+	sameBoundingBox := core.NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(1, 1, 1))
 	shapes := make([]Shape, 5)
 
 	// Helper function to create hit function with specific t value
-	makeHitFn := func(tValue float64) func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
-		return func(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+		return func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 			if ray.Direction.X > 0 && tValue >= tMin && tValue <= tMax {
-				return &HitRecord{T: tValue}, true
+				return &material.HitRecord{T: tValue}, true
 			}
 			return nil, false
 		}
@@ -232,7 +235,7 @@ func TestBVH_IdenticalBoundingBoxes(t *testing.T) {
 	}
 
 	bvh := NewBVH(shapes)
-	ray := NewRay(NewVec3(-1, 0.5, 0.5), NewVec3(1, 0, 0))
+	ray := core.NewRay(core.NewVec3(-1, 0.5, 0.5), core.NewVec3(1, 0, 0))
 
 	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
 	if !isHit {
@@ -249,14 +252,14 @@ func TestWorldRadius(t *testing.T) {
 	tests := []struct {
 		name           string
 		shapes         []Shape
-		expectedCenter Vec3
+		expectedCenter core.Vec3
 		expectedRadius float64
 		tolerance      float64
 	}{
 		{
 			name:           "EmptyScene",
 			shapes:         []Shape{},
-			expectedCenter: Vec3{},
+			expectedCenter: core.Vec3{},
 			expectedRadius: 0.0,
 			tolerance:      0.0,
 		},
@@ -264,11 +267,11 @@ func TestWorldRadius(t *testing.T) {
 			name: "SingleSphere",
 			shapes: []Shape{
 				MockShape{
-					boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
+					boundingBox: core.NewAABB(core.NewVec3(-1, -1, -1), core.NewVec3(1, 1, 1)),
 				},
 			},
-			expectedCenter: NewVec3(0, 0, 0), // Center of AABB from (-1,-1,-1) to (1,1,1)
-			expectedRadius: math.Sqrt(3),     // Distance from center (0,0,0) to corner (1,1,1)
+			expectedCenter: core.NewVec3(0, 0, 0), // Center of AABB from (-1,-1,-1) to (1,1,1)
+			expectedRadius: math.Sqrt(3),          // Distance from center (0,0,0) to corner (1,1,1)
 			tolerance:      1e-10,
 		},
 		{
@@ -276,27 +279,27 @@ func TestWorldRadius(t *testing.T) {
 			shapes: []Shape{
 				// Finite sphere
 				MockShape{
-					boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
+					boundingBox: core.NewAABB(core.NewVec3(-1, -1, -1), core.NewVec3(1, 1, 1)),
 				},
 				// Infinite plane (large bounds)
 				MockShape{
-					boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
+					boundingBox: core.NewAABB(core.NewVec3(-1e6, -0.1, -1e6), core.NewVec3(1e6, 0.1, 1e6)),
 				},
 			},
 			// Should only consider the finite sphere
-			expectedCenter: NewVec3(0, 0, 0), // Center of finite sphere
-			expectedRadius: math.Sqrt(2e12),  // Radius to edge of plane
+			expectedCenter: core.NewVec3(0, 0, 0), // Center of finite sphere
+			expectedRadius: math.Sqrt(2e12),       // Radius to edge of plane
 			tolerance:      1e-6,
 		},
 		{
 			name: "OnlyInfinitePlanes",
 			shapes: []Shape{
 				MockShape{
-					boundingBox: NewAABB(NewVec3(-1e6, -0.1, -1e6), NewVec3(1e6, 0.1, 1e6)),
+					boundingBox: core.NewAABB(core.NewVec3(-1e6, -0.1, -1e6), core.NewVec3(1e6, 0.1, 1e6)),
 				},
 			},
 			// No finite geometry, should return zero center and radius
-			expectedCenter: NewVec3(0, 0, 0),
+			expectedCenter: core.NewVec3(0, 0, 0),
 			expectedRadius: math.Sqrt(2e12),
 			tolerance:      1e-6,
 		},
@@ -331,7 +334,7 @@ func TestBVHWorldRadius(t *testing.T) {
 	// Test that the BVH correctly stores the world radius
 	shapes := []Shape{
 		MockShape{
-			boundingBox: NewAABB(NewVec3(-1, -1, -1), NewVec3(1, 1, 1)),
+			boundingBox: core.NewAABB(core.NewVec3(-1, -1, -1), core.NewVec3(1, 1, 1)),
 		},
 	}
 

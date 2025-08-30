@@ -813,7 +813,7 @@ func TestCameraPathBetaPropagation(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		material         core.Material
+		material         material.Material
 		sampler          *TestSampler
 		expectedVertices []ExpectedVertex
 		testDescription  string
@@ -928,7 +928,7 @@ func TestLightPathBetaPropagation(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		material         core.Material
+		material         material.Material
 		sampler          *TestSampler
 		expectedVertices []ExpectedVertex
 		testDescription  string

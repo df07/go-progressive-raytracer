@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // DiscLight represents a circular area light
@@ -12,7 +13,7 @@ type DiscLight struct {
 }
 
 // NewDiscLight creates a new circular disc light
-func NewDiscLight(center, normal core.Vec3, radius float64, material core.Material) *DiscLight {
+func NewDiscLight(center, normal core.Vec3, radius float64, material material.Material) *DiscLight {
 	return &DiscLight{
 		Disc: NewDisc(center, normal, radius, material),
 	}
@@ -125,7 +126,7 @@ func (dl *DiscLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 // Emit implements the Light interface - returns material emission
 func (dl *DiscLight) Emit(ray core.Ray) core.Vec3 {
 	// Area lights emit according to their material
-	if emitter, isEmissive := dl.Material.(core.Emitter); isEmissive {
+	if emitter, isEmissive := dl.Material.(material.Emitter); isEmissive {
 		return emitter.Emit(ray)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}

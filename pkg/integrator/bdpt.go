@@ -6,16 +6,17 @@ import (
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // Vertex represents a single vertex in a light transport path
 type Vertex struct {
-	Point      core.Vec3      // 3D position
-	Normal     core.Vec3      // Surface normal
-	Light      geometry.Light // Light at this vertex (TODO: remove after cleanup)
-	LightIndex int            // Index of light in scene's light array (-1 if not a light vertex)
-	Material   core.Material  // Material at this vertex
+	Point      core.Vec3         // 3D position
+	Normal     core.Vec3         // Surface normal
+	Light      geometry.Light    // Light at this vertex (TODO: remove after cleanup)
+	LightIndex int               // Index of light in scene's light array (-1 if not a light vertex)
+	Material   material.Material // Material at this vertex
 
 	// Path tracing information
 	IncomingDirection core.Vec3 // Direction ray arrived from

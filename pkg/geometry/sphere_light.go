@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // SphereLight represents a spherical area light
@@ -12,7 +13,7 @@ type SphereLight struct {
 }
 
 // NewSphereLight creates a new spherical light
-func NewSphereLight(center core.Vec3, radius float64, material core.Material) *SphereLight {
+func NewSphereLight(center core.Vec3, radius float64, material material.Material) *SphereLight {
 	return &SphereLight{
 		Sphere: NewSphere(center, radius, material),
 	}
@@ -203,7 +204,7 @@ func (sl *SphereLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64
 // Emit implements the Light interface - returns material emission
 func (sl *SphereLight) Emit(ray core.Ray) core.Vec3 {
 	// Area lights emit according to their material
-	if emitter, isEmissive := sl.Material.(core.Emitter); isEmissive {
+	if emitter, isEmissive := sl.Material.(material.Emitter); isEmissive {
 		return emitter.Emit(ray)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}

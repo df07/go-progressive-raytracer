@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // uniformInfiniteLightMaterial implements uniform emission for infinite lights
@@ -12,8 +13,8 @@ type uniformInfiniteLightMaterial struct {
 }
 
 // Scatter implements the Material interface (infinite lights don't scatter, only emit)
-func (uilm *uniformInfiniteLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
-	return core.ScatterResult{}, false // No scattering, only emission
+func (uilm *uniformInfiniteLightMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
+	return material.ScatterResult{}, false // No scattering, only emission
 }
 
 // Emit implements the Emitter interface with uniform emission
@@ -36,10 +37,10 @@ func (uilm *uniformInfiniteLightMaterial) PDF(incomingDir, outgoingDir, normal c
 
 // UniformInfiniteLight represents a uniform infinite area light (constant emission in all directions)
 type UniformInfiniteLight struct {
-	emission    core.Vec3     // Uniform emission color
-	worldCenter core.Vec3     // Finite scene center from BVH
-	worldRadius float64       // Finite scene radius from BVH
-	material    core.Material // Material for emission
+	emission    core.Vec3         // Uniform emission color
+	worldCenter core.Vec3         // Finite scene center from BVH
+	worldRadius float64           // Finite scene radius from BVH
+	material    material.Material // Material for emission
 }
 
 // NewUniformInfiniteLight creates a new uniform infinite light
@@ -56,7 +57,7 @@ func (uil *UniformInfiniteLight) Type() LightType {
 }
 
 // GetMaterial returns the material for emission calculations
-func (uil *UniformInfiniteLight) GetMaterial() core.Material {
+func (uil *UniformInfiniteLight) GetMaterial() material.Material {
 	return uil.material
 }
 
@@ -118,8 +119,8 @@ func (uil *UniformInfiniteLight) Emit(ray core.Ray) core.Vec3 {
 }
 
 // Preprocess implements the Preprocessor interface - sets world bounds from scene
-func (uil *UniformInfiniteLight) Preprocess(bvh *core.BVH) error {
-	uil.worldCenter = bvh.Center
-	uil.worldRadius = bvh.Radius
+func (uil *UniformInfiniteLight) Preprocess(worldCenter core.Vec3, worldRadius float64) error {
+	uil.worldCenter = worldCenter
+	uil.worldRadius = worldRadius
 	return nil
 }

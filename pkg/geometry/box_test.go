@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // DummyMaterial for testing (same as in quad_test.go)
 type DummyBoxMaterial struct{}
 
-func (d DummyBoxMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
-	return core.ScatterResult{}, false
+func (d DummyBoxMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
+	return material.ScatterResult{}, false
 }
 
 func (d DummyBoxMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {

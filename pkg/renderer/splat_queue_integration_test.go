@@ -166,7 +166,7 @@ func TestSplatSystemIntegration(t *testing.T) {
 	metal := material.NewMetal(core.Vec3{X: 0.7, Y: 0.6, Z: 0.5}, 0.1)
 
 	// Create shapes
-	var shapes []core.Shape
+	var shapes []geometry.Shape
 	var lights []geometry.Light
 
 	// Add a sphere with lambertian material

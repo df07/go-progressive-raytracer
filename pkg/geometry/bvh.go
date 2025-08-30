@@ -1,12 +1,15 @@
-package core
+package geometry
 
 import (
 	"sort"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // BVHNode represents a node in the Bounding Volume Hierarchy
 type BVHNode struct {
-	BoundingBox AABB
+	BoundingBox core.AABB
 	Left        *BVHNode
 	Right       *BVHNode
 	Shapes      []Shape // Multiple shapes for leaf nodes (nil for internal nodes)
@@ -15,14 +18,14 @@ type BVHNode struct {
 // BVH represents a Bounding Volume Hierarchy for fast ray-object intersection
 type BVH struct {
 	Root   *BVHNode
-	Center Vec3    // Precomputed finite scene center for infinite light calculations
-	Radius float64 // Precomputed world radius for infinite light PDF calculations
+	Center core.Vec3 // Precomputed finite scene center for infinite light calculations
+	Radius float64   // Precomputed world radius for infinite light PDF calculations
 }
 
 // NewBVH constructs a BVH from a slice of shapes
 func NewBVH(shapes []Shape) *BVH {
 	if len(shapes) == 0 {
-		return &BVH{Root: nil, Center: Vec3{}, Radius: 0}
+		return &BVH{Root: nil, Center: core.Vec3{}, Radius: 0}
 	}
 
 	// Make a copy of the shapes slice to avoid modifying the original
@@ -33,14 +36,14 @@ func NewBVH(shapes []Shape) *BVH {
 	root := buildBVH(shapesCopy, 0)
 
 	// Use the root BVH node's bounding box for world bounds (no need to recalculate)
-	var worldCenter Vec3
+	var worldCenter core.Vec3
 	var worldRadius float64
 	if root != nil {
 		worldCenter = root.BoundingBox.Center()
 		worldRadius = root.BoundingBox.Max.Subtract(worldCenter).Length()
 	} else {
 		// Empty scene fallback
-		worldCenter = Vec3{}
+		worldCenter = core.Vec3{}
 		worldRadius = 100.0
 	}
 
@@ -60,7 +63,7 @@ const leafThreshold = 8
 // the previous sorting-based approach while maintaining good ray intersection performance.
 func buildBVH(shapes []Shape, depth int) *BVHNode {
 	// Calculate bounding box for all shapes
-	var boundingBox AABB
+	var boundingBox core.AABB
 	if len(shapes) > 0 {
 		boundingBox = shapes[0].BoundingBox()
 		for i := 1; i < len(shapes); i++ {
@@ -106,7 +109,7 @@ func buildBVH(shapes []Shape, depth int) *BVHNode {
 }
 
 // findBestSplitSimple finds the best axis and split position using simple binned median
-func findBestSplitSimple(shapes []Shape, boundingBox AABB) (bestAxis int, splitPos float64) {
+func findBestSplitSimple(shapes []Shape, boundingBox core.AABB) (bestAxis int, splitPos float64) {
 	bestAxis = boundingBox.LongestAxis()
 
 	// Get the extent along the best axis
@@ -177,7 +180,7 @@ func sortShapesByAxis(shapes []Shape, axis int) {
 }
 
 // Hit tests if a ray intersects any shape in the BVH
-func (bvh *BVH) Hit(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+func (bvh *BVH) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	if bvh.Root == nil {
 		return nil, false
 	}
@@ -185,7 +188,7 @@ func (bvh *BVH) Hit(ray Ray, tMin, tMax float64) (*HitRecord, bool) {
 }
 
 // hitNode recursively tests ray intersection with BVH nodes
-func (bvh *BVH) hitNode(node *BVHNode, ray Ray, tMin, tMax float64) (*HitRecord, bool) {
+func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	// First check if ray hits the bounding box
 	if !node.BoundingBox.Hit(ray, tMin, tMax) {
 		return nil, false
@@ -193,7 +196,7 @@ func (bvh *BVH) hitNode(node *BVHNode, ray Ray, tMin, tMax float64) (*HitRecord,
 
 	// If this is a leaf node, test against all shapes using linear search
 	if node.Shapes != nil {
-		var closestHit *HitRecord
+		var closestHit *material.HitRecord
 		hitAnything := false
 		closestSoFar := tMax
 
@@ -210,7 +213,7 @@ func (bvh *BVH) hitNode(node *BVHNode, ray Ray, tMin, tMax float64) (*HitRecord,
 	}
 
 	// Internal node - test both children
-	var closestHit *HitRecord
+	var closestHit *material.HitRecord
 	hitAnything := false
 	closestSoFar := tMax
 
@@ -233,6 +236,14 @@ func (bvh *BVH) hitNode(node *BVHNode, ray Ray, tMin, tMax float64) (*HitRecord,
 	}
 
 	return closestHit, hitAnything
+}
+
+// BoundingBox implements the Shape interface - returns the overall bounding box of the BVH
+func (bvh *BVH) BoundingBox() core.AABB {
+	if bvh.Root == nil {
+		return core.AABB{}
+	}
+	return bvh.Root.BoundingBox
 }
 
 // getStats returns statistics about the BVH structure

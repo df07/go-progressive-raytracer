@@ -16,9 +16,9 @@ func NewEmissive(emission core.Vec3) *Emissive {
 
 // Scatter implements the Material interface for emissive materials
 // Emissive materials don't scatter rays - they only emit light
-func (e *Emissive) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
+func (e *Emissive) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
 	// Emissive materials don't scatter - they absorb all incoming rays
-	return core.ScatterResult{}, false
+	return ScatterResult{}, false
 }
 
 // Emit returns the emitted light for this material

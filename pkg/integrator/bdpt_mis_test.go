@@ -25,7 +25,7 @@ func TestVertexConvertSolidAngleToAreaPdf(t *testing.T) {
 		fromNormal      core.Vec3
 		toPoint         core.Vec3
 		toNormal        core.Vec3
-		toMaterial      core.Material
+		toMaterial      material.Material
 		isInfiniteLight bool
 		solidAnglePdf   float64
 		expectedPdf     float64
@@ -163,7 +163,7 @@ func TestCalculateMISWeight(t *testing.T) {
 		// Basic case - test the trivial s+t==2 early return
 		{
 			name: "TrivialCase_s0t2_EarlyReturn",
-			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // surface
 			}),
@@ -178,11 +178,11 @@ func TestCalculateMISWeight(t *testing.T) {
 		// Direct lighting scenarios (s=1)
 		{
 			name: "DirectLighting_s1t2",
-			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // diffuse surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 			}),
 			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
@@ -193,12 +193,12 @@ func TestCalculateMISWeight(t *testing.T) {
 		},
 		{
 			name: "DirectLighting_s1t3_OneBounce",
-			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),   // camera
 				core.NewVec3(0, 0, -1),  // first diffuse surface
 				core.NewVec3(-1, 0, -1), // second diffuse surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(-1, 2, -1), // area light above second surface
 			}),
 			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
@@ -211,11 +211,11 @@ func TestCalculateMISWeight(t *testing.T) {
 		// Indirect lighting scenarios (s=2)
 		{
 			name: "IndirectLighting_s2t2",
-			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // diffuse surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive, white}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 				core.NewVec3(0, 1, -1), // light bounces off diffuse surface
 			}),
@@ -229,12 +229,12 @@ func TestCalculateMISWeight(t *testing.T) {
 		// Complex multi-bounce scenarios
 		{
 			name: "ComplexPath_s2t3_MultiBounce",
-			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // first bounce
 				core.NewVec3(1, 0, -1), // second bounce
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive, white}, []core.Vec3{
 				core.NewVec3(1, 3, -1), // light source
 				core.NewVec3(1, 2, -1), // light bounces once
 			}),
@@ -248,7 +248,7 @@ func TestCalculateMISWeight(t *testing.T) {
 		// More complex cases that actually exercise MIS calculation logic
 		{
 			name: "PathTracing_s0t4_MultiBounce",
-			cameraPath: createTestCameraPath([]core.Material{white, white, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white, white, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // first bounce
 				core.NewVec3(1, 0, -1), // second bounce
@@ -268,7 +268,7 @@ func TestCalculateMISWeight(t *testing.T) {
 					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
 					material.NewEmissive(core.NewVec3(4.0, 4.0, 4.0)))
 
-				return createTestCameraPathWithLight([]core.Material{white, emissive}, []core.Vec3{
+				return createTestCameraPathWithLight([]material.Material{white, emissive}, []core.Vec3{
 					core.NewVec3(0, 0, 0),  // camera
 					core.NewVec3(0, 0, -1), // diffuse bounce
 					core.NewVec3(0, 2, -1), // path hits light directly
@@ -283,12 +283,12 @@ func TestCalculateMISWeight(t *testing.T) {
 		},
 		{
 			name: "MultiBounceGlass_s1t3",
-			cameraPath: createTestCameraPath([]core.Material{glass, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{glass, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // glass surface
 				core.NewVec3(0, 0, -2), // diffuse surface after glass
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(0, 2, -2), // area light above final surface
 			}),
 			s: 1, t: 3,
@@ -301,7 +301,7 @@ func TestCalculateMISWeight(t *testing.T) {
 		// ========== SPECULAR MATERIAL TESTS ==========
 		{
 			name: "SpecularMirrorPath_s1t3",
-			cameraPath: createTestCameraPath([]core.Material{
+			cameraPath: createTestCameraPath([]material.Material{
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
 				white,
 			}, []core.Vec3{
@@ -309,7 +309,7 @@ func TestCalculateMISWeight(t *testing.T) {
 				core.NewVec3(0, 0, -1), // perfect mirror
 				core.NewVec3(1, 0, -1), // diffuse surface after mirror bounce
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(1, 2, -1), // area light above final surface
 			}),
 			s: 1, t: 3,
@@ -320,13 +320,13 @@ func TestCalculateMISWeight(t *testing.T) {
 		},
 		{
 			name: "DirectSpecularLighting_s1t2",
-			cameraPath: createTestCameraPath([]core.Material{
+			cameraPath: createTestCameraPath([]material.Material{
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
 			}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // perfect mirror surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 			}),
 			s: 1, t: 2,
@@ -337,13 +337,13 @@ func TestCalculateMISWeight(t *testing.T) {
 		},
 		{
 			name: "ComplexSpecularPath_s2t2",
-			cameraPath: createTestCameraPath([]core.Material{
+			cameraPath: createTestCameraPath([]material.Material{
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
 			}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // perfect mirror
 			}),
-			lightPath: createTestLightPath([]core.Material{
+			lightPath: createTestLightPath([]material.Material{
 				emissive,
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // light bounces off mirror
 			}, []core.Vec3{
@@ -366,7 +366,7 @@ func TestCalculateMISWeight(t *testing.T) {
 					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
 					material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
 
-				path := createTestCameraPathWithLight([]core.Material{white, emissive}, []core.Vec3{
+				path := createTestCameraPathWithLight([]material.Material{white, emissive}, []core.Vec3{
 					core.NewVec3(0, 0, 0),  // camera
 					core.NewVec3(0, 0, -1), // diffuse surface
 					core.NewVec3(0, 2, -1), // camera path hits light directly (second light)
@@ -446,7 +446,7 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		// Use the same test cases as the original MIS weight test
 		{
 			name: "TrivialCase_s0t2_EarlyReturn",
-			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // surface
 			}),
@@ -456,11 +456,11 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "DirectLighting_s1t2",
-			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // diffuse surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 			}),
 			s: 1, t: 2,
@@ -469,12 +469,12 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "DirectLighting_s1t3_OneBounce",
-			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),   // camera
 				core.NewVec3(0, 0, -1),  // first diffuse surface
 				core.NewVec3(-1, 0, -1), // second diffuse surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(-1, 2, -1), // area light above second surface
 			}),
 			s: 1, t: 3,
@@ -483,11 +483,11 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "IndirectLighting_s2t2",
-			cameraPath: createTestCameraPath([]core.Material{white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // diffuse surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive, white}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 				core.NewVec3(0, 1, -1), // light bounces off diffuse surface
 			}),
@@ -497,12 +497,12 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "ComplexPath_s2t3_MultiBounce",
-			cameraPath: createTestCameraPath([]core.Material{white, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // first bounce
 				core.NewVec3(1, 0, -1), // second bounce
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive, white}, []core.Vec3{
 				core.NewVec3(1, 3, -1), // light source
 				core.NewVec3(1, 2, -1), // light bounces once
 			}),
@@ -512,7 +512,7 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "PathTracing_s0t4_MultiBounce",
-			cameraPath: createTestCameraPath([]core.Material{white, white, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{white, white, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // first bounce
 				core.NewVec3(1, 0, -1), // second bounce
@@ -524,12 +524,12 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "MultiBounceGlass_s1t3",
-			cameraPath: createTestCameraPath([]core.Material{glass, white}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{glass, white}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // glass surface
 				core.NewVec3(0, 0, -2), // diffuse surface after glass
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(0, 2, -2), // area light above final surface
 			}),
 			s: 1, t: 3,
@@ -538,7 +538,7 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "SpecularMirrorPath_s1t3",
-			cameraPath: createTestCameraPath([]core.Material{
+			cameraPath: createTestCameraPath([]material.Material{
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
 				white,
 			}, []core.Vec3{
@@ -546,7 +546,7 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 				core.NewVec3(0, 0, -1), // perfect mirror
 				core.NewVec3(1, 0, -1), // diffuse surface after mirror bounce
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(1, 2, -1), // area light above final surface
 			}),
 			s: 1, t: 3,
@@ -555,13 +555,13 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "DirectSpecularLighting_s1t2",
-			cameraPath: createTestCameraPath([]core.Material{
+			cameraPath: createTestCameraPath([]material.Material{
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
 			}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // perfect mirror surface
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 			}),
 			s: 1, t: 2,
@@ -570,13 +570,13 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "ComplexSpecularPath_s2t2",
-			cameraPath: createTestCameraPath([]core.Material{
+			cameraPath: createTestCameraPath([]material.Material{
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // perfect mirror
 			}, []core.Vec3{
 				core.NewVec3(0, 0, 0),  // camera
 				core.NewVec3(0, 0, -1), // perfect mirror
 			}),
-			lightPath: createTestLightPath([]core.Material{
+			lightPath: createTestLightPath([]material.Material{
 				emissive,
 				material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0), // light bounces off mirror
 			}, []core.Vec3{
@@ -589,10 +589,10 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "LightTracing_s2t1",
-			cameraPath: createTestCameraPath([]core.Material{}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{}, []core.Vec3{
 				core.NewVec3(0, 0, 0), // camera only
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive, white}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive, white}, []core.Vec3{
 				core.NewVec3(0, 2, -1), // area light
 				core.NewVec3(0, 1, -1), // light bounces once before hitting camera
 			}),
@@ -602,10 +602,10 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 		},
 		{
 			name: "LightTracing_s3t1",
-			cameraPath: createTestCameraPath([]core.Material{}, []core.Vec3{
+			cameraPath: createTestCameraPath([]material.Material{}, []core.Vec3{
 				core.NewVec3(0, 0, 0), // camera only
 			}),
-			lightPath: createTestLightPath([]core.Material{emissive, white, white}, []core.Vec3{
+			lightPath: createTestLightPath([]material.Material{emissive, white, white}, []core.Vec3{
 				core.NewVec3(0, 3, -1), // area light
 				core.NewVec3(0, 2, -1), // first bounce
 				core.NewVec3(0, 1, -1), // second bounce before hitting camera
@@ -749,7 +749,7 @@ func TestPdfPropagation(t *testing.T) {
 	tests := []struct {
 		name               string
 		pathType           string // "camera" or "light"
-		material           core.Material
+		material           material.Material
 		sampler            *TestSampler
 		expectedVertexPdfs []ExpectedPdfVertex
 		sceneName          string // "default" or "cornell"

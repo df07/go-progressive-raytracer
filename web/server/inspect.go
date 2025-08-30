@@ -27,7 +27,7 @@ type InspectResponse struct {
 }
 
 // extractMaterialInfo extracts detailed material information with type assertions
-func (s *Server) extractMaterialInfo(mat core.Material) (string, map[string]interface{}) {
+func (s *Server) extractMaterialInfo(mat material.Material) (string, map[string]interface{}) {
 	properties := make(map[string]interface{})
 
 	// Check specific material types using type assertions
@@ -89,7 +89,7 @@ func (s *Server) extractMaterialInfo(mat core.Material) (string, map[string]inte
 
 	default:
 		// Check if it's emissive using interface
-		if emitter, ok := mat.(core.Emitter); ok {
+		if emitter, ok := mat.(material.Emitter); ok {
 			emission := emitter.Emit(core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0)))
 			properties["emission"] = [3]float64{emission.X, emission.Y, emission.Z}
 			properties["color"] = fmt.Sprintf("#%02x%02x%02x",
@@ -103,8 +103,8 @@ func (s *Server) extractMaterialInfo(mat core.Material) (string, map[string]inte
 // InspectResult contains rich information about an object hit by an inspection ray
 type InspectResult struct {
 	Hit       bool
-	HitRecord *core.HitRecord // Full hit record with material reference
-	Shape     core.Shape      // The actual shape that was hit
+	HitRecord *material.HitRecord // Full hit record with material reference
+	Shape     geometry.Shape      // The actual shape that was hit
 }
 
 // inspectPixel casts a ray through the specified pixel coordinates and returns information about the first object hit
@@ -152,7 +152,7 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 }
 
 // extractGeometryInfo extracts detailed geometry information
-func (s *Server) extractGeometryInfo(shape core.Shape) (string, map[string]interface{}) {
+func (s *Server) extractGeometryInfo(shape geometry.Shape) (string, map[string]interface{}) {
 	properties := make(map[string]interface{})
 
 	switch geom := shape.(type) {

@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // MockMaterial for testing
 type MockTriangleMaterial struct{}
 
-func (m MockTriangleMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
-	return core.ScatterResult{}, false
+func (m MockTriangleMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
+	return material.ScatterResult{}, false
 }
 
 func (m MockTriangleMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {

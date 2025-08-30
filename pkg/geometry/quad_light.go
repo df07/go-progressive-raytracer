@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // QuadLight represents a rectangular area light
@@ -13,7 +14,7 @@ type QuadLight struct {
 }
 
 // NewQuadLight creates a new quad light
-func NewQuadLight(corner, u, v core.Vec3, material core.Material) *QuadLight {
+func NewQuadLight(corner, u, v core.Vec3, material material.Material) *QuadLight {
 	quad := NewQuad(corner, u, v, material)
 
 	// Calculate area of the quad: |u × v|
@@ -173,7 +174,7 @@ func (ql *QuadLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 // Emit implements the Light interface - returns material emission
 func (ql *QuadLight) Emit(ray core.Ray) core.Vec3 {
 	// Area lights emit according to their material
-	if emitter, isEmissive := ql.Material.(core.Emitter); isEmissive {
+	if emitter, isEmissive := ql.Material.(material.Emitter); isEmissive {
 		return emitter.Emit(ray)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}

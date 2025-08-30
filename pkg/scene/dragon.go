@@ -20,7 +20,7 @@ func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, ca
 
 	s := &Scene{
 		Camera:         camera,
-		Shapes:         make([]core.Shape, 0),
+		Shapes:         make([]geometry.Shape, 0),
 		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: createDragonSamplingConfig(),
 		CameraConfig:   cameraConfig,
@@ -140,7 +140,7 @@ func addDragonMesh(s *Scene, materialFinish string, logger core.Logger) {
 	}
 
 	// Create dragon material based on finish type
-	var dragonMaterial core.Material
+	var dragonMaterial material.Material
 	switch materialFinish {
 	case "plastic":
 		// Light purple shiny plastic - layered material with dielectric outer and lambertian inner

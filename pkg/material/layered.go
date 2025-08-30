@@ -8,12 +8,12 @@ import (
 // Light hits the outer layer first, then if it scatters inward, hits the inner layer
 // This simulates coatings, films, or other layered surface treatments
 type Layered struct {
-	Outer core.Material // Outer layer material (e.g., coating, surface treatment)
-	Inner core.Material // Inner layer material (e.g., base material)
+	Outer Material // Outer layer material (e.g., coating, surface treatment)
+	Inner Material // Inner layer material (e.g., base material)
 }
 
 // NewLayered creates a new layered material
-func NewLayered(outer, inner core.Material) *Layered {
+func NewLayered(outer, inner Material) *Layered {
 	return &Layered{
 		Outer: outer,
 		Inner: inner,
@@ -21,7 +21,7 @@ func NewLayered(outer, inner core.Material) *Layered {
 }
 
 // Scatter implements the Material interface for layered scattering
-func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
+func (l *Layered) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
 	// Step 1: Ray hits the outer material first
 	outerHit := hit
 	outerHit.Material = l.Outer
@@ -30,7 +30,7 @@ func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampl
 
 	// If outer material doesn't scatter, no interaction occurs
 	if !outerScatters {
-		return core.ScatterResult{}, false
+		return ScatterResult{}, false
 	}
 
 	// Step 2: Check if the scattered ray from outer material points inward
@@ -65,7 +65,7 @@ func (l *Layered) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampl
 	// The attenuation is the product of both materials (light filtered through both)
 	combinedAttenuation := outerResult.Attenuation.MultiplyVec(innerResult.Attenuation)
 
-	return core.ScatterResult{
+	return ScatterResult{
 		Incoming:    rayIn,
 		Scattered:   innerResult.Scattered,
 		Attenuation: combinedAttenuation,

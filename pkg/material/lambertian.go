@@ -17,7 +17,7 @@ func NewLambertian(albedo core.Vec3) *Lambertian {
 }
 
 // Scatter implements the Material interface for lambertian scattering
-func (l *Lambertian) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
+func (l *Lambertian) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
 	// Generate cosine-weighted random direction in hemisphere around normal
 	scatterDirection := core.RandomCosineDirection(hit.Normal, sampler.Get2D())
 	scattered := core.Ray{Origin: hit.Point, Direction: scatterDirection}
@@ -32,7 +32,7 @@ func (l *Lambertian) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sa
 	// BRDF: albedo / π (proper energy conservation)
 	attenuation := l.Albedo.Multiply(1.0 / math.Pi)
 
-	return core.ScatterResult{
+	return ScatterResult{
 		Incoming:    rayIn,
 		Scattered:   scattered,
 		Attenuation: attenuation,

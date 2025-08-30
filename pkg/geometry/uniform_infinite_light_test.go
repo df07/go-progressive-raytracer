@@ -81,10 +81,7 @@ func TestUniformInfiniteLight_SampleEmission(t *testing.T) {
 	worldRadius := 15.0
 
 	light := NewUniformInfiniteLight(emission)
-	light.Preprocess(&core.BVH{
-		Center: worldCenter,
-		Radius: worldRadius,
-	})
+	light.Preprocess(worldCenter, worldRadius)
 
 	samplePoint := core.NewVec2(0.3, 0.7)
 	sampleDirection := core.NewVec2(0.1, 0.9)
@@ -119,7 +116,7 @@ func TestUniformInfiniteLight_EmissionPDF(t *testing.T) {
 	worldRadius := 20.0
 	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
 
-	light.Preprocess(&core.BVH{Radius: worldRadius})
+	light.Preprocess(core.Vec3{}, worldRadius)
 
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)
@@ -176,7 +173,7 @@ func TestUniformInfiniteLight_ParallelRays(t *testing.T) {
 	light := NewUniformInfiniteLight(core.NewVec3(1, 1, 1))
 	worldCenter := core.NewVec3(0, 0, 0)
 
-	light.Preprocess(&core.BVH{Radius: worldRadius, Center: worldCenter})
+	light.Preprocess(worldCenter, worldRadius)
 
 	// Same direction sample, different point samples should give parallel rays
 	directionSample := core.NewVec2(0.3, 0.7)

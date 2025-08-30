@@ -102,14 +102,14 @@ func SphereConePDF(distance, radius float64) float64 {
 // 		return 0.0
 // 	}
 // 	totalPDF := 0.0
-// 
+//
 // 	// For each light, calculate the PDF weighted by its selection probability
 // 	for i, light := range lights {
 // 		lightPDF := light.PDF(point, normal, direction)
 // 		lightSelectionPdf := lightSampler.GetLightProbability(i, point, normal)
 // 		totalPDF += lightPDF * lightSelectionPdf
 // 	}
-// 
+//
 // 	return totalPDF
 // }
 
@@ -119,10 +119,10 @@ func SphereConePDF(distance, radius float64) float64 {
 // 		return LightSample{}, nil, false
 // 	}
 // 	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLight(point, normal, sampler.Get1D())
-// 
+//
 // 	sample := selectedLight.Sample(point, normal, sampler.Get2D())
 // 	sample.PDF *= lightSelectionPdf // Combined PDF for MIS calculations
-// 
+//
 // 	return sample, selectedLight, true
 // }
 
@@ -133,31 +133,31 @@ func SphereConePDF(distance, radius float64) float64 {
 // // 		return EmissionSample{}, false
 // // 	}
 // // 	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLightEmission(sampler.Get1D())
-// // 
+// //
 // // 	sample := selectedLight.SampleEmission(sampler.Get2D(), sampler.Get2D())
 // // 	// Apply light selection probability to area PDF only (combined effect when multiplied)
 // // 	sample.AreaPDF *= lightSelectionPdf
 // // 	// Don't modify DirectionPDF - it's independent of light selection
-// // 
+// //
 // // 	return sample, true
 // // }
-// 
+//
 // // SampleEmissionDirection samples a cosine-weighted emission direction from a surface
 // // and returns both the direction and the emission sample with separate area and direction PDFs
 // func SampleEmissionDirection(point Vec3, normal Vec3, areaPDF float64, material Material, sample Vec2) EmissionSample {
 // 	// Sample emission direction (cosine-weighted hemisphere)
 // 	emissionDir := RandomCosineDirection(normal, sample)
-// 
+//
 // 	// Calculate direction PDF separately (cosine-weighted)
 // 	cosTheta := emissionDir.Dot(normal)
 // 	directionPDF := cosTheta / math.Pi
-// 
+//
 // 	// Get emission from material
 // 	var emission Vec3
 // 	if emitter, ok := material.(Emitter); ok {
 // 		emission = emitter.Emit(NewRay(point, emissionDir))
 // 	}
-// 
+//
 // 	return EmissionSample{
 // 		Point:        point,
 // 		Normal:       normal,

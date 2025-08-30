@@ -4,20 +4,21 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // Disc represents a circular disc in 3D space
 type Disc struct {
-	Center   core.Vec3     // Center of the disc
-	Normal   core.Vec3     // Normal vector (pointing "up" from the disc)
-	Radius   float64       // Radius of the disc
-	Material core.Material // Material of the disc
-	Right    core.Vec3     // Right vector (perpendicular to normal)
-	Up       core.Vec3     // Up vector (perpendicular to normal and right)
+	Center   core.Vec3         // Center of the disc
+	Normal   core.Vec3         // Normal vector (pointing "up" from the disc)
+	Radius   float64           // Radius of the disc
+	Material material.Material // Material of the disc
+	Right    core.Vec3         // Right vector (perpendicular to normal)
+	Up       core.Vec3         // Up vector (perpendicular to normal and right)
 }
 
 // NewDisc creates a new disc
-func NewDisc(center, normal core.Vec3, radius float64, material core.Material) *Disc {
+func NewDisc(center, normal core.Vec3, radius float64, material material.Material) *Disc {
 	normalNormalized := normal.Normalize()
 
 	// Create orthogonal vectors
@@ -42,7 +43,7 @@ func NewDisc(center, normal core.Vec3, radius float64, material core.Material) *
 }
 
 // Hit implements the Shape interface
-func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
+func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	// Check if ray intersects the plane containing the disc
 	denom := d.Normal.Dot(ray.Direction)
 	if math.Abs(denom) < 1e-6 {
@@ -65,7 +66,7 @@ func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
 	}
 
 	// Create hit record
-	hitRecord := &core.HitRecord{
+	hitRecord := &material.HitRecord{
 		Point:    hitPoint,
 		T:        t,
 		Material: d.Material,

@@ -36,7 +36,7 @@ func TestEmissive_Scatter(t *testing.T) {
 
 			// Test that emissive materials don't scatter
 			ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0))
-			hit := core.HitRecord{
+			hit := HitRecord{
 				Point:  core.NewVec3(1, 0, 0),
 				Normal: core.NewVec3(-1, 0, 0),
 				T:      1.0,
@@ -103,10 +103,10 @@ func TestEmissive_InterfaceCompliance(t *testing.T) {
 	emissive := NewEmissive(core.NewVec3(1.0, 1.0, 1.0))
 
 	// Test that it implements Material interface
-	var _ core.Material = emissive
+	var _ Material = emissive
 
 	// Test that it implements Emitter interface
-	var _ core.Emitter = emissive
+	var _ Emitter = emissive
 }
 
 func abs(x float64) float64 {

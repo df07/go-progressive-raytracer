@@ -16,7 +16,7 @@ func TestDielectricBasicBehavior(t *testing.T) {
 	rayDirection := core.NewVec3(1, -1, 0).Normalize() // 45-degree angle
 	ray := core.Ray{Origin: core.NewVec3(0, 1, 0), Direction: rayDirection}
 
-	hit := core.HitRecord{
+	hit := HitRecord{
 		Point:     core.NewVec3(0, 0, 0),
 		Normal:    core.NewVec3(0, 1, 0), // Normal pointing up
 		T:         1.0,
@@ -83,7 +83,7 @@ func TestDielectricTotalInternalReflection(t *testing.T) {
 	ray := core.Ray{Origin: core.NewVec3(0, 0, 0), Direction: rayDirection}
 
 	// Create hit record for back face (exiting material)
-	hit := core.HitRecord{
+	hit := HitRecord{
 		Point:     core.NewVec3(0, 0, 0),
 		Normal:    core.NewVec3(0, 1, 0), // Normal pointing up
 		T:         1.0,

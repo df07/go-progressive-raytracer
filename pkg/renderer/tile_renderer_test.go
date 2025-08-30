@@ -43,7 +43,7 @@ func createTestScene() *scene.Scene {
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
 	scene := &scene.Scene{
-		Shapes: []core.Shape{sphere},
+		Shapes: []geometry.Shape{sphere},
 		Lights: []geometry.Light{},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{

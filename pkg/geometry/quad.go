@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // AxisAlignment represents which axis a normal vector is aligned with
@@ -95,17 +96,17 @@ func findMinMax(corners []core.Vec3, accessor func(core.Vec3) float64) (float64,
 
 // Quad represents a rectangular surface defined by a corner and two edge vectors
 type Quad struct {
-	Corner   core.Vec3     // One corner of the quad
-	U        core.Vec3     // First edge vector
-	V        core.Vec3     // Second edge vector
-	Normal   core.Vec3     // Normal vector (computed from U × V)
-	Material core.Material // Material of the quad
-	D        float64       // Plane equation constant: ax + by + cz = d
-	W        core.Vec3     // Cached cross product for barycentric coordinates
+	Corner   core.Vec3         // One corner of the quad
+	U        core.Vec3         // First edge vector
+	V        core.Vec3         // Second edge vector
+	Normal   core.Vec3         // Normal vector (computed from U × V)
+	Material material.Material // Material of the quad
+	D        float64           // Plane equation constant: ax + by + cz = d
+	W        core.Vec3         // Cached cross product for barycentric coordinates
 }
 
 // NewQuad creates a new quad from a corner point and two edge vectors
-func NewQuad(corner, u, v core.Vec3, material core.Material) *Quad {
+func NewQuad(corner, u, v core.Vec3, material material.Material) *Quad {
 	// Calculate normal from cross product of edge vectors
 	normal := u.Cross(v).Normalize()
 
@@ -129,7 +130,7 @@ func NewQuad(corner, u, v core.Vec3, material core.Material) *Quad {
 }
 
 // Hit tests if a ray intersects with the quad
-func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
+func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	// Calculate denominator: dot product of ray direction and quad normal
 	denominator := ray.Direction.Dot(q.Normal)
 
@@ -162,7 +163,7 @@ func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
 	}
 
 	// Create hit record
-	hitRecord := &core.HitRecord{
+	hitRecord := &material.HitRecord{
 		T:        t,
 		Point:    hitPoint,
 		Material: q.Material,

@@ -78,7 +78,7 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 	// Create the scene
 	s := &Scene{
 		Camera:         camera,
-		Shapes:         make([]core.Shape, 0),
+		Shapes:         make([]geometry.Shape, 0),
 		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: samplingConfig,
 		CameraConfig:   cameraConfig,
@@ -145,7 +145,7 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 			color := oklchToRGB(lightness, chroma, hue)
 
 			// Create material based on finish type
-			var sphereMaterial core.Material
+			var sphereMaterial material.Material
 			switch materialFinish {
 			case "matte":
 				// Lambertian (diffuse) material - flat, no reflections

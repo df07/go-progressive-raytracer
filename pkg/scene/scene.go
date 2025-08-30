@@ -8,7 +8,7 @@ import (
 
 // NewGroundQuad creates a large quad to replace infinite ground planes
 // Creates a horizontal quad centered at the given point with normal pointing up (0,1,0)
-func NewGroundQuad(center core.Vec3, size float64, material core.Material) *geometry.Quad {
+func NewGroundQuad(center core.Vec3, size float64, material material.Material) *geometry.Quad {
 	// Create corner at bottom-left of the quad
 	corner := core.NewVec3(center.X-size/2, center.Y, center.Z-size/2)
 	// Edge vectors: u along X axis, v along Z axis
@@ -21,12 +21,12 @@ func NewGroundQuad(center core.Vec3, size float64, material core.Material) *geom
 // Scene contains all the elements needed for rendering
 type Scene struct {
 	Camera         *geometry.Camera
-	Shapes         []core.Shape      // Objects in the scene
+	Shapes         []geometry.Shape      // Objects in the scene
 	Lights         []geometry.Light      // Lights in the scene
 	LightSampler   geometry.LightSampler // Light sampler
 	SamplingConfig core.SamplingConfig
 	CameraConfig   geometry.CameraConfig
-	BVH            *core.BVH // Acceleration structure for ray-object intersection
+	BVH            *geometry.BVH // Acceleration structure for ray-object intersection
 }
 
 // NewDefaultScene creates a default scene with spheres, ground, and camera
@@ -61,7 +61,7 @@ func NewDefaultScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 
 	s := &Scene{
 		Camera:         camera,
-		Shapes:         make([]core.Shape, 0),
+		Shapes:         make([]geometry.Shape, 0),
 		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: samplingConfig,
 		CameraConfig:   cameraConfig,
@@ -121,12 +121,12 @@ func NewDefaultScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 // Preprocess prepares the scene for rendering by preprocessing all objects that need it
 func (s *Scene) Preprocess() error {
 	// Create the BVH
-	s.BVH = core.NewBVH(s.Shapes)
+	s.BVH = geometry.NewBVH(s.Shapes)
 
 	// Preprocess all lights that implement the Preprocessor interface
 	for _, light := range s.Lights {
-		if preprocessor, ok := light.(core.Preprocessor); ok {
-			if err := preprocessor.Preprocess(s.BVH); err != nil {
+		if preprocessor, ok := light.(geometry.Preprocessor); ok {
+			if err := preprocessor.Preprocess(s.BVH.Center, s.BVH.Radius); err != nil {
 				return err
 			}
 		}
@@ -144,8 +144,8 @@ func (s *Scene) Preprocess() error {
 
 	// Could also preprocess shapes here in the future if needed
 	for _, shape := range s.Shapes {
-		if preprocessor, ok := shape.(core.Preprocessor); ok {
-			if err := preprocessor.Preprocess(s.BVH); err != nil {
+		if preprocessor, ok := shape.(geometry.Preprocessor); ok {
+			if err := preprocessor.Preprocess(s.BVH.Center, s.BVH.Radius); err != nil {
 				return err
 			}
 		}
@@ -164,7 +164,7 @@ func (s *Scene) GetPrimitiveCount() int {
 }
 
 // countPrimitivesInShape counts primitives in a single shape, handling complex objects
-func (s *Scene) countPrimitivesInShape(shape core.Shape) int {
+func (s *Scene) countPrimitivesInShape(shape geometry.Shape) int {
 	switch obj := shape.(type) {
 	case *geometry.TriangleMesh:
 		// Triangle meshes contain multiple triangles

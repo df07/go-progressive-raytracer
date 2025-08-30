@@ -28,7 +28,7 @@ func NewTriangleMeshSceneWithComplexity(complexity int, cameraOverrides ...geome
 
 	s := &Scene{
 		Camera:         camera,
-		Shapes:         make([]core.Shape, 0),
+		Shapes:         make([]geometry.Shape, 0),
 		Lights:         make([]geometry.Light, 0),
 		SamplingConfig: createTriangleMeshSamplingConfig(),
 		CameraConfig:   cameraConfig,
@@ -156,7 +156,7 @@ func addSphereTriangleMeshGeometryWithComplexity(s *Scene, complexity int) {
 // longitudeSubdivisions: number of subdivisions around the sphere (longitude)
 // latitudeSubdivisions: number of subdivisions from pole to pole (latitude)
 // material: material for the sphere
-func createSphereMesh(center core.Vec3, radius float64, longitudeSubdivisions, latitudeSubdivisions int, material core.Material) *geometry.TriangleMesh {
+func createSphereMesh(center core.Vec3, radius float64, longitudeSubdivisions, latitudeSubdivisions int, material material.Material) *geometry.TriangleMesh {
 	vertices := make([]core.Vec3, 0)
 	faces := make([]int, 0)
 

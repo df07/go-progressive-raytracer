@@ -2,18 +2,19 @@ package geometry
 
 import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // Triangle represents a single triangle defined by three vertices
 type Triangle struct {
-	V0, V1, V2 core.Vec3     // The three vertices
-	Material   core.Material // Material of the triangle
-	normal     core.Vec3     // Cached normal vector
-	bbox       core.AABB     // Cached bounding box
+	V0, V1, V2 core.Vec3         // The three vertices
+	Material   material.Material // Material of the triangle
+	normal     core.Vec3         // Cached normal vector
+	bbox       core.AABB         // Cached bounding box
 }
 
 // NewTriangle creates a new triangle from three vertices
-func NewTriangle(v0, v1, v2 core.Vec3, material core.Material) *Triangle {
+func NewTriangle(v0, v1, v2 core.Vec3, material material.Material) *Triangle {
 	t := &Triangle{
 		V0:       v0,
 		V1:       v1,
@@ -29,7 +30,7 @@ func NewTriangle(v0, v1, v2 core.Vec3, material core.Material) *Triangle {
 }
 
 // NewTriangleWithNormal creates a new triangle from three vertices with a custom normal
-func NewTriangleWithNormal(v0, v1, v2 core.Vec3, normal core.Vec3, material core.Material) *Triangle {
+func NewTriangleWithNormal(v0, v1, v2 core.Vec3, normal core.Vec3, material material.Material) *Triangle {
 	t := &Triangle{
 		V0:       v0,
 		V1:       v1,
@@ -60,7 +61,7 @@ func (t *Triangle) computeBoundingBox() {
 }
 
 // Hit tests if a ray intersects with the triangle using the Möller-Trumbore algorithm
-func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
+func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	const epsilon = 1e-8
 
 	// Calculate two edge vectors
@@ -105,7 +106,7 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool)
 	hitPoint := ray.At(t_param)
 
 	// Create hit record
-	hitRecord := &core.HitRecord{
+	hitRecord := &material.HitRecord{
 		T:        t_param,
 		Point:    hitPoint,
 		Material: t.Material,

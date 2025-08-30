@@ -306,7 +306,7 @@ func createSimpleTestScene() *scene.Scene {
 	lights := []geometry.Light{light}
 
 	scene := &scene.Scene{
-		Shapes: []core.Shape{sphere, light.Quad},
+		Shapes: []geometry.Shape{sphere, light.Quad},
 		Lights: lights, LightSampler: geometry.NewUniformLightSampler(lights, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
@@ -323,7 +323,7 @@ func createSceneWithLightsAndWeights(lights []geometry.Light, weights []float64)
 	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -5), 0.5, white)
 
-	var shapes []core.Shape = []core.Shape{sphere}
+	var shapes []geometry.Shape = []geometry.Shape{sphere}
 
 	// Add geometry for each light that has it
 	for _, light := range lights {
@@ -369,7 +369,7 @@ func createTestAreaLight() geometry.Light {
 	return geometry.NewSphereLight(core.NewVec3(0, 1, 0), 0.1, emissiveMaterial)
 }
 
-func createGlancingTestSceneWithMaterial(mat core.Material) *scene.Scene {
+func createGlancingTestSceneWithMaterial(mat material.Material) *scene.Scene {
 	// Create sphere with the specified material - positioned for camera ray hit
 	// Sphere is centered at (0, 0, -2) so camera at origin can hit it
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -2), 1.0, mat)
@@ -389,7 +389,7 @@ func createGlancingTestSceneWithMaterial(mat core.Material) *scene.Scene {
 	lights := []geometry.Light{pointLight}
 
 	scene := &scene.Scene{
-		Shapes: []core.Shape{sphere},
+		Shapes: []geometry.Shape{sphere},
 		Lights: lights, LightSampler: geometry.NewUniformLightSampler(lights, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
@@ -399,7 +399,7 @@ func createGlancingTestSceneWithMaterial(mat core.Material) *scene.Scene {
 	return scene
 }
 
-func createGlancingTestSceneAndRay(mat core.Material) (*scene.Scene, core.Ray) {
+func createGlancingTestSceneAndRay(mat material.Material) (*scene.Scene, core.Ray) {
 	scene := createGlancingTestSceneWithMaterial(mat)
 
 	// Create the standard glancing ray that hits the sphere at an angle
@@ -410,7 +410,7 @@ func createGlancingTestSceneAndRay(mat core.Material) (*scene.Scene, core.Ray) {
 	return scene, ray
 }
 
-func createLightSceneWithMaterial(mat core.Material) *scene.Scene {
+func createLightSceneWithMaterial(mat material.Material) *scene.Scene {
 	// Create a surface for light to bounce off of
 	sphere := geometry.NewSphere(core.NewVec3(0, -1.5, 0), 0.8, mat)
 
@@ -435,7 +435,7 @@ func createLightSceneWithMaterial(mat core.Material) *scene.Scene {
 	lights := []geometry.Light{quadLight}
 
 	scene := &scene.Scene{
-		Shapes: []core.Shape{sphere, boundingSphere},
+		Shapes: []geometry.Shape{sphere, boundingSphere},
 		Lights: lights, LightSampler: geometry.NewUniformLightSampler(lights, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
@@ -445,7 +445,7 @@ func createLightSceneWithMaterial(mat core.Material) *scene.Scene {
 	return scene
 }
 
-func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera bool, material core.Material) Vertex {
+func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera bool, material material.Material) Vertex {
 	return Vertex{
 		Point:             point,
 		Normal:            normal,
@@ -712,11 +712,11 @@ func TestBDPTPathIndexing(t *testing.T) {
 // ============================================================================
 
 // createTestCameraPath creates a camera path with specified materials and positions
-func createTestCameraPath(materials []core.Material, positions []core.Vec3) Path {
+func createTestCameraPath(materials []material.Material, positions []core.Vec3) Path {
 	return createTestCameraPathWithLight(materials, positions, nil)
 }
 
-func createTestCameraPathWithLight(materials []core.Material, positions []core.Vec3, hitLight geometry.Light) Path {
+func createTestCameraPathWithLight(materials []material.Material, positions []core.Vec3, hitLight geometry.Light) Path {
 	if len(positions) != len(materials)+1 {
 		panic("positions must be one more than materials")
 	}
@@ -759,7 +759,7 @@ func createTestCameraPathWithLight(materials []core.Material, positions []core.V
 			vertices[i].LightIndex = 0 // Default to light index 0 for tests
 			// Set EmittedLight using the same pattern as BDPT - use incoming ray
 			incomingRay := core.NewRayTo(positions[i-1], positions[i])
-			if emitter, isEmissive := mat.(core.Emitter); isEmissive {
+			if emitter, isEmissive := mat.(material.Emitter); isEmissive {
 				vertices[i].EmittedLight = emitter.Emit(incomingRay)
 			}
 		}
@@ -772,7 +772,7 @@ func createTestCameraPathWithLight(materials []core.Material, positions []core.V
 }
 
 // createTestLightPath creates a light path with specified materials and positions
-func createTestLightPath(materials []core.Material, positions []core.Vec3) Path {
+func createTestLightPath(materials []material.Material, positions []core.Vec3) Path {
 	if len(positions) != len(materials) {
 		panic("positions and materials must have same length")
 	}
@@ -857,7 +857,7 @@ func createMinimalCornellScene(includeBoxes bool) *scene.Scene {
 	camera := geometry.NewCamera(config)
 
 	scene := &scene.Scene{
-		Shapes: make([]core.Shape, 0),
+		Shapes: make([]geometry.Shape, 0),
 		Lights: make([]geometry.Light, 0),
 		Camera: camera,
 	}

@@ -129,7 +129,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 
 	testScene := &scene.Scene{
 		Lights:         []geometry.Light{light},
-		Shapes:         []core.Shape{light.Sphere, sphere},
+		Shapes:         []geometry.Shape{light.Sphere, sphere},
 		SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 		Camera:         camera,
 	}
@@ -196,7 +196,7 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Sce
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGreen)
 
-	shapes := []core.Shape{groundQuad}
+	shapes := []geometry.Shape{groundQuad}
 	lights := []geometry.Light{}
 	if includeLight {
 		emissiveMaterial := material.NewEmissive(core.NewVec3(15.0, 14.0, 13.0))
@@ -256,7 +256,7 @@ func TestInfiniteLightEmissionSampling(t *testing.T) {
 	// Create mock scene
 	testScene := &scene.Scene{
 		Lights:         []geometry.Light{infiniteLight},
-		Shapes:         []core.Shape{groundQuad},
+		Shapes:         []geometry.Shape{groundQuad},
 		SamplingConfig: core.SamplingConfig{MaxDepth: 3},
 	}
 
@@ -362,7 +362,7 @@ func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
 	metalMaterial := material.NewMetal(core.NewVec3(0.8, 0.8, 0.9), 0.0) // Mirror-like
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 1000.0, metalMaterial)
 
-	shapes := []core.Shape{groundQuad}
+	shapes := []geometry.Shape{groundQuad}
 
 	// Add infinite light for reflections
 	infiniteLight := geometry.NewGradientInfiniteLight(

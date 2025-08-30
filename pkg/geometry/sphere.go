@@ -4,17 +4,18 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // Sphere represents a sphere shape
 type Sphere struct {
 	Center   core.Vec3
 	Radius   float64
-	Material core.Material
+	Material material.Material
 }
 
 // NewSphere creates a new sphere
-func NewSphere(center core.Vec3, radius float64, material core.Material) *Sphere {
+func NewSphere(center core.Vec3, radius float64, material material.Material) *Sphere {
 	return &Sphere{
 		Center:   center,
 		Radius:   radius,
@@ -23,7 +24,7 @@ func NewSphere(center core.Vec3, radius float64, material core.Material) *Sphere
 }
 
 // Hit tests if a ray intersects with the sphere
-func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
+func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	// Vector from ray origin to sphere center
 	oc := ray.Origin.Subtract(s.Center)
 
@@ -55,7 +56,7 @@ func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
 	}
 
 	// Create hit record with material
-	hitRecord := &core.HitRecord{
+	hitRecord := &material.HitRecord{
 		T:        root,
 		Point:    ray.At(root),
 		Material: s.Material,

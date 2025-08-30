@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // CalculateLightPDF calculates the combined PDF for a given direction toward multiple lights
@@ -54,7 +55,7 @@ func SampleLightEmission(lights []Light, lightSampler LightSampler, sampler core
 
 // SampleEmissionDirection samples a cosine-weighted emission direction from a surface
 // and returns both the direction and the emission sample with separate area and direction PDFs
-func SampleEmissionDirection(point core.Vec3, normal core.Vec3, areaPDF float64, material core.Material, sample core.Vec2) EmissionSample {
+func SampleEmissionDirection(point core.Vec3, normal core.Vec3, areaPDF float64, mat material.Material, sample core.Vec2) EmissionSample {
 	// Sample emission direction (cosine-weighted hemisphere)
 	emissionDir := core.RandomCosineDirection(normal, sample)
 
@@ -64,7 +65,7 @@ func SampleEmissionDirection(point core.Vec3, normal core.Vec3, areaPDF float64,
 
 	// Get emission from material
 	var emission core.Vec3
-	if emitter, ok := material.(core.Emitter); ok {
+	if emitter, ok := mat.(material.Emitter); ok {
 		emission = emitter.Emit(core.NewRay(point, emissionDir))
 	}
 

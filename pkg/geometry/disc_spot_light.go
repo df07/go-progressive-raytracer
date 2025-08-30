@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // discSpotLightMaterial implements directional emission for disc spot lights
@@ -15,8 +16,8 @@ type discSpotLightMaterial struct {
 }
 
 // Scatter implements the Material interface (spot lights don't scatter, only emit)
-func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit core.HitRecord, sampler core.Sampler) (core.ScatterResult, bool) {
-	return core.ScatterResult{}, false // No scattering, only emission
+func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
+	return material.ScatterResult{}, false // No scattering, only emission
 }
 
 // Emit implements the Emitter interface with directional spot light falloff
@@ -78,7 +79,7 @@ func NewDiscSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaA
 	falloffStartRadians := (coneAngleDegrees - coneDeltaAngleDegrees) * math.Pi / 180.0
 
 	// Create directional material
-	material := &discSpotLightMaterial{
+	mat := &discSpotLightMaterial{
 		baseEmission:    emission,
 		spotDirection:   direction,
 		cosTotalWidth:   math.Cos(totalWidthRadians),
@@ -87,7 +88,7 @@ func NewDiscSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaA
 
 	// Create a circular disc light oriented towards the target
 	// The disc normal should point in the spot light direction
-	discLight := NewDiscLight(from, direction, radius, material)
+	discLight := NewDiscLight(from, direction, radius, mat)
 
 	return &DiscSpotLight{
 		position:        from,
@@ -168,7 +169,7 @@ func (dsl *DiscSpotLight) GetIntensityAt(point core.Vec3) core.Vec3 {
 }
 
 // Hit implements the Shape interface for caustic ray intersection
-func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*core.HitRecord, bool) {
+func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	return dsl.discLight.Hit(ray, tMin, tMax)
 }
 
@@ -233,7 +234,7 @@ func (dsl *DiscSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 // Emit implements the Light interface - returns material emission
 func (dsl *DiscSpotLight) Emit(ray core.Ray) core.Vec3 {
 	// Spot lights emit according to their material
-	if emitter, isEmissive := dsl.discLight.Material.(core.Emitter); isEmissive {
+	if emitter, isEmissive := dsl.discLight.Material.(material.Emitter); isEmissive {
 		return emitter.Emit(ray)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}

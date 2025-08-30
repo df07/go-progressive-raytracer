@@ -15,6 +15,5 @@ type SplatRay struct {
 type Integrator interface {
 	// RayColor computes color for a ray, with support for ray-based splatting
 	// Returns (pixel color, splat rays)
-	// Note: Uses interface{} to avoid circular import (actual type is *scene.Scene)
 	RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []SplatRay)
 }
