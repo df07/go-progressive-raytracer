@@ -10,7 +10,7 @@ type Triangle struct {
 	V0, V1, V2 core.Vec3         // The three vertices
 	Material   material.Material // Material of the triangle
 	normal     core.Vec3         // Cached normal vector
-	bbox       core.AABB         // Cached bounding box
+	bbox       AABB              // Cached bounding box
 }
 
 // NewTriangle creates a new triangle from three vertices
@@ -57,7 +57,7 @@ func (t *Triangle) computeNormal() {
 
 // computeBoundingBox calculates and caches the triangle's bounding box
 func (t *Triangle) computeBoundingBox() {
-	t.bbox = core.NewAABBFromPoints(t.V0, t.V1, t.V2)
+	t.bbox = NewAABBFromPoints(t.V0, t.V1, t.V2)
 }
 
 // Hit tests if a ray intersects with the triangle using the Möller-Trumbore algorithm
@@ -119,7 +119,7 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, b
 }
 
 // BoundingBox returns the axis-aligned bounding box for this triangle
-func (t *Triangle) BoundingBox() core.AABB {
+func (t *Triangle) BoundingBox() AABB {
 	return t.bbox
 }
 

@@ -8,7 +8,7 @@ import (
 // Shape interface for objects that can be hit by rays
 type Shape interface {
 	Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
-	BoundingBox() core.AABB
+	BoundingBox() AABB
 }
 
 // Preprocessor interface for objects that need scene preprocessing

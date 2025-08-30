@@ -9,7 +9,7 @@ import (
 
 // BVHNode represents a node in the Bounding Volume Hierarchy
 type BVHNode struct {
-	BoundingBox core.AABB
+	BoundingBox AABB
 	Left        *BVHNode
 	Right       *BVHNode
 	Shapes      []Shape // Multiple shapes for leaf nodes (nil for internal nodes)
@@ -63,7 +63,7 @@ const leafThreshold = 8
 // the previous sorting-based approach while maintaining good ray intersection performance.
 func buildBVH(shapes []Shape, depth int) *BVHNode {
 	// Calculate bounding box for all shapes
-	var boundingBox core.AABB
+	var boundingBox AABB
 	if len(shapes) > 0 {
 		boundingBox = shapes[0].BoundingBox()
 		for i := 1; i < len(shapes); i++ {
@@ -109,7 +109,7 @@ func buildBVH(shapes []Shape, depth int) *BVHNode {
 }
 
 // findBestSplitSimple finds the best axis and split position using simple binned median
-func findBestSplitSimple(shapes []Shape, boundingBox core.AABB) (bestAxis int, splitPos float64) {
+func findBestSplitSimple(shapes []Shape, boundingBox AABB) (bestAxis int, splitPos float64) {
 	bestAxis = boundingBox.LongestAxis()
 
 	// Get the extent along the best axis
@@ -239,9 +239,9 @@ func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64) (*mater
 }
 
 // BoundingBox implements the Shape interface - returns the overall bounding box of the BVH
-func (bvh *BVH) BoundingBox() core.AABB {
+func (bvh *BVH) BoundingBox() AABB {
 	if bvh.Root == nil {
-		return core.AABB{}
+		return AABB{}
 	}
 	return bvh.Root.BoundingBox
 }

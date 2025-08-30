@@ -79,7 +79,7 @@ func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 }
 
 // BoundingBox implements the Shape interface
-func (d *Disc) BoundingBox() core.AABB {
+func (d *Disc) BoundingBox() AABB {
 	// Create a bounding box that encompasses the disc
 	// The disc extends radius in all directions perpendicular to the normal
 
@@ -102,7 +102,7 @@ func (d *Disc) BoundingBox() core.AABB {
 	maxY := math.Max(math.Max(corner1.Y, corner2.Y), math.Max(corner3.Y, corner4.Y))
 	maxZ := math.Max(math.Max(corner1.Z, corner2.Z), math.Max(corner3.Z, corner4.Z))
 
-	return core.AABB{
+	return AABB{
 		Min: core.NewVec3(minX, minY, minZ),
 		Max: core.NewVec3(maxX, maxY, maxZ),
 	}

@@ -1,20 +1,24 @@
-package core
+package geometry
 
-import "math"
+import (
+	"math"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
+)
 
 // AABB represents an axis-aligned bounding box
 type AABB struct {
-	Min Vec3 // Minimum corner
-	Max Vec3 // Maximum corner
+	Min core.Vec3 // Minimum corner
+	Max core.Vec3 // Maximum corner
 }
 
 // NewAABB creates a new AABB from min and max points
-func NewAABB(min, max Vec3) AABB {
+func NewAABB(min, max core.Vec3) AABB {
 	return AABB{Min: min, Max: max}
 }
 
 // NewAABBFromPoints creates an AABB that bounds all given points
-func NewAABBFromPoints(points ...Vec3) AABB {
+func NewAABBFromPoints(points ...core.Vec3) AABB {
 	if len(points) == 0 {
 		return AABB{}
 	}
@@ -36,7 +40,7 @@ func NewAABBFromPoints(points ...Vec3) AABB {
 }
 
 // Hit tests if a ray intersects with this AABB using the slab method
-func (aabb AABB) Hit(ray Ray, tMin, tMax float64) bool {
+func (aabb AABB) Hit(ray core.Ray, tMin, tMax float64) bool {
 	for axis := 0; axis < 3; axis++ {
 		var min, max, origin, direction float64
 
@@ -92,12 +96,12 @@ func (aabb AABB) Hit(ray Ray, tMin, tMax float64) bool {
 
 // Union returns an AABB that bounds both this AABB and another
 func (aabb AABB) Union(other AABB) AABB {
-	min := Vec3{
+	min := core.Vec3{
 		X: math.Min(aabb.Min.X, other.Min.X),
 		Y: math.Min(aabb.Min.Y, other.Min.Y),
 		Z: math.Min(aabb.Min.Z, other.Min.Z),
 	}
-	max := Vec3{
+	max := core.Vec3{
 		X: math.Max(aabb.Max.X, other.Max.X),
 		Y: math.Max(aabb.Max.Y, other.Max.Y),
 		Z: math.Max(aabb.Max.Z, other.Max.Z),
@@ -106,12 +110,12 @@ func (aabb AABB) Union(other AABB) AABB {
 }
 
 // Center returns the center point of the AABB
-func (aabb AABB) Center() Vec3 {
+func (aabb AABB) Center() core.Vec3 {
 	return aabb.Min.Add(aabb.Max).Multiply(0.5)
 }
 
 // Size returns the size (extent) of the AABB along each axis
-func (aabb AABB) Size() Vec3 {
+func (aabb AABB) Size() core.Vec3 {
 	return aabb.Max.Subtract(aabb.Min)
 }
 
@@ -142,7 +146,7 @@ func (aabb AABB) IsValid() bool {
 
 // Expand returns an AABB expanded by the given amount in all directions
 func (aabb AABB) Expand(amount float64) AABB {
-	expansion := NewVec3(amount, amount, amount)
+	expansion := core.NewVec3(amount, amount, amount)
 	return AABB{
 		Min: aabb.Min.Subtract(expansion),
 		Max: aabb.Max.Add(expansion),

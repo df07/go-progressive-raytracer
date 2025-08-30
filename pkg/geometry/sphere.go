@@ -70,9 +70,9 @@ func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, boo
 }
 
 // BoundingBox returns the axis-aligned bounding box for this sphere
-func (s *Sphere) BoundingBox() core.AABB {
+func (s *Sphere) BoundingBox() AABB {
 	radius := core.NewVec3(s.Radius, s.Radius, s.Radius)
-	return core.NewAABB(
+	return NewAABB(
 		s.Center.Subtract(radius),
 		s.Center.Add(radius),
 	)

@@ -12,7 +12,7 @@ import (
 type TriangleMesh struct {
 	triangles []Shape           // Individual triangles as shapes
 	bvh       *BVH              // BVH for fast intersection
-	bbox      core.AABB         // Overall bounding box
+	bbox      AABB              // Overall bounding box
 	material  material.Material // Default material (can be overridden per triangle)
 }
 
@@ -97,7 +97,7 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material material.Materi
 	bvh := NewBVH(triangles)
 
 	// Calculate overall bounding box
-	var bbox core.AABB
+	var bbox AABB
 	if len(triangles) > 0 {
 		bbox = triangles[0].BoundingBox()
 		for i := 1; i < len(triangles); i++ {
@@ -126,7 +126,7 @@ func (tm *TriangleMesh) Hit(ray core.Ray, tMin, tMax float64) (*material.HitReco
 }
 
 // BoundingBox returns the axis-aligned bounding box for the entire mesh
-func (tm *TriangleMesh) BoundingBox() core.AABB {
+func (tm *TriangleMesh) BoundingBox() AABB {
 	return tm.bbox
 }
 

@@ -174,7 +174,7 @@ func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRe
 }
 
 // BoundingBox implements the Shape interface
-func (dsl *DiscSpotLight) BoundingBox() core.AABB {
+func (dsl *DiscSpotLight) BoundingBox() AABB {
 	return dsl.discLight.BoundingBox()
 }
 

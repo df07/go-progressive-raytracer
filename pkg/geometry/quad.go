@@ -41,7 +41,7 @@ func getAxisAlignment(normal core.Vec3) AxisAlignment {
 }
 
 // createAxisAlignedAABB creates a thin bounding box for axis-aligned quads
-func createAxisAlignedAABB(corners []core.Vec3, alignment AxisAlignment, fixedCoord float64) core.AABB {
+func createAxisAlignedAABB(corners []core.Vec3, alignment AxisAlignment, fixedCoord float64) AABB {
 	const epsilon = 0.001
 
 	// Find min/max for the two varying coordinates
@@ -50,7 +50,7 @@ func createAxisAlignedAABB(corners []core.Vec3, alignment AxisAlignment, fixedCo
 		// Quad in YZ plane, X is fixed
 		minY, maxY := findMinMax(corners, func(v core.Vec3) float64 { return v.Y })
 		minZ, maxZ := findMinMax(corners, func(v core.Vec3) float64 { return v.Z })
-		return core.NewAABB(
+		return NewAABB(
 			core.NewVec3(fixedCoord-epsilon, minY, minZ),
 			core.NewVec3(fixedCoord+epsilon, maxY, maxZ),
 		)
@@ -58,7 +58,7 @@ func createAxisAlignedAABB(corners []core.Vec3, alignment AxisAlignment, fixedCo
 		// Quad in XZ plane, Y is fixed
 		minX, maxX := findMinMax(corners, func(v core.Vec3) float64 { return v.X })
 		minZ, maxZ := findMinMax(corners, func(v core.Vec3) float64 { return v.Z })
-		return core.NewAABB(
+		return NewAABB(
 			core.NewVec3(minX, fixedCoord-epsilon, minZ),
 			core.NewVec3(maxX, fixedCoord+epsilon, maxZ),
 		)
@@ -66,13 +66,13 @@ func createAxisAlignedAABB(corners []core.Vec3, alignment AxisAlignment, fixedCo
 		// Quad in XY plane, Z is fixed
 		minX, maxX := findMinMax(corners, func(v core.Vec3) float64 { return v.X })
 		minY, maxY := findMinMax(corners, func(v core.Vec3) float64 { return v.Y })
-		return core.NewAABB(
+		return NewAABB(
 			core.NewVec3(minX, minY, fixedCoord-epsilon),
 			core.NewVec3(maxX, maxY, fixedCoord+epsilon),
 		)
 	default:
 		// Should not happen, but return a safe fallback
-		return core.NewAABBFromPoints(corners[0], corners[1], corners[2], corners[3])
+		return NewAABBFromPoints(corners[0], corners[1], corners[2], corners[3])
 	}
 }
 
@@ -176,7 +176,7 @@ func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 }
 
 // BoundingBox returns the axis-aligned bounding box for this quad
-func (q *Quad) BoundingBox() core.AABB {
+func (q *Quad) BoundingBox() AABB {
 	// Calculate the four corners of the quad
 	corners := []core.Vec3{
 		q.Corner,
@@ -202,5 +202,5 @@ func (q *Quad) BoundingBox() core.AABB {
 	}
 
 	// Not axis-aligned - use standard bounding box from all corners
-	return core.NewAABBFromPoints(corners[0], corners[1], corners[2], corners[3])
+	return NewAABBFromPoints(corners[0], corners[1], corners[2], corners[3])
 }

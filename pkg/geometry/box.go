@@ -12,7 +12,7 @@ type Box struct {
 	Rotation core.Vec3         // Rotation angles in radians (X, Y, Z)
 	Material material.Material // Material for all faces
 	faces    [6]*Quad          // The 6 quad faces
-	bbox     core.AABB         // Cached bounding box
+	bbox     AABB              // Cached bounding box
 }
 
 // NewBox creates a new box with the given center, size, rotation, and material
@@ -117,7 +117,7 @@ func (b *Box) generateFaces() {
 	)
 
 	// Calculate bounding box from all corners
-	b.bbox = core.NewAABBFromPoints(corners[0], corners[1], corners[2], corners[3],
+	b.bbox = NewAABBFromPoints(corners[0], corners[1], corners[2], corners[3],
 		corners[4], corners[5], corners[6], corners[7])
 }
 
@@ -140,6 +140,6 @@ func (b *Box) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) 
 }
 
 // BoundingBox returns the axis-aligned bounding box for this box
-func (b *Box) BoundingBox() core.AABB {
+func (b *Box) BoundingBox() AABB {
 	return b.bbox
 }
