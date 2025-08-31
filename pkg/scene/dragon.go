@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"os"
 	"time"
 
@@ -21,7 +22,7 @@ func NewDragonScene(loadMesh bool, materialFinish string, logger core.Logger, ca
 	s := &Scene{
 		Camera:         camera,
 		Shapes:         make([]geometry.Shape, 0),
-		Lights:         make([]geometry.Light, 0),
+		Lights:         make([]lights.Light, 0),
 		SamplingConfig: createDragonSamplingConfig(),
 		CameraConfig:   cameraConfig,
 	}

@@ -4,8 +4,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
+	ls "github.com/df07/go-progressive-raytracer/pkg/lights"
+
 	"github.com/df07/go-progressive-raytracer/pkg/core"
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
@@ -163,7 +165,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 	tests := []struct {
 		name                   string
 		cameraVertex           Vertex
-		light                  geometry.Light
+		light                  ls.Light
 		sampler                *TestSampler
 		expectedLightPoint     core.Vec3
 		expectedContribution   core.Vec3
@@ -180,7 +182,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
-			light: geometry.NewQuadLight(
+			light: lights.NewQuadLight(
 				core.NewVec3(-0.5, 2.0, -0.5), // corner
 				core.NewVec3(1.0, 0.0, 0.0),   // u vector
 				core.NewVec3(0.0, 0.0, 1.0),   // v vector
@@ -205,7 +207,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
-			light: geometry.NewPointSpotLight(
+			light: ls.NewPointSpotLight(
 				core.NewVec3(0, 2, 0),       // light position above surface
 				core.NewVec3(0, 2, -10),     // pointing away from surface
 				core.NewVec3(5.0, 5.0, 5.0), // emission
@@ -231,7 +233,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
-			light: geometry.NewQuadLight(
+			light: ls.NewQuadLight(
 				core.NewVec3(-0.5, -2.0, -0.5), // corner below surface
 				core.NewVec3(1.0, 0.0, 0.0),    // u vector
 				core.NewVec3(0.0, 0.0, 1.0),    // v vector
@@ -257,7 +259,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
 				IsSpecular: true,
 			},
-			light: geometry.NewQuadLight(
+			light: ls.NewQuadLight(
 				core.NewVec3(-0.5, 2.0, -0.5),
 				core.NewVec3(1.0, 0.0, 0.0),
 				core.NewVec3(0.0, 0.0, 1.0),
@@ -282,7 +284,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
 				Beta:     core.Vec3{X: 0, Y: 0, Z: 0}, // zero throughput
 			},
-			light: geometry.NewQuadLight(
+			light: ls.NewQuadLight(
 				core.NewVec3(-0.5, 2.0, -0.5),
 				core.NewVec3(1.0, 0.0, 0.0),
 				core.NewVec3(0.0, 0.0, 1.0),

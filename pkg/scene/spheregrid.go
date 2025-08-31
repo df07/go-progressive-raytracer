@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -79,7 +80,7 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 	s := &Scene{
 		Camera:         camera,
 		Shapes:         make([]geometry.Shape, 0),
-		Lights:         make([]geometry.Light, 0),
+		Lights:         make([]lights.Light, 0),
 		SamplingConfig: samplingConfig,
 		CameraConfig:   cameraConfig,
 	}

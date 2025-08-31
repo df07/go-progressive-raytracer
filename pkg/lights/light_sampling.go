@@ -1,4 +1,4 @@
-package geometry
+package lights
 
 import (
 	"math"

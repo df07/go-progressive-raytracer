@@ -1,4 +1,4 @@
-package geometry
+package lights
 
 import (
 	"math"
@@ -314,7 +314,7 @@ func TestDiscLight_EmissionPDF(t *testing.T) {
 		},
 		{
 			name:      "Point at disc center",
-			point:     center, // Disc center
+			point:     center, // geometry.Disc center
 			direction: normal, // Normal direction
 			expectPDF: true,
 		},

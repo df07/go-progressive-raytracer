@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"os"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 // NewCausticGlassScene creates a scene with glass caustic geometry
 // Based on the glass.pbrt scene configuration
 // If loadMesh is false, creates the scene structure without loading the PLY files
-func NewCausticGlassScene(loadMesh bool, lightType geometry.LightType, logger core.Logger, cameraOverrides ...geometry.CameraConfig) *Scene {
+func NewCausticGlassScene(loadMesh bool, lightType lights.LightType, logger core.Logger, cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Setup camera based on PBRT scene configuration
 	cameraConfig := setupCausticGlassCamera(cameraOverrides...)
 	camera := geometry.NewCamera(cameraConfig)
@@ -21,7 +22,7 @@ func NewCausticGlassScene(loadMesh bool, lightType geometry.LightType, logger co
 	s := &Scene{
 		Camera:         camera,
 		Shapes:         make([]geometry.Shape, 0),
-		Lights:         make([]geometry.Light, 0),
+		Lights:         make([]lights.Light, 0),
 		SamplingConfig: createCausticGlassSamplingConfig(),
 		CameraConfig:   cameraConfig,
 	}
@@ -81,14 +82,14 @@ func createCausticGlassSamplingConfig() core.SamplingConfig {
 // LightSource "spot" "point from" [ 0 5 9 ] "point to" [ -5 2.7500000000 0 ]
 // "rgb I" [ 139.8113403320 118.6366500854 105.3887557983 ]
 // LightSource "infinite" "rgb L" [ 0.1000000015 0.1000000015 0.1000000015 ]
-func addCausticGlassLighting(s *Scene, lightType geometry.LightType) {
+func addCausticGlassLighting(s *Scene, lightType lights.LightType) {
 	// Main spot light using exact PBRT parameters
 	spotFrom := core.NewVec3(0, 5, 9)
 	spotIntensity := core.NewVec3(139.8113403320, 118.6366500854, 105.3887557983)
 
 	// Use disc spot light
 	spotTo := core.NewVec3(-5, 2.7500000000, 0)
-	if lightType == geometry.LightTypePoint {
+	if lightType == lights.LightTypePoint {
 		s.AddPointSpotLight(spotFrom, spotTo, spotIntensity, 30.0, 5.0, 0.7)
 	} else {
 		s.AddSpotLight(spotFrom, spotTo, spotIntensity, 30.0, 5.0, 0.7)

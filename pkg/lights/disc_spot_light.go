@@ -1,6 +1,7 @@
-package geometry
+package lights
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -61,7 +62,7 @@ type DiscSpotLight struct {
 	emission        core.Vec3  // Light intensity/color
 	cosTotalWidth   float64    // Cosine of total cone angle (outer edge)
 	cosFalloffStart float64    // Cosine of falloff start angle (inner cone)
-	discLight       *DiscLight // Disc representing the area light
+	discLight       *DiscLight // geometry.Disc representing the area light
 }
 
 // NewDiscSpotLight creates a new disc spot light
@@ -174,12 +175,12 @@ func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRe
 }
 
 // BoundingBox implements the Shape interface
-func (dsl *DiscSpotLight) BoundingBox() AABB {
+func (dsl *DiscSpotLight) BoundingBox() geometry.AABB {
 	return dsl.discLight.BoundingBox()
 }
 
 // GetDisc returns the underlying disc light for scene integration
-func (dsl *DiscSpotLight) GetDisc() *Disc {
+func (dsl *DiscSpotLight) GetDisc() *geometry.Disc {
 	return dsl.discLight.Disc
 }
 

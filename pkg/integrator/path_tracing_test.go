@@ -1,6 +1,7 @@
 package integrator
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"math"
 	"math/rand"
 	"testing"
@@ -17,7 +18,7 @@ func createTestScene() *scene.Scene {
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.3, 0.3))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
 
-	infiniteLight := geometry.NewGradientInfiniteLight(
+	infiniteLight := lights.NewGradientInfiniteLight(
 		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
 		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white ground)
 	)
@@ -27,7 +28,7 @@ func createTestScene() *scene.Scene {
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
-		Lights: []geometry.Light{infiniteLight},
+		Lights: []lights.Light{infiniteLight},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  10,
@@ -128,14 +129,14 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 	}
 	camera := geometry.NewCamera(cameraConfig)
 
-	infiniteLight := geometry.NewGradientInfiniteLight(
+	infiniteLight := lights.NewGradientInfiniteLight(
 		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
 		core.NewVec3(1.0, 1.0, 1.0), // bottomColor (white ground)
 	)
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
-		Lights: []geometry.Light{infiniteLight},
+		Lights: []lights.Light{infiniteLight},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  5,
@@ -184,7 +185,7 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
-		Lights: []geometry.Light{},
+		Lights: []lights.Light{},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
 			MaxDepth: 10,

@@ -1,6 +1,7 @@
-package geometry
+package lights
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -9,13 +10,13 @@ import (
 
 // QuadLight represents a rectangular area light
 type QuadLight struct {
-	*Quad         // Embed quad for hit testing
-	Area  float64 // Cached area for PDF calculations
+	*geometry.Quad         // Embed quad for hit testing
+	Area           float64 // Cached area for PDF calculations
 }
 
 // NewQuadLight creates a new quad light
 func NewQuadLight(corner, u, v core.Vec3, material material.Material) *QuadLight {
-	quad := NewQuad(corner, u, v, material)
+	quad := geometry.NewQuad(corner, u, v, material)
 
 	// Calculate area of the quad: |u × v|
 	area := u.Cross(v).Length()

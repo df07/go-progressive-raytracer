@@ -1,4 +1,4 @@
-package geometry
+package lights
 
 import "github.com/df07/go-progressive-raytracer/pkg/core"
 

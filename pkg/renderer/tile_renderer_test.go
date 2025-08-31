@@ -9,6 +9,7 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/integrator"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -44,7 +45,7 @@ func createTestScene() *scene.Scene {
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
-		Lights: []geometry.Light{},
+		Lights: []lights.Light{},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
 			MaxDepth:           10,

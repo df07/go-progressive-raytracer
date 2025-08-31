@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -264,7 +264,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			name: "PathTracing_s0t3_HitsLight",
 			cameraPath: func() Path {
 				// Create a light for the path tracing to hit
-				hitLight := geometry.NewQuadLight(
+				hitLight := lights.NewQuadLight(
 					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
 					material.NewEmissive(core.NewVec3(4.0, 4.0, 4.0)))
 
@@ -362,7 +362,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			name: "WeightedLightSampler_PathTracing_s0t3",
 			cameraPath: func() Path {
 				// Create the light that the camera path will hit
-				hitLight := geometry.NewQuadLight(
+				hitLight := lights.NewQuadLight(
 					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0),
 					material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
 
@@ -384,13 +384,13 @@ func TestCalculateMISWeight(t *testing.T) {
 			description:    "Path tracing hitting light with weighted sampler - verifies MIS uses actual sampler weights",
 			customScene: func() *scene.Scene {
 				// Create two lights with different emissions to test weighted sampling
-				light1 := geometry.NewQuadLight(
+				light1 := lights.NewQuadLight(
 					core.NewVec3(-1.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0), material.NewEmissive(core.NewVec3(2.0, 2.0, 2.0)))
-				light2 := geometry.NewQuadLight(
+				light2 := lights.NewQuadLight(
 					core.NewVec3(-0.5, 2.0, -1.5), core.NewVec3(1.0, 0.0, 0.0), core.NewVec3(0.0, 0.0, 1.0), material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0)))
 
 				// Use weighted sampling: 20% weight to first light, 80% to second light
-				return createSceneWithLightsAndWeights([]geometry.Light{light1, light2}, []float64{0.2, 0.8})
+				return createSceneWithLightsAndWeights([]lights.Light{light1, light2}, []float64{0.2, 0.8})
 			},
 		},
 	}

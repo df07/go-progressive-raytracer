@@ -5,7 +5,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -14,7 +14,7 @@ import (
 type Vertex struct {
 	Point      core.Vec3         // 3D position
 	Normal     core.Vec3         // Surface normal
-	Light      geometry.Light    // Light at this vertex (TODO: remove after cleanup)
+	Light      lights.Light      // Light at this vertex (TODO: remove after cleanup)
 	LightIndex int               // Index of light in scene's light array (-1 if not a light vertex)
 	Material   material.Material // Material at this vertex
 
@@ -43,7 +43,7 @@ type Vertex struct {
 func (v *Vertex) IsOnSurface() bool {
 	if v.IsLight && v.Light != nil {
 		// Light vertices: only area lights are "on surface", not point lights
-		return v.Light.Type() == geometry.LightTypeArea
+		return v.Light.Type() == lights.LightTypeArea
 	}
 	// Non-light vertices: check if has material (surface interaction)
 	return v.Material != nil
@@ -142,8 +142,8 @@ func (bdpt *BDPTIntegrator) generateLightPath(scene *scene.Scene, sampler core.S
 	}
 
 	// Sample emission from a light in the scene
-	lights := scene.Lights
-	if len(lights) == 0 {
+	ls := scene.Lights
+	if len(ls) == 0 {
 		return path
 	}
 
@@ -160,9 +160,9 @@ func (bdpt *BDPTIntegrator) generateLightPath(scene *scene.Scene, sampler core.S
 		AreaPdfForward:  emissionSample.AreaPDF * lightSelectionPdf, // probability of generating this point is the light sampling pdf
 		AreaPdfReverse:  0.0,                                        // probability of generating this point in reverse is set by MIS weight calculation
 		IsLight:         true,
-		IsInfiniteLight: sampledLight.Type() == geometry.LightTypeInfinite, // Detect infinite lights for proper MIS handling
-		Beta:            emissionSample.Emission,                           // PBRT: light vertex stores raw emission, transport beta used for path continuation
-		EmittedLight:    emissionSample.Emission,                           // Already properly scaled
+		IsInfiniteLight: sampledLight.Type() == lights.LightTypeInfinite, // Detect infinite lights for proper MIS handling
+		Beta:            emissionSample.Emission,                         // PBRT: light vertex stores raw emission, transport beta used for path continuation
+		EmittedLight:    emissionSample.Emission,                         // Already properly scaled
 	}
 
 	path.Vertices = append(path.Vertices, lightVertex)
@@ -210,11 +210,11 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		if !isHit {
 			if isCameraPath {
 				// Hit background - check for infinite light emission
-				lights := scene.Lights
+				ls := scene.Lights
 				var totalEmission core.Vec3
-				for _, light := range lights {
+				for _, light := range ls {
 					// Only check infinite lights when we miss all geometry
-					if light.Type() == geometry.LightTypeInfinite {
+					if light.Type() == lights.LightTypeInfinite {
 						emission := light.Emit(currentRay)
 						totalEmission = totalEmission.Add(emission)
 					}
@@ -337,7 +337,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
 
-	lightSample, sampledLight, hasLight := geometry.SampleLight(scene.Lights, scene.LightSampler, cameraVertex.Point, cameraVertex.Normal, sampler)
+	lightSample, sampledLight, hasLight := lights.SampleLight(scene.Lights, scene.LightSampler, cameraVertex.Point, cameraVertex.Normal, sampler)
 	if !hasLight || lightSample.Emission.IsZero() || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
@@ -374,11 +374,11 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		Point:           lightSample.Point,
 		Normal:          lightSample.Normal,
 		Light:           sampledLight,    // TODO: remove after cleanup
-		LightIndex:      -1,              // TODO: get actual light index from geometry.SampleLight
+		LightIndex:      -1,              // TODO: get actual light index from lights.SampleLight
 		AreaPdfForward:  lightSample.PDF, // probability of generating this point is the light sampling pdf
 		AreaPdfReverse:  0.0,             // probability of generating this point in reverse is set by MIS weight calculation
 		IsLight:         true,
-		IsInfiniteLight: sampledLight.Type() == geometry.LightTypeInfinite, // Properly mark infinite lights
+		IsInfiniteLight: sampledLight.Type() == lights.LightTypeInfinite, // Properly mark infinite lights
 		Beta:            lightBeta,
 		EmittedLight:    lightSample.Emission,
 	}

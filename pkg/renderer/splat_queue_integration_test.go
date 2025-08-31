@@ -8,6 +8,7 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/integrator"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -167,7 +168,7 @@ func TestSplatSystemIntegration(t *testing.T) {
 
 	// Create shapes
 	var shapes []geometry.Shape
-	var lights []geometry.Light
+	var ls []lights.Light
 
 	// Add a sphere with lambertian material
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, 0), 1.0, lambertian)
@@ -178,21 +179,21 @@ func TestSplatSystemIntegration(t *testing.T) {
 	shapes = append(shapes, metallicSphere)
 
 	// Add an area light
-	lightQuad := geometry.NewQuadLight(
+	lightQuad := lights.NewQuadLight(
 		core.NewVec3(-2, 3, -2),
 		core.NewVec3(4, 0, 0),
 		core.NewVec3(0, 0, 4),
 		light,
 	)
 	shapes = append(shapes, lightQuad)
-	lights = append(lights, lightQuad)
+	ls = append(ls, lightQuad)
 
 	// Create scene with geometry
 	sceneObj := &scene.Scene{
 		Camera:         camera,
 		SamplingConfig: config,
 		Shapes:         shapes,
-		Lights:         lights,
+		Lights:         ls,
 	}
 
 	// Create progressive raytracer

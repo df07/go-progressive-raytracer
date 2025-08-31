@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
+
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
@@ -284,7 +286,7 @@ func createSimpleTestScene() *scene.Scene {
 	emission := core.NewVec3(5.0, 5.0, 5.0)
 	emissive := material.NewEmissive(emission)
 	// Quad light at y=2, centered at (0,2,0), size 1x1 in XZ plane
-	light := geometry.NewQuadLight(
+	light := lights.NewQuadLight(
 		core.NewVec3(-0.5, 2.0, -0.5), // corner
 		core.NewVec3(1.0, 0.0, 0.0),   // u vector (X direction)
 		core.NewVec3(0.0, 0.0, 1.0),   // v vector (Z direction)
@@ -303,11 +305,11 @@ func createSimpleTestScene() *scene.Scene {
 		FocusDistance: 0.0,
 	}
 	camera := geometry.NewCamera(cameraConfig)
-	lights := []geometry.Light{light}
+	ls := []lights.Light{light}
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere, light.Quad},
-		Lights: lights, LightSampler: geometry.NewUniformLightSampler(lights, 10),
+		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
 
@@ -318,7 +320,7 @@ func createSimpleTestScene() *scene.Scene {
 
 // Helper function to create a simple scene with specific lights
 // If weights is provided, uses WeightedLightSampler; otherwise uses uniform sampling
-func createSceneWithLightsAndWeights(lights []geometry.Light, weights []float64) *scene.Scene {
+func createSceneWithLightsAndWeights(ls []lights.Light, weights []float64) *scene.Scene {
 	// Simple diffuse sphere (not used in our tests but needed for complete scene)
 	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -5), 0.5, white)
@@ -326,11 +328,11 @@ func createSceneWithLightsAndWeights(lights []geometry.Light, weights []float64)
 	var shapes []geometry.Shape = []geometry.Shape{sphere}
 
 	// Add geometry for each light that has it
-	for _, light := range lights {
+	for _, light := range ls {
 		switch l := light.(type) {
-		case *geometry.QuadLight:
+		case *lights.QuadLight:
 			shapes = append(shapes, l.Quad)
-		case *geometry.SphereLight:
+		case *lights.SphereLight:
 			shapes = append(shapes, l.Sphere)
 			// Point lights and infinite lights don't have geometry
 		}
@@ -345,12 +347,12 @@ func createSceneWithLightsAndWeights(lights []geometry.Light, weights []float64)
 
 	scene := &scene.Scene{
 		Shapes: shapes,
-		Lights: lights, LightSampler: geometry.NewUniformLightSampler(lights, 10),
+		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
 
 	if len(weights) > 0 {
-		scene.LightSampler = geometry.NewWeightedLightSampler(lights, weights, 10.0)
+		scene.LightSampler = lights.NewWeightedLightSampler(ls, weights, 10.0)
 	}
 
 	// Initialize BVH and preprocess lights
@@ -359,14 +361,14 @@ func createSceneWithLightsAndWeights(lights []geometry.Light, weights []float64)
 }
 
 // Helper function to create a simple scene with a specific light (backwards compatibility)
-func createSceneWithLight(light geometry.Light) *scene.Scene {
-	return createSceneWithLightsAndWeights([]geometry.Light{light}, []float64{})
+func createSceneWithLight(light lights.Light) *scene.Scene {
+	return createSceneWithLightsAndWeights([]lights.Light{light}, []float64{})
 }
 
 // createTestVertex creates a test vertex with specified properties
-func createTestAreaLight() geometry.Light {
+func createTestAreaLight() lights.Light {
 	emissiveMaterial := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
-	return geometry.NewSphereLight(core.NewVec3(0, 1, 0), 0.1, emissiveMaterial)
+	return lights.NewSphereLight(core.NewVec3(0, 1, 0), 0.1, emissiveMaterial)
 }
 
 func createGlancingTestSceneWithMaterial(mat material.Material) *scene.Scene {
@@ -375,7 +377,7 @@ func createGlancingTestSceneWithMaterial(mat material.Material) *scene.Scene {
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -2), 1.0, mat)
 
 	// Point light for simple lighting
-	pointLight := geometry.NewPointSpotLight(
+	pointLight := lights.NewPointSpotLight(
 		core.NewVec3(0, 3, -2), core.NewVec3(0, -1, 0),
 		core.NewVec3(3, 3, 3), 90.0, 1.0,
 	)
@@ -386,11 +388,11 @@ func createGlancingTestSceneWithMaterial(mat material.Material) *scene.Scene {
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
 	camera := geometry.NewCamera(cameraConfig)
-	lights := []geometry.Light{pointLight}
+	ls := []lights.Light{pointLight}
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
-		Lights: lights, LightSampler: geometry.NewUniformLightSampler(lights, 10),
+		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
 
@@ -420,7 +422,7 @@ func createLightSceneWithMaterial(mat material.Material) *scene.Scene {
 	// Use quad light pointing downward - much more predictable than sphere light
 	emissiveMaterial := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
 	// Create a horizontal quad at y=1.0, pointing downward (-Y direction)
-	quadLight := geometry.NewQuadLight(
+	quadLight := lights.NewQuadLight(
 		core.NewVec3(-0.5, 1.0, -0.5), // corner
 		core.NewVec3(1.0, 0, 0),       // u vector (width)
 		core.NewVec3(0, 0, 1.0),       // v vector (height)
@@ -432,11 +434,11 @@ func createLightSceneWithMaterial(mat material.Material) *scene.Scene {
 		Width: 100, AspectRatio: 1.0, VFov: 45.0,
 	}
 	camera := geometry.NewCamera(cameraConfig)
-	lights := []geometry.Light{quadLight}
+	ls := []lights.Light{quadLight}
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere, boundingSphere},
-		Lights: lights, LightSampler: geometry.NewUniformLightSampler(lights, 10),
+		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
 		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 	}
 
@@ -716,7 +718,7 @@ func createTestCameraPath(materials []material.Material, positions []core.Vec3) 
 	return createTestCameraPathWithLight(materials, positions, nil)
 }
 
-func createTestCameraPathWithLight(materials []material.Material, positions []core.Vec3, hitLight geometry.Light) Path {
+func createTestCameraPathWithLight(materials []material.Material, positions []core.Vec3, hitLight lights.Light) Path {
 	if len(positions) != len(materials)+1 {
 		panic("positions must be one more than materials")
 	}
@@ -858,7 +860,7 @@ func createMinimalCornellScene(includeBoxes bool) *scene.Scene {
 
 	scene := &scene.Scene{
 		Shapes: make([]geometry.Shape, 0),
-		Lights: make([]geometry.Light, 0),
+		Lights: make([]lights.Light, 0),
 		Camera: camera,
 	}
 
@@ -918,7 +920,7 @@ func createMinimalCornellScene(includeBoxes bool) *scene.Scene {
 
 	// Create emissive material and quad light
 	emissiveMat := material.NewEmissive(lightEmission)
-	quadLight := geometry.NewQuadLight(lightCorner, lightU, lightV, emissiveMat)
+	quadLight := lights.NewQuadLight(lightCorner, lightU, lightV, emissiveMat)
 	scene.Lights = append(scene.Lights, quadLight)
 	scene.Shapes = append(scene.Shapes, quadLight.Quad)
 
@@ -953,7 +955,7 @@ func createMinimalCornellScene(includeBoxes bool) *scene.Scene {
 		scene.Shapes = append(scene.Shapes, shortBox, tallBox)
 	}
 
-	scene.LightSampler = geometry.NewUniformLightSampler(scene.Lights, 10)
+	scene.LightSampler = lights.NewUniformLightSampler(scene.Lights, 10)
 
 	// Initialize BVH and preprocess lights
 	scene.Preprocess()

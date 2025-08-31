@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
+
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
@@ -114,7 +116,7 @@ func TestBDPTvsPathTracingBackgroundHandling(t *testing.T) {
 func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	// Create a simple scene with a light and diffuse surface
 	emissiveMaterial := material.NewEmissive(core.NewVec3(2, 2, 2))
-	light := geometry.NewSphereLight(core.NewVec3(0, 3, 0), 0.5, emissiveMaterial)
+	light := lights.NewSphereLight(core.NewVec3(0, 3, 0), 0.5, emissiveMaterial)
 
 	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
 	sphere := geometry.NewSphere(core.NewVec3(0, 0, -1), 0.5, lambertian)
@@ -128,13 +130,13 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	})
 
 	testScene := &scene.Scene{
-		Lights:         []geometry.Light{light},
+		Lights:         []lights.Light{light},
 		Shapes:         []geometry.Shape{light.Sphere, sphere},
 		SamplingConfig: core.SamplingConfig{MaxDepth: 5},
 		Camera:         camera,
 	}
 
-	infiniteLight := geometry.NewGradientInfiniteLight(
+	infiniteLight := lights.NewGradientInfiniteLight(
 		core.NewVec3(0.1, 0.1, 0.1),    // topColor
 		core.NewVec3(0.05, 0.05, 0.05), // bottomColor
 	)
@@ -197,12 +199,12 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Sce
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGreen)
 
 	shapes := []geometry.Shape{groundQuad}
-	lights := []geometry.Light{}
+	ls := []lights.Light{}
 	if includeLight {
 		emissiveMaterial := material.NewEmissive(core.NewVec3(15.0, 14.0, 13.0))
-		light := geometry.NewSphereLight(core.NewVec3(30, 30.5, 15), 10, emissiveMaterial)
+		light := lights.NewSphereLight(core.NewVec3(30, 30.5, 15), 10, emissiveMaterial)
 		shapes = append(shapes, light.Sphere)
-		lights = append(lights, light)
+		ls = append(ls, light)
 	}
 
 	defaultCameraConfig := geometry.CameraConfig{
@@ -219,7 +221,7 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Sce
 	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
 
 	testScene := &scene.Scene{
-		Lights:         lights,
+		Lights:         ls,
 		Shapes:         shapes,
 		SamplingConfig: config,
 		Camera:         geometry.NewCamera(defaultCameraConfig),
@@ -227,13 +229,13 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Sce
 
 	if includeBackground {
 		// Add infinite light to match background colors for BDPT compatibility
-		infiniteLight := geometry.NewGradientInfiniteLight(
+		infiniteLight := lights.NewGradientInfiniteLight(
 			core.NewVec3(0.5, 0.7, 1.0), // topColor
 			core.NewVec3(1.0, 1.0, 1.0), // bottomColor
 		)
 		// Preprocess the infinite light with scene bounds
-		lights = append(lights, infiniteLight)
-		testScene.Lights = lights
+		ls = append(ls, infiniteLight)
+		testScene.Lights = ls
 	}
 
 	testScene.Preprocess()
@@ -248,14 +250,14 @@ func TestInfiniteLightEmissionSampling(t *testing.T) {
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 1000.0, lambertianGreen)
 
 	// Create gradient infinite light
-	infiniteLight := geometry.NewGradientInfiniteLight(
+	infiniteLight := lights.NewGradientInfiniteLight(
 		core.NewVec3(0.5, 0.7, 1.0), // topColor
 		core.NewVec3(1.0, 1.0, 1.0), // bottomColor
 	)
 
 	// Create mock scene
 	testScene := &scene.Scene{
-		Lights:         []geometry.Light{infiniteLight},
+		Lights:         []lights.Light{infiniteLight},
 		Shapes:         []geometry.Shape{groundQuad},
 		SamplingConfig: core.SamplingConfig{MaxDepth: 3},
 	}
@@ -365,7 +367,7 @@ func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
 	shapes := []geometry.Shape{groundQuad}
 
 	// Add infinite light for reflections
-	infiniteLight := geometry.NewGradientInfiniteLight(
+	infiniteLight := lights.NewGradientInfiniteLight(
 		core.NewVec3(0.8, 0.9, 1.0), // Blue sky
 		core.NewVec3(0.9, 0.9, 1.0), // Light horizon
 	)
@@ -382,7 +384,7 @@ func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
 	config := core.SamplingConfig{MaxDepth: 6, RussianRouletteMinBounces: 100}
 
 	testScene := &scene.Scene{
-		Lights:         []geometry.Light{infiniteLight},
+		Lights:         []lights.Light{infiniteLight},
 		Shapes:         shapes,
 		SamplingConfig: config,
 		Camera:         camera,

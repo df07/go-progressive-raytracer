@@ -3,6 +3,7 @@ package scene
 import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
@@ -22,8 +23,8 @@ func NewGroundQuad(center core.Vec3, size float64, material material.Material) *
 type Scene struct {
 	Camera         *geometry.Camera
 	Shapes         []geometry.Shape      // Objects in the scene
-	Lights         []geometry.Light      // Lights in the scene
-	LightSampler   geometry.LightSampler // Light sampler
+	Lights         []lights.Light      // Lights in the scene
+	LightSampler   lights.LightSampler // Light sampler
 	SamplingConfig core.SamplingConfig
 	CameraConfig   geometry.CameraConfig
 	BVH            *geometry.BVH // Acceleration structure for ray-object intersection
@@ -62,7 +63,7 @@ func NewDefaultScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 	s := &Scene{
 		Camera:         camera,
 		Shapes:         make([]geometry.Shape, 0),
-		Lights:         make([]geometry.Light, 0),
+		Lights:         make([]lights.Light, 0),
 		SamplingConfig: samplingConfig,
 		CameraConfig:   cameraConfig,
 	}
@@ -137,7 +138,7 @@ func (s *Scene) Preprocess() error {
 
 	// Use uniform light sampling
 	if s.LightSampler == nil {
-		s.LightSampler = geometry.NewUniformLightSampler(s.Lights, sceneRadius)
+		s.LightSampler = lights.NewUniformLightSampler(s.Lights, sceneRadius)
 	}
 	// Alternative: weighted sampling
 	//s.LightSampler = core.NewWeightedLightSampler(s.Lights, []float64{0.9, 0.1}, sceneRadius)
@@ -178,7 +179,7 @@ func (s *Scene) countPrimitivesInShape(shape geometry.Shape) int {
 // AddSphereLight adds a spherical light to the scene
 func (s *Scene) AddSphereLight(center core.Vec3, radius float64, emission core.Vec3) {
 	emissiveMat := material.NewEmissive(emission)
-	sphereLight := geometry.NewSphereLight(center, radius, emissiveMat)
+	sphereLight := lights.NewSphereLight(center, radius, emissiveMat)
 	s.Lights = append(s.Lights, sphereLight)
 	s.Shapes = append(s.Shapes, sphereLight.Sphere)
 }
@@ -186,14 +187,14 @@ func (s *Scene) AddSphereLight(center core.Vec3, radius float64, emission core.V
 // AddQuadLight adds a rectangular area light to the scene
 func (s *Scene) AddQuadLight(corner, u, v core.Vec3, emission core.Vec3) {
 	emissiveMat := material.NewEmissive(emission)
-	quadLight := geometry.NewQuadLight(corner, u, v, emissiveMat)
+	quadLight := lights.NewQuadLight(corner, u, v, emissiveMat)
 	s.Lights = append(s.Lights, quadLight)
 	s.Shapes = append(s.Shapes, quadLight.Quad)
 }
 
 // AddSpotLight adds a disc spot light with custom cone angle and falloff
 func (s *Scene) AddSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaAngleDegrees, radius float64) {
-	spotLight := geometry.NewDiscSpotLight(from, to, emission, coneAngleDegrees, coneDeltaAngleDegrees, radius)
+	spotLight := lights.NewDiscSpotLight(from, to, emission, coneAngleDegrees, coneDeltaAngleDegrees, radius)
 	s.Lights = append(s.Lights, spotLight)
 	// Add the underlying disc to shapes for caustic ray intersection
 	s.Shapes = append(s.Shapes, spotLight.GetDisc())
@@ -201,18 +202,18 @@ func (s *Scene) AddSpotLight(from, to, emission core.Vec3, coneAngleDegrees, con
 
 // AddPointSpotLight adds a point spot light to the scene
 func (s *Scene) AddPointSpotLight(from, to, emission core.Vec3, coneAngleDegrees, coneDeltaAngleDegrees, radius float64) {
-	spotLight := geometry.NewPointSpotLight(from, to, emission, coneAngleDegrees, coneDeltaAngleDegrees)
+	spotLight := lights.NewPointSpotLight(from, to, emission, coneAngleDegrees, coneDeltaAngleDegrees)
 	s.Lights = append(s.Lights, spotLight)
 }
 
 // AddUniformInfiniteLight adds a uniform infinite light to the scene
 func (s *Scene) AddUniformInfiniteLight(emission core.Vec3) {
-	infiniteLight := geometry.NewUniformInfiniteLight(emission)
+	infiniteLight := lights.NewUniformInfiniteLight(emission)
 	s.Lights = append(s.Lights, infiniteLight)
 }
 
 // AddGradientInfiniteLight adds a gradient infinite light to the scene
 func (s *Scene) AddGradientInfiniteLight(topColor, bottomColor core.Vec3) {
-	infiniteLight := geometry.NewGradientInfiniteLight(topColor, bottomColor)
+	infiniteLight := lights.NewGradientInfiniteLight(topColor, bottomColor)
 	s.Lights = append(s.Lights, infiniteLight)
 }

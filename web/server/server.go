@@ -10,6 +10,7 @@ import (
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -44,12 +45,12 @@ type RenderRequest struct {
 	Integrator         string  `json:"integrator"`         // Integrator type: "path-tracing" or "bdpt"
 
 	// Scene-specific configuration
-	CornellGeometry      string             `json:"cornellGeometry"`      // Cornell box geometry type: "spheres", "boxes", "empty"
-	SphereGridSize       int                `json:"sphereGridSize"`       // Sphere grid size (e.g., 10, 20, 100)
-	MaterialFinish       string             `json:"materialFinish"`       // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
-	SphereComplexity     int                `json:"sphereComplexity"`     // Triangle mesh sphere complexity
-	DragonMaterialFinish string             `json:"dragonMaterialFinish"` // Dragon material finish: "gold", "plastic", "matte", "mirror", "glass", "copper"
-	LightType            geometry.LightType `json:"lightType"`            // Light type: "area", "point"
+	CornellGeometry      string           `json:"cornellGeometry"`      // Cornell box geometry type: "spheres", "boxes", "empty"
+	SphereGridSize       int              `json:"sphereGridSize"`       // Sphere grid size (e.g., 10, 20, 100)
+	MaterialFinish       string           `json:"materialFinish"`       // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
+	SphereComplexity     int              `json:"sphereComplexity"`     // Triangle mesh sphere complexity
+	DragonMaterialFinish string           `json:"dragonMaterialFinish"` // Dragon material finish: "gold", "plastic", "matte", "mirror", "glass", "copper"
+	LightType            lights.LightType `json:"lightType"`            // Light type: "area", "point"
 }
 
 // Stats represents render statistics
@@ -162,11 +163,11 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 	sLightType := r.URL.Query().Get("lightType")
 	switch sLightType {
 	case "area":
-		req.LightType = geometry.LightTypeArea
+		req.LightType = lights.LightTypeArea
 	case "point":
-		req.LightType = geometry.LightTypePoint
+		req.LightType = lights.LightTypePoint
 	default:
-		req.LightType = geometry.LightTypeArea // Default
+		req.LightType = lights.LightTypeArea // Default
 	}
 
 	// Parse sphere complexity parameter

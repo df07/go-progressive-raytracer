@@ -1,6 +1,7 @@
-package geometry
+package lights
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -9,13 +10,13 @@ import (
 
 // DiscLight represents a circular area light
 type DiscLight struct {
-	*Disc // Embed disc for hit testing
+	*geometry.Disc // Embed disc for hit testing
 }
 
 // NewDiscLight creates a new circular disc light
 func NewDiscLight(center, normal core.Vec3, radius float64, material material.Material) *DiscLight {
 	return &DiscLight{
-		Disc: NewDisc(center, normal, radius, material),
+		Disc: geometry.NewDisc(center, normal, radius, material),
 	}
 }
 

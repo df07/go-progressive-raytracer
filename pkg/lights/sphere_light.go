@@ -1,6 +1,7 @@
-package geometry
+package lights
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -9,13 +10,13 @@ import (
 
 // SphereLight represents a spherical area light
 type SphereLight struct {
-	*Sphere // Embed sphere for hit testing
+	*geometry.Sphere // Embed sphere for hit testing
 }
 
 // NewSphereLight creates a new spherical light
 func NewSphereLight(center core.Vec3, radius float64, material material.Material) *SphereLight {
 	return &SphereLight{
-		Sphere: NewSphere(center, radius, material),
+		Sphere: geometry.NewSphere(center, radius, material),
 	}
 }
 

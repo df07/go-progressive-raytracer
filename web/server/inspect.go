@@ -10,6 +10,7 @@ import (
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -170,12 +171,12 @@ func (s *Server) extractGeometryInfo(shape geometry.Shape) (string, map[string]i
 
 	// Note: Planes removed, replaced with finite quads
 
-	case *geometry.SphereLight:
+	case *lights.SphereLight:
 		properties["center"] = [3]float64{geom.Center.X, geom.Center.Y, geom.Center.Z}
 		properties["radius"] = geom.Radius
 		return "sphere_light", properties
 
-	case *geometry.QuadLight:
+	case *lights.QuadLight:
 		properties["corner"] = [3]float64{geom.Corner.X, geom.Corner.Y, geom.Corner.Z}
 		properties["u"] = [3]float64{geom.U.X, geom.U.Y, geom.U.Z}
 		properties["v"] = [3]float64{geom.V.X, geom.V.Y, geom.V.Z}

@@ -1,6 +1,7 @@
 package integrator
 
 import (
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"math"
 	"math/rand"
 	"testing"
@@ -22,7 +23,7 @@ func createSceneWithInfiniteLight() *scene.Scene {
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
-		Lights: []geometry.Light{},
+		Lights: []lights.Light{},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  10,
@@ -31,7 +32,7 @@ func createSceneWithInfiniteLight() *scene.Scene {
 	}
 
 	// Add a gradient infinite light (this replaces background gradient functionality)
-	infiniteLight := geometry.NewGradientInfiniteLight(
+	infiniteLight := lights.NewGradientInfiniteLight(
 		core.NewVec3(0.5, 0.7, 1.0), // topColor (blue sky)
 		core.NewVec3(1.0, 0.8, 0.6), // bottomColor (warm ground)
 	)
@@ -108,7 +109,7 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
-		Lights: []geometry.Light{},
+		Lights: []lights.Light{},
 		Camera: camera,
 		SamplingConfig: core.SamplingConfig{
 			MaxDepth:                  10,
@@ -117,7 +118,7 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 	}
 
 	// Add uniform infinite light
-	uniformLight := geometry.NewUniformInfiniteLight(core.NewVec3(0.8, 0.6, 0.4))
+	uniformLight := lights.NewUniformInfiniteLight(core.NewVec3(0.8, 0.6, 0.4))
 	scene.Lights = append(scene.Lights, uniformLight)
 
 	scene.Preprocess()
