@@ -29,7 +29,7 @@ func (m *Metal) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (Sc
 
 	// Add fuzziness by perturbing the reflection direction
 	if m.Fuzzness > 0 {
-		perturbation := core.RandomInUnitSphere(sampler.Get3D()).Multiply(m.Fuzzness)
+		perturbation := core.SamplePointInUnitSphere(sampler.Get3D()).Multiply(m.Fuzzness)
 		reflected = reflected.Add(perturbation)
 	}
 

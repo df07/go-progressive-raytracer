@@ -1,8 +1,9 @@
 package lights
 
 import (
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
+
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
@@ -110,7 +111,7 @@ func (dl *DiscLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 // EmissionPDF implements the Light interface - calculates PDF for emission sampling
 func (dl *DiscLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 	// Validate point is on disc surface
-	if !core.ValidatePointOnDisc(point, dl.Center, dl.Normal, dl.Radius, 0.001) {
+	if !validatePointOnDisc(point, dl.Center, dl.Normal, dl.Radius, 0.001) {
 		return 0.0
 	}
 
@@ -131,4 +132,19 @@ func (dl *DiscLight) Emit(ray core.Ray) core.Vec3 {
 		return emitter.Emit(ray)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// ValidatePointOnDisc checks if a point lies on a disc surface within tolerance
+func validatePointOnDisc(point core.Vec3, center core.Vec3, normal core.Vec3, radius float64, tolerance float64) bool {
+	toPoint := point.Subtract(center)
+
+	// Check distance to plane
+	distanceToPlane := math.Abs(toPoint.Dot(normal))
+	if distanceToPlane > tolerance {
+		return false
+	}
+
+	// Check if within disc radius
+	projectedPoint := toPoint.Subtract(normal.Multiply(toPoint.Dot(normal)))
+	return projectedPoint.Length() <= radius
 }

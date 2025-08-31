@@ -160,14 +160,14 @@ func (sl *PointSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection 
 	point := sl.position
 
 	// Sample direction within the spot cone using shared function
-	emissionDir := core.SampleUniformCone(sl.direction, sl.cosTotalWidth, sampleDirection)
+	emissionDir := core.SampleCone(sl.direction, sl.cosTotalWidth, sampleDirection)
 
 	// Calculate spot light falloff
 	cosTheta := emissionDir.Dot(sl.direction)
 	spotAttenuation := sl.falloff(cosTheta)
 
 	// For point lights, the PDF is over solid angle only (no area component)
-	conePDF := core.UniformConePDF(sl.cosTotalWidth)
+	conePDF := UniformConePDF(sl.cosTotalWidth)
 
 	// Apply spot attenuation to emission
 	emission := sl.emission.Multiply(spotAttenuation)
@@ -199,7 +199,7 @@ func (sl *PointSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 	}
 
 	// Use shared cone PDF calculation
-	return core.UniformConePDF(sl.cosTotalWidth)
+	return UniformConePDF(sl.cosTotalWidth)
 }
 
 // Emit implements the Light interface - point lights emit in all directions

@@ -19,7 +19,7 @@ func NewLambertian(albedo core.Vec3) *Lambertian {
 // Scatter implements the Material interface for lambertian scattering
 func (l *Lambertian) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
 	// Generate cosine-weighted random direction in hemisphere around normal
-	scatterDirection := core.RandomCosineDirection(hit.Normal, sampler.Get2D())
+	scatterDirection := core.SampleCosineHemisphere(hit.Normal, sampler.Get2D())
 	scattered := core.Ray{Origin: hit.Point, Direction: scatterDirection}
 
 	// Calculate PDF: cos(θ) / π where θ is angle from normal

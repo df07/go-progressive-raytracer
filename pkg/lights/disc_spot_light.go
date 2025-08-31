@@ -1,8 +1,9 @@
 package lights
 
 import (
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
+
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
@@ -190,14 +191,14 @@ func (dsl *DiscSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection 
 	point, normal := dsl.discLight.Disc.SampleUniform(samplePoint)
 
 	// Sample emission within the cone
-	emissionDir := core.SampleUniformCone(dsl.direction, dsl.cosTotalWidth, sampleDirection)
+	emissionDir := core.SampleCone(dsl.direction, dsl.cosTotalWidth, sampleDirection)
 
 	// Calculate spot light falloff
 	cosTheta := emissionDir.Dot(dsl.direction)
 	spotAttenuation := dsl.falloff(cosTheta)
 
 	// Calculate PDF for cone sampling
-	conePDF := core.UniformConePDF(dsl.cosTotalWidth)
+	conePDF := UniformConePDF(dsl.cosTotalWidth)
 	areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
 
 	// Apply spot attenuation to emission

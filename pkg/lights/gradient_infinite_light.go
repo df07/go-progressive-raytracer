@@ -76,7 +76,7 @@ func (gil *GradientInfiniteLight) emissionForDirection(direction core.Vec3) core
 func (gil *GradientInfiniteLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2) LightSample {
 	// For infinite lights, sample the visible hemisphere using cosine-weighted sampling
 	// This provides better importance sampling since cosine terms cancel in the rendering equation
-	direction := core.RandomCosineDirection(normal, sample)
+	direction := core.SampleCosineHemisphere(normal, sample)
 	cosTheta := direction.Dot(normal)
 	emission := gil.emissionForDirection(direction)
 
@@ -103,7 +103,7 @@ func (gil *GradientInfiniteLight) PDF(point, normal, direction core.Vec3) float6
 // SampleEmission implements the Light interface - samples emission for BDPT light path generation
 func (gil *GradientInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample {
 	// Use PBRT's disk sampling approach from shared function
-	emissionRay, areaPDF, directionPDF := core.SampleInfiniteLight(gil.worldCenter, gil.worldRadius, samplePoint, sampleDirection)
+	emissionRay, areaPDF, directionPDF := SampleInfiniteLight(gil.worldCenter, gil.worldRadius, samplePoint, sampleDirection)
 	emission := gil.emissionForDirection(emissionRay.Direction)
 
 	return EmissionSample{

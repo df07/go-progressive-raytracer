@@ -57,7 +57,7 @@ func SampleLightEmission(lights []Light, lightSampler LightSampler, sampler core
 // and returns both the direction and the emission sample with separate area and direction PDFs
 func SampleEmissionDirection(point core.Vec3, normal core.Vec3, areaPDF float64, mat material.Material, sample core.Vec2) EmissionSample {
 	// Sample emission direction (cosine-weighted hemisphere)
-	emissionDir := core.RandomCosineDirection(normal, sample)
+	emissionDir := core.SampleCosineHemisphere(normal, sample)
 
 	// Calculate direction PDF separately (cosine-weighted)
 	cosTheta := emissionDir.Dot(normal)
@@ -77,4 +77,39 @@ func SampleEmissionDirection(point core.Vec3, normal core.Vec3, areaPDF float64,
 		AreaPDF:      areaPDF,
 		DirectionPDF: directionPDF,
 	}
+}
+
+// UniformConePDF calculates the PDF for uniform sampling within a cone
+func UniformConePDF(cosTotalWidth float64) float64 {
+	return 1.0 / (2.0 * math.Pi * (1.0 - cosTotalWidth))
+}
+
+// SampleInfiniteLight samples emission from an infinite light using PBRT's disk sampling approach
+// Returns emission ray, area PDF, and direction PDF
+func SampleInfiniteLight(worldCenter core.Vec3, worldRadius float64, samplePoint core.Vec2, sampleDirection core.Vec2) (core.Ray, float64, float64) {
+	// Sample direction uniformly on sphere
+	direction := core.SampleOnUnitSphere(sampleDirection)
+
+	// Create orthonormal basis with direction as one axis
+	var up core.Vec3
+	if math.Abs(direction.X) > 0.9 {
+		up = core.NewVec3(0, 1, 0)
+	} else {
+		up = core.NewVec3(1, 0, 0)
+	}
+	right := direction.Cross(up).Normalize()
+	up = right.Cross(direction).Normalize()
+
+	// Sample point on unit disk, then scale by world radius
+	diskSample := core.SamplePointInUnitDisk(samplePoint)
+	diskPoint := worldCenter.Add(right.Multiply(diskSample.X * worldRadius)).Add(up.Multiply(diskSample.Y * worldRadius))
+
+	// Emission point is behind the disk, ray travels in sampled direction (parallel rays)
+	emissionPoint := diskPoint.Add(direction.Multiply(-worldRadius))
+
+	// PBRT PDF calculations
+	areaPDF := 1.0 / (math.Pi * worldRadius * worldRadius) // Planar density
+	directionPDF := 1.0 / (4.0 * math.Pi)                  // Uniform over sphere
+
+	return core.NewRay(emissionPoint, direction), areaPDF, directionPDF
 }

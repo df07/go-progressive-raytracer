@@ -1,8 +1,9 @@
 package lights
 
 import (
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
+
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
@@ -104,7 +105,7 @@ func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	point := ql.Corner.Add(ql.U.Multiply(samplePoint.X)).Add(ql.V.Multiply(samplePoint.Y))
 
 	// Sample emission direction (cosine-weighted hemisphere)
-	emissionDir := core.RandomCosineDirection(ql.Normal, sampleDirection)
+	emissionDir := core.SampleCosineHemisphere(ql.Normal, sampleDirection)
 
 	// Calculate PDFs separately for BDPT
 	// areaPDF: probability per unit area on the light surface

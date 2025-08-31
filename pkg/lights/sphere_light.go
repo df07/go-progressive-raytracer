@@ -1,8 +1,9 @@
 package lights
 
 import (
-	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"math"
+
+	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
@@ -185,7 +186,7 @@ func (sl *SphereLight) SampleEmission(samplePoint core.Vec2, sampleDirection cor
 // EmissionPDF implements the Light interface - calculates PDF for emission sampling
 func (sl *SphereLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 	// Validate point is on sphere surface
-	if !core.ValidatePointOnSphere(point, sl.Center, sl.Radius, 0.001) {
+	if !validatePointOnSphere(point, sl.Center, sl.Radius, 0.001) {
 		return 0.0
 	}
 
@@ -209,4 +210,10 @@ func (sl *SphereLight) Emit(ray core.Ray) core.Vec3 {
 		return emitter.Emit(ray)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
+}
+
+// ValidatePointOnSphere checks if a point lies on a sphere surface within tolerance
+func validatePointOnSphere(point core.Vec3, center core.Vec3, radius float64, tolerance float64) bool {
+	distFromCenter := point.Subtract(center).Length()
+	return math.Abs(distFromCenter-radius) <= tolerance
 }

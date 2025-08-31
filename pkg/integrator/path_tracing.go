@@ -144,7 +144,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, sca
 	}
 
 	// Calculate MIS weight
-	misWeight := core.PowerHeuristic(1, lightSample.PDF, 1, materialPDF)
+	misWeight := powerHeuristic(1, lightSample.PDF, 1, materialPDF)
 
 	// Calculate BRDF for the new outgoing direction
 	brdf := hit.Material.EvaluateBRDF(scatter.Incoming.Direction, lightSample.Direction, hit.Normal)
@@ -172,7 +172,7 @@ func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene *scene.Scene, s
 	lightPDF := lights.CalculateLightPDF(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, scatterDirection)
 
 	// Calculate MIS weight
-	misWeight := core.PowerHeuristic(1, scatter.PDF, 1, lightPDF)
+	misWeight := powerHeuristic(1, scatter.PDF, 1, lightPDF)
 
 	// Update throughput for the recursive call
 	newThroughput := throughput.MultiplyVec(scatter.Attenuation).Multiply(cosine / scatter.PDF)
@@ -217,6 +217,20 @@ func (pt *PathTracingIntegrator) ApplyRussianRoulette(depth int, throughput core
 	// Energy-conserving compensation (no artificial cap)
 	compensationFactor := 1.0 / survivalProb
 	return false, compensationFactor
+}
+
+// PowerHeuristic implements the power heuristic for multiple importance sampling
+// This balances between two sampling strategies (typically light sampling vs material sampling)
+func powerHeuristic(nf int, fPdf float64, ng int, gPdf float64) float64 {
+	if fPdf == 0 {
+		return 0
+	}
+
+	f := float64(nf) * fPdf
+	g := float64(ng) * gPdf
+
+	// Power heuristic with β = 2 (squared)
+	return (f * f) / (f*f + g*g)
 }
 
 func (pt *PathTracingIntegrator) logf(format string, a ...interface{}) {

@@ -152,7 +152,7 @@ func TestUniformSampleSphere(t *testing.T) {
 	}
 
 	for i, sample := range samples {
-		direction := core.SampleUniformSphere(sample)
+		direction := core.SampleOnUnitSphere(sample)
 
 		// Check normalization
 		length := direction.Length()

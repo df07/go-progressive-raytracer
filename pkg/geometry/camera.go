@@ -180,7 +180,7 @@ func (c *Camera) GetRay(i, j int, samplePoint core.Vec2, sampleJitter core.Vec2)
 	// Determine ray origin (with defocus blur if enabled)
 	rayOrigin := c.center
 	if c.defocusDiskU.Length() > 0 {
-		p := core.RandomInUnitDisk(samplePoint)
+		p := core.SamplePointInUnitDisk(samplePoint)
 		offset := c.defocusDiskU.Multiply(p.X).Add(c.defocusDiskV.Multiply(p.Y))
 		rayOrigin = c.center.Add(offset)
 	}
@@ -225,7 +225,7 @@ func (c *Camera) GetCameraForward() core.Vec3 {
 // Equivalent to pbrt PerspectiveCamera::SampleWi
 func (c *Camera) SampleCameraFromPoint(refPoint core.Vec3, sample core.Vec2) *CameraSample {
 	// Sample lens coordinates using concentric disk sampling
-	lensCoords := core.RandomInUnitDisk(sample).Multiply(c.lensRadius)
+	lensCoords := core.SamplePointInUnitDisk(sample).Multiply(c.lensRadius)
 
 	// Transform lens point to world space using stored camera basis vectors
 	lensPoint := c.center.Add(c.u.Multiply(lensCoords.X)).Add(c.v.Multiply(lensCoords.Y))
