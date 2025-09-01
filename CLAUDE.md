@@ -20,18 +20,16 @@ go test -v ./...
 # Run tests for specific package
 go test ./pkg/renderer/
 
-# Run benchmarks
-go test -bench=. ./pkg/core/
-go test -bench=. ./pkg/geometry/
-
 # Run with CPU profiling
 ./raytracer --scene=default --mode=normal --profile=cpu.prof
 
 # Analyze profile
 go tool pprof cpu.prof
 
-# Automated performance benchmarking
-./benchmark.sh  # Compares performance before/after uncommitted changes
+# Benchmark script
+#   Without args: Compare current changes vs HEAD (stashes changes first)
+#   With commit:  Compare current changes vs specified commit (stashes changes first)
+./benchmark.sh [baseline_commit]
 ```
 
 ## Architecture Overview
@@ -40,8 +38,7 @@ This is a sophisticated progressive raytracer with a clean modular architecture:
 
 ### Core Design Philosophy
 - **Progressive Rendering**: Multi-pass rendering with immediate visual feedback via tile-based parallel processing
-- **Direct Struct Access**: Clean separation with concrete types for better performance (no interface overhead)
-- **Deterministic Parallelism**: Tile-specific random seeds ensure identical results regardless of worker count
+- **Deterministic Parallelism**: Tile-specific random seeds and overrideable sampler ensure identical results
 - **Zero External Dependencies**: Uses only Go standard library
 
 ### Dependency Hierarchy
@@ -49,30 +46,19 @@ This is a sophisticated progressive raytracer with a clean modular architecture:
 The codebase follows a strict hierarchical dependency structure to avoid circular imports and maintain clean separation of concerns:
 
 ```
-renderer → integrator → scene → {geometry, material, core}
-                              ↘ 
-web → renderer                  core (foundation types only)
+web → renderer → integrator → scene → lights → geometry → material → core
 ```
-
-**Dependency Rules:**
-- `core/`: Foundation types (Vec3, Ray, interfaces) - no dependencies on other packages
-- `geometry/`, `material/`: Primitive types and implementations - depend only on `core/`  
-- `scene/`: Scene management and presets - depends on `core/`, `geometry/`, `material/`
-- `integrator/`: Rendering algorithms - depends on `core/`, `geometry/`, `material/`, `scene/`
-- `renderer/`: Progressive rendering engine - depends on all lower levels
-- `web/`: Web interface - depends on `renderer/` and lower levels
-
-This hierarchy was established during a major refactor to eliminate interface overhead and enable direct field access (e.g., `scene.Camera`, `scene.Lights`) for better performance.
 
 ### Package Structure
 ```
-pkg/core/          # Foundation types and minimal interfaces (Vec3, Ray, Shape, Material)
-pkg/geometry/      # Shape primitives with BVH acceleration
+pkg/core/          # Foundation types and minimal interfaces 
 pkg/material/      # Physically-based materials (lambertian, metal, glass, emissive)
-pkg/renderer/      # Progressive raytracing engine with worker pools
+pkg/geometry/      # Shape primitives with BVH acceleration
+pkg/lights/        # Physically-based lights (e.g. sphere, quad, infinite)
 pkg/scene/         # Scene management and presets
+pkg/integrator/    # BDPT and path tracing integrators
+pkg/renderer/      # Progressive raytracing engine with worker pools
 pkg/loaders/       # File format loaders (PLY mesh support)
-pkg/integrators/   # BDPT and path tracing integrators
 web/               # Real-time web interface with Server-Sent Events
 ```
 
@@ -81,16 +67,9 @@ web/               # Real-time web interface with Server-Sent Events
 **Progressive Renderer (`pkg/renderer/`)**:
 - `ProgressiveRaytracer`: Orchestrates multi-pass tile-based rendering
 - `WorkerPool`: Manages parallel 64x64 tile processing
-- Sample strategy: 1 sample → linear progression → adaptive final pass
-- Thread-safe accumulation with deterministic seeds per tile
-
-**Material System**: Unified `ScatterResult` eliminates type casting:
-- All materials return consistent interface with PDF support
-- Supports Multiple Importance Sampling (MIS) and Russian Roulette termination
 
 **BVH Acceleration**: 
 - Optimized median-split algorithm with up to 39x speedup for complex meshes
-- Thread-safe: each worker creates its own BVH instance
 
 **BDPT Splat System**: 
 - Lock-free splat queue for cross-tile light contributions
@@ -105,26 +84,26 @@ web/               # Real-time web interface with Server-Sent Events
 
 **Available Scenes**:
 - `default` - Mixed materials showcase
-- `cornell` - Classic Cornell box with area lighting  
-- `cornell-boxes` - Cornell box with rotated boxes
-- `caustic-glass` - Glass caustic geometry (excellent for BDPT testing)
+- `cornell` - Classic Cornell box with area lighting and mirror surrfaces
 - `spheregrid` - BVH performance testing
 - `trianglemesh` - Complex procedural triangle geometry
 - `dragon` - High-poly mesh (1.8M triangles, requires separate PLY download)
+- `caustic-glass` - Glass with complex geometry for testing caustics and bdpt
 
 ## CLI Usage Examples
 
 ```bash
 # Progressive rendering with path tracing
-./raytracer --scene=cornell --max-passes=3 --max-samples=25
+./raytracer --scene=cornell --max-passes=3 --max-samples=20
 
 # BDPT with caustic-glass scene (excellent for complex lighting)
-./raytracer --scene=caustic-glass --integrator=bdpt --max-samples=100
+./raytracer --scene=caustic-glass --integrator=bdpt --max-samples=20
 
 # High quality render
-./raytracer --scene=default --max-passes=10 --max-samples=200 --workers=4
+./raytracer --scene=default --max-passes=10 --max-samples=2000 --workers=20
 
 # Web interface (usually running at localhost:8080 via air in background)
+cd web && air
 ```
 
 ## Real-Time Web Interface
