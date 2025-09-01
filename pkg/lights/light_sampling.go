@@ -25,16 +25,16 @@ func CalculateLightPDF(lights []Light, lightSampler LightSampler, point, normal,
 }
 
 // SampleLight selects and samples a light from the scene using importance sampling
-func SampleLight(lights []Light, lightSampler LightSampler, point core.Vec3, normal core.Vec3, sampler core.Sampler) (LightSample, Light, bool) {
+func SampleLight(lights []Light, lightSampler LightSampler, point core.Vec3, normal core.Vec3, sampler core.Sampler) (LightSample, Light, int, bool) {
 	if len(lights) == 0 {
-		return LightSample{}, nil, false
+		return LightSample{}, nil, -1, false
 	}
-	selectedLight, lightSelectionPdf, _ := lightSampler.SampleLight(point, normal, sampler.Get1D())
+	selectedLight, lightSelectionPdf, lightIndex := lightSampler.SampleLight(point, normal, sampler.Get1D())
 
 	sample := selectedLight.Sample(point, normal, sampler.Get2D())
 	sample.PDF *= lightSelectionPdf // Combined PDF for MIS calculations
 
-	return sample, selectedLight, true
+	return sample, selectedLight, lightIndex, true
 }
 
 // SampleLightEmission selects and samples emission from a light using uniform sampling

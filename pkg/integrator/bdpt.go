@@ -337,7 +337,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
 
-	lightSample, sampledLight, hasLight := lights.SampleLight(scene.Lights, scene.LightSampler, cameraVertex.Point, cameraVertex.Normal, sampler)
+	lightSample, sampledLight, lightIndex, hasLight := lights.SampleLight(scene.Lights, scene.LightSampler, cameraVertex.Point, cameraVertex.Normal, sampler)
 	if !hasLight || lightSample.Emission.IsZero() || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
 	}
@@ -373,8 +373,8 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 	sampledVertex := &Vertex{
 		Point:           lightSample.Point,
 		Normal:          lightSample.Normal,
-		Light:           sampledLight,    // TODO: remove after cleanup
-		LightIndex:      -1,              // TODO: get actual light index from lights.SampleLight
+		Light:           sampledLight, // TODO: remove after cleanup
+		LightIndex:      lightIndex,
 		AreaPdfForward:  lightSample.PDF, // probability of generating this point is the light sampling pdf
 		AreaPdfReverse:  0.0,             // probability of generating this point in reverse is set by MIS weight calculation
 		IsLight:         true,

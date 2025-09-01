@@ -130,7 +130,7 @@ func TestSampleLight_EmptyLights(t *testing.T) {
 	normal := core.NewVec3(0, 0, 1)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample, selectedLight, success := SampleLight(lights, lightSampler, point, normal, sampler)
+	sample, selectedLight, _, success := SampleLight(lights, lightSampler, point, normal, sampler)
 
 	if success {
 		t.Error("Expected failure for empty lights array")
@@ -158,7 +158,7 @@ func TestSampleLight_SingleLight(t *testing.T) {
 	normal := core.NewVec3(0, 0, 1)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	sample, selectedLight, success := SampleLight(lights, lightSampler, point, normal, sampler)
+	sample, selectedLight, _, success := SampleLight(lights, lightSampler, point, normal, sampler)
 
 	if !success {
 		t.Fatal("Expected successful sampling")
@@ -201,7 +201,7 @@ func TestSampleLight_MultipleLights(t *testing.T) {
 	numSamples := 300
 
 	for i := 0; i < numSamples; i++ {
-		sample, selectedLight, success := SampleLight(lights, lightSampler, point, normal, sampler)
+		sample, selectedLight, _, success := SampleLight(lights, lightSampler, point, normal, sampler)
 
 		if !success {
 			t.Fatalf("Sampling failed at iteration %d", i)

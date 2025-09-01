@@ -789,6 +789,7 @@ func createTestLightPath(materials []material.Material, positions []core.Vec3) P
 		Material:       materials[0],
 		IsLight:        true,
 		Light:          testLight,
+		LightIndex:     0,                           // Test light at index 0
 		Beta:           core.Vec3{X: 1, Y: 1, Z: 1}, // full light emission
 		AreaPdfForward: 0.25 / math.Pi,              // area light sampling
 		EmittedLight:   core.Vec3{X: 5, Y: 5, Z: 5},

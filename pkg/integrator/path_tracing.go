@@ -115,7 +115,7 @@ func (pt *PathTracingIntegrator) GetEmittedLight(ray core.Ray, hit *material.Hit
 // calculateDirectLighting samples lights directly for direct illumination with the provided random generator
 func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, scatter material.ScatterResult, hit *material.HitRecord, sampler core.Sampler, depth int) core.Vec3 {
 	// Sample a light
-	lightSample, _, hasLight := lights.SampleLight(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, sampler)
+	lightSample, _, _, hasLight := lights.SampleLight(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, sampler)
 	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
