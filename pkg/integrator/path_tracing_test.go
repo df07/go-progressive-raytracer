@@ -31,7 +31,7 @@ func createTestScene() *scene.Scene {
 		Shapes: []geometry.Shape{sphere},
 		Lights: []lights.Light{infiniteLight},
 		Camera: camera,
-		SamplingConfig: core.SamplingConfig{
+		SamplingConfig: scene.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
 		},
@@ -44,22 +44,22 @@ func createTestScene() *scene.Scene {
 
 // TestPathTracingDepthTermination tests that ray depth is properly limited
 func TestPathTracingDepthTermination(t *testing.T) {
-	scene := createTestScene()
+	sc := createTestScene()
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
 	// Ray pointing at the sphere
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1))
 
 	// Test with depth 0 (should return black)
-	integrator := NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 0, RussianRouletteMinBounces: 100})
-	colorDepth0, _ := integrator.RayColor(ray, scene, sampler)
+	integrator := NewPathTracingIntegrator(scene.SamplingConfig{MaxDepth: 0, RussianRouletteMinBounces: 100})
+	colorDepth0, _ := integrator.RayColor(ray, sc, sampler)
 	if colorDepth0 != (core.Vec3{}) {
 		t.Errorf("Expected black color for depth 0, got %v", colorDepth0)
 	}
 
 	// Test with positive depth (should return some color)
-	integrator = NewPathTracingIntegrator(core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100})
-	colorDepth2, _ := integrator.RayColor(ray, scene, sampler)
+	integrator = NewPathTracingIntegrator(scene.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100})
+	colorDepth2, _ := integrator.RayColor(ray, sc, sampler)
 	if colorDepth2 == (core.Vec3{}) {
 		t.Error("Expected non-black color for positive depth")
 	}
@@ -67,7 +67,7 @@ func TestPathTracingDepthTermination(t *testing.T) {
 
 // TestPathTracingRussianRoulette tests Russian roulette termination
 func TestPathTracingRussianRoulette(t *testing.T) {
-	config := core.SamplingConfig{
+	config := scene.SamplingConfig{
 		MaxDepth:                  50, // Very deep
 		RussianRouletteMinBounces: 1,  // Start RR immediately
 	}
@@ -139,7 +139,7 @@ func TestPathTracingSpecularMaterial(t *testing.T) {
 		Shapes: []geometry.Shape{sphere},
 		Lights: []lights.Light{infiniteLight},
 		Camera: camera,
-		SamplingConfig: core.SamplingConfig{
+		SamplingConfig: scene.SamplingConfig{
 			MaxDepth:                  5,
 			RussianRouletteMinBounces: 5,
 		},
@@ -188,7 +188,7 @@ func TestPathTracingEmissiveMaterial(t *testing.T) {
 		Shapes: []geometry.Shape{sphere},
 		Lights: []lights.Light{},
 		Camera: camera,
-		SamplingConfig: core.SamplingConfig{
+		SamplingConfig: scene.SamplingConfig{
 			MaxDepth: 10,
 		},
 	}

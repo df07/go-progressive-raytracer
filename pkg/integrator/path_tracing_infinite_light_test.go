@@ -25,7 +25,7 @@ func createSceneWithInfiniteLight() *scene.Scene {
 		Shapes: []geometry.Shape{sphere},
 		Lights: []lights.Light{},
 		Camera: camera,
-		SamplingConfig: core.SamplingConfig{
+		SamplingConfig: scene.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
 		},
@@ -111,7 +111,7 @@ func TestUniformInfiniteLight_PathTracing(t *testing.T) {
 		Shapes: []geometry.Shape{sphere},
 		Lights: []lights.Light{},
 		Camera: camera,
-		SamplingConfig: core.SamplingConfig{
+		SamplingConfig: scene.SamplingConfig{
 			MaxDepth:                  10,
 			RussianRouletteMinBounces: 5,
 		},

@@ -48,7 +48,7 @@ func (tr *TileRenderer) RenderTileBounds(bounds image.Rectangle, pixelStats [][]
 }
 
 // adaptiveSamplePixelWithSplats uses adaptive sampling with the integrator and handles splat contributions
-func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera *geometry.Camera, i, j int, ps *PixelStats, splatQueue *SplatQueue, sampler core.Sampler, maxSamples int, samplingConfig core.SamplingConfig) int {
+func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera *geometry.Camera, i, j int, ps *PixelStats, splatQueue *SplatQueue, sampler core.Sampler, maxSamples int, samplingConfig scene.SamplingConfig) int {
 	initialSampleCount := ps.SampleCount
 
 	// Take samples until we reach convergence or max samples
@@ -74,7 +74,7 @@ func (tr *TileRenderer) adaptiveSamplePixelWithSplats(camera *geometry.Camera, i
 }
 
 // shouldStopSampling determines if adaptive sampling should stop based on perceptual relative error
-func (tr *TileRenderer) shouldStopSampling(ps *PixelStats, maxSamples int, samplingConfig core.SamplingConfig) bool {
+func (tr *TileRenderer) shouldStopSampling(ps *PixelStats, maxSamples int, samplingConfig scene.SamplingConfig) bool {
 	// Calculate minimum samples as percentage of max samples, but ensure at least 1 sample
 	minSamples := max(1, int(float64(maxSamples)*samplingConfig.AdaptiveMinSamples))
 

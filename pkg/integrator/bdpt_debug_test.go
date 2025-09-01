@@ -16,8 +16,8 @@ import (
 // TestBDPTvsPathTracingDirectLighting compares BDPT vs path tracing on a simple Cornell setup
 // This test isolates the direct lighting issue - BDPT should perform similarly to path tracing
 func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
-	// Create a minimal Cornell scene: just floor + quad light
-	scene := createMinimalCornellScene(false)
+	// Create a minimal Cornell testScene: just floor + quad light
+	testScene := createMinimalCornellScene(false)
 
 	// Setup a ray hitting the floor center
 	rayToFloor := core.NewRay(
@@ -30,19 +30,19 @@ func TestBDPTvsPathTracingDirectLighting(t *testing.T) {
 
 	// Path tracing result
 	pathSampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
-	pathConfig := core.SamplingConfig{MaxDepth: 5}
+	pathConfig := scene.SamplingConfig{MaxDepth: 5}
 	pathIntegrator := NewPathTracingIntegrator(pathConfig)
-	pathResult, _ := pathIntegrator.RayColor(rayToFloor, scene, pathSampler)
+	pathResult, _ := pathIntegrator.RayColor(rayToFloor, testScene, pathSampler)
 
 	// BDPT result with debug output
 	bdptSampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
+	bdptConfig := scene.SamplingConfig{MaxDepth: 5}
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
 	bdptIntegrator.Verbose = testing.Verbose() // Enable verbose logging to see MIS weights
 
 	// Get the final result through RayColor for comparison
 	bdptSampler = core.NewRandomSampler(rand.New(rand.NewSource(seed)))
-	bdptResult, _ := bdptIntegrator.RayColor(rayToFloor, scene, bdptSampler)
+	bdptResult, _ := bdptIntegrator.RayColor(rayToFloor, testScene, bdptSampler)
 
 	t.Logf("=== FINAL COMPARISON ===")
 	t.Logf("Path tracing result: %v (luminance: %.6f)", pathResult, pathResult.Luminance())
@@ -132,7 +132,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	testScene := &scene.Scene{
 		Lights:         []lights.Light{light},
 		Shapes:         []geometry.Shape{light.Sphere, sphere},
-		SamplingConfig: core.SamplingConfig{MaxDepth: 5},
+		SamplingConfig: scene.SamplingConfig{MaxDepth: 5},
 		Camera:         camera,
 	}
 
@@ -143,7 +143,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	testScene.Lights = append(testScene.Lights, infiniteLight)
 	testScene.Preprocess()
 
-	config := core.SamplingConfig{MaxDepth: 5}
+	config := scene.SamplingConfig{MaxDepth: 5}
 
 	// Create both integrators
 	pathTracer := NewPathTracingIntegrator(config)
@@ -193,7 +193,7 @@ func TestBDPTvsPathTracingConsistency(t *testing.T) {
 	}
 }
 
-func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Scene, core.SamplingConfig) {
+func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Scene, scene.SamplingConfig) {
 	// simple scene with a green ground quad mirroring default scene (without spheres)
 	lambertianGreen := material.NewLambertian(core.NewVec3(0.8, 0.8, 0.0).Multiply(0.6))
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGreen)
@@ -218,7 +218,7 @@ func SceneWithGroundPlane(includeBackground bool, includeLight bool) (*scene.Sce
 		FocusDistance: 0.0,  // Auto-calculate focus distance
 	}
 
-	config := core.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
+	config := scene.SamplingConfig{MaxDepth: 3, RussianRouletteMinBounces: 100}
 
 	testScene := &scene.Scene{
 		Lights:         ls,
@@ -259,7 +259,7 @@ func TestInfiniteLightEmissionSampling(t *testing.T) {
 	testScene := &scene.Scene{
 		Lights:         []lights.Light{infiniteLight},
 		Shapes:         []geometry.Shape{groundQuad},
-		SamplingConfig: core.SamplingConfig{MaxDepth: 3},
+		SamplingConfig: scene.SamplingConfig{MaxDepth: 3},
 	}
 
 	testScene.Preprocess()
@@ -359,7 +359,7 @@ func TestBDPTvsPathTracingReflectiveGround(t *testing.T) {
 	}
 }
 
-func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
+func SceneWithReflectiveGroundPlane() (*scene.Scene, scene.SamplingConfig) {
 	// Create a reflective (metal) ground plane
 	metalMaterial := material.NewMetal(core.NewVec3(0.8, 0.8, 0.9), 0.0) // Mirror-like
 	groundQuad := scene.NewGroundQuad(core.NewVec3(0, 0, 0), 1000.0, metalMaterial)
@@ -381,7 +381,7 @@ func SceneWithReflectiveGroundPlane() (*scene.Scene, core.SamplingConfig) {
 		VFov:        45.0,
 	})
 
-	config := core.SamplingConfig{MaxDepth: 6, RussianRouletteMinBounces: 100}
+	config := scene.SamplingConfig{MaxDepth: 6, RussianRouletteMinBounces: 100}
 
 	testScene := &scene.Scene{
 		Lights:         []lights.Light{infiniteLight},

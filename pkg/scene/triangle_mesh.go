@@ -70,8 +70,8 @@ func setupTriangleMeshCamera(cameraOverrides ...geometry.CameraConfig) geometry.
 }
 
 // createTriangleMeshSamplingConfig creates the sampling configuration for triangle mesh scenes
-func createTriangleMeshSamplingConfig() core.SamplingConfig {
-	return core.SamplingConfig{
+func createTriangleMeshSamplingConfig() SamplingConfig {
+	return SamplingConfig{
 		SamplesPerPixel:           150,
 		MaxDepth:                  40,
 		RussianRouletteMinBounces: 10,    // Good balance for triangle mesh scenes

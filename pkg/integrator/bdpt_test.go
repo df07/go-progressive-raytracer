@@ -79,7 +79,7 @@ func (t *TestSampler) Reset() {
 
 // TestExtendPath tests path extension logic - the core ray bouncing mechanics
 func TestExtendPath(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 5})
 
 	tests := []struct {
 		name                string
@@ -201,7 +201,7 @@ func TestExtendPath(t *testing.T) {
 
 // TestGenerateCameraSubpath tests camera vertex creation and initial ray
 func TestGenerateCameraSubpath(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 3})
 	scene := createSimpleTestScene()
 	ray := core.NewRay(core.NewVec3(1, 2, 3), core.NewVec3(0, 0, -1))
 
@@ -229,7 +229,7 @@ func TestGenerateCameraSubpath(t *testing.T) {
 
 // TestGenerateLightSubpath tests light emission sampling and initial vertex
 func TestGenerateLightSubpath(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 3})
 	scene := createSimpleTestScene()
 
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
@@ -310,7 +310,7 @@ func createSimpleTestScene() *scene.Scene {
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere, light.Quad},
 		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
-		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
+		Camera: camera, SamplingConfig: scene.SamplingConfig{MaxDepth: 5},
 	}
 
 	// Initialize BVH and preprocess lights
@@ -348,7 +348,7 @@ func createSceneWithLightsAndWeights(ls []lights.Light, weights []float64) *scen
 	scene := &scene.Scene{
 		Shapes: shapes,
 		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
-		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
+		Camera: camera, SamplingConfig: scene.SamplingConfig{MaxDepth: 5},
 	}
 
 	if len(weights) > 0 {
@@ -393,7 +393,7 @@ func createGlancingTestSceneWithMaterial(mat material.Material) *scene.Scene {
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere},
 		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
-		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
+		Camera: camera, SamplingConfig: scene.SamplingConfig{MaxDepth: 5},
 	}
 
 	// Initialize BVH and preprocess lights
@@ -439,7 +439,7 @@ func createLightSceneWithMaterial(mat material.Material) *scene.Scene {
 	scene := &scene.Scene{
 		Shapes: []geometry.Shape{sphere, boundingSphere},
 		Lights: ls, LightSampler: lights.NewUniformLightSampler(ls, 10),
-		Camera: camera, SamplingConfig: core.SamplingConfig{MaxDepth: 5},
+		Camera: camera, SamplingConfig: scene.SamplingConfig{MaxDepth: 5},
 	}
 
 	// Initialize BVH and preprocess lights
@@ -467,20 +467,20 @@ func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera 
 
 // TestLightPathDirectionAndIntersection verifies that light paths are generated correctly
 func TestLightPathDirectionAndIntersection(t *testing.T) {
-	scene := createMinimalCornellScene(false)
+	testScene := createMinimalCornellScene(false)
 
 	// Generate multiple light paths to test consistency
 	seed := int64(42)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
 
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
+	bdptConfig := scene.SamplingConfig{MaxDepth: 5}
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
 
 	successfulPaths := 0
 	totalPaths := 10
 
 	for i := 0; i < totalPaths; i++ {
-		lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
+		lightPath := bdptIntegrator.generateLightPath(testScene, sampler, bdptConfig.MaxDepth)
 
 		t.Logf("Light path %d: length=%d", i, lightPath.Length)
 
@@ -546,7 +546,7 @@ func TestLightPathDirectionAndIntersection(t *testing.T) {
 
 // TestBDPTCameraPathHitsLight tests that camera paths can find light sources
 func TestBDPTCameraPathHitsLight(t *testing.T) {
-	scene := createMinimalCornellScene(false)
+	testScene := createMinimalCornellScene(false)
 
 	// Create a ray that should hit the light directly
 	rayToLight := core.NewRay(
@@ -557,11 +557,11 @@ func TestBDPTCameraPathHitsLight(t *testing.T) {
 	seed := int64(42)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
 
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
+	bdptConfig := scene.SamplingConfig{MaxDepth: 5}
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
 
 	// Generate camera path that should hit the light
-	cameraPath := bdptIntegrator.generateCameraPath(rayToLight, scene, sampler, bdptConfig.MaxDepth)
+	cameraPath := bdptIntegrator.generateCameraPath(rayToLight, testScene, sampler, bdptConfig.MaxDepth)
 
 	// Assert: Camera path should have at least 2 vertices (camera + light hit)
 	if cameraPath.Length < 2 {
@@ -599,12 +599,12 @@ func TestBDPTCameraPathHitsLight(t *testing.T) {
 
 // TestBDPTConnectionStrategy tests that BDPT can connect camera and light paths
 func TestBDPTConnectionStrategy(t *testing.T) {
-	scene := createMinimalCornellScene(false)
+	testScene := createMinimalCornellScene(false)
 
 	seed := int64(42)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
 
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
+	bdptConfig := scene.SamplingConfig{MaxDepth: 5}
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
 
 	// Generate camera path that hits floor
@@ -612,10 +612,10 @@ func TestBDPTConnectionStrategy(t *testing.T) {
 		core.NewVec3(278, 400, -200),
 		core.NewVec3(0, -1, 0.5).Normalize(),
 	)
-	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
+	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, testScene, sampler, bdptConfig.MaxDepth)
 
 	// Generate light path
-	lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
+	lightPath := bdptIntegrator.generateLightPath(testScene, sampler, bdptConfig.MaxDepth)
 
 	// Assert: Both paths should exist
 	if cameraPath.Length == 0 {
@@ -650,7 +650,7 @@ func TestBDPTConnectionStrategy(t *testing.T) {
 	if cameraPath.Length >= 2 && lightPath.Length >= 1 {
 		// s=1: light source (first vertex in light path)
 		// t=2: floor hit (second vertex in camera path, first bounce from camera)
-		contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, 1, 2, scene)
+		contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, 1, 2, testScene)
 		t.Logf("Connection strategy (s=0, t=1) contribution: %v (luminance: %.6f)",
 			contribution, contribution.Luminance())
 
@@ -663,12 +663,12 @@ func TestBDPTConnectionStrategy(t *testing.T) {
 
 // TestBDPTPathIndexing verifies how paths are indexed in our implementation
 func TestBDPTPathIndexing(t *testing.T) {
-	scene := createMinimalCornellScene(false)
+	testScene := createMinimalCornellScene(false)
 
 	seed := int64(42)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(seed)))
 
-	bdptConfig := core.SamplingConfig{MaxDepth: 5}
+	bdptConfig := scene.SamplingConfig{MaxDepth: 5}
 	bdptIntegrator := NewBDPTIntegrator(bdptConfig)
 
 	// Generate camera path that hits floor
@@ -676,10 +676,10 @@ func TestBDPTPathIndexing(t *testing.T) {
 		core.NewVec3(278, 400, -200),
 		core.NewVec3(0, -1, 0.5).Normalize(),
 	)
-	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, scene, sampler, bdptConfig.MaxDepth)
+	cameraPath := bdptIntegrator.generateCameraPath(rayToFloor, testScene, sampler, bdptConfig.MaxDepth)
 
 	// Generate light path
-	lightPath := bdptIntegrator.generateLightPath(scene, sampler, bdptConfig.MaxDepth)
+	lightPath := bdptIntegrator.generateLightPath(testScene, sampler, bdptConfig.MaxDepth)
 
 	t.Logf("=== CAMERA PATH (length %d) ===", cameraPath.Length)
 	for i, vertex := range cameraPath.Vertices {
@@ -704,7 +704,7 @@ func TestBDPTPathIndexing(t *testing.T) {
 		t.Logf("t=1 should be first camera bounce: %v", cameraPath.Vertices[1])
 
 		// Now using proper 0-based indexing
-		contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, 0, 1, scene)
+		contribution := bdptIntegrator.evaluateConnectionStrategy(cameraPath, lightPath, 0, 1, testScene)
 		t.Logf("Connection contribution: %v (luminance: %.6f)", contribution, contribution.Luminance())
 	}
 }

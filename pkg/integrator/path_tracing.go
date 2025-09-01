@@ -13,12 +13,12 @@ import (
 
 // PathTracingIntegrator implements unidirectional path tracing
 type PathTracingIntegrator struct {
-	config  core.SamplingConfig
+	config  scene.SamplingConfig
 	Verbose bool
 }
 
 // NewPathTracingIntegrator creates a new path tracing integrator
-func NewPathTracingIntegrator(config core.SamplingConfig) *PathTracingIntegrator {
+func NewPathTracingIntegrator(config scene.SamplingConfig) *PathTracingIntegrator {
 	return &PathTracingIntegrator{
 		config:  config,
 		Verbose: false,

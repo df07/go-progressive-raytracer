@@ -62,7 +62,7 @@ type BDPTIntegrator struct {
 }
 
 // NewBDPTIntegrator creates a new BDPT integrator
-func NewBDPTIntegrator(config core.SamplingConfig) *BDPTIntegrator {
+func NewBDPTIntegrator(config scene.SamplingConfig) *BDPTIntegrator {
 	return &BDPTIntegrator{
 		PathTracingIntegrator: NewPathTracingIntegrator(config),
 		Verbose:               false,

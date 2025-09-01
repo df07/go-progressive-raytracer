@@ -68,8 +68,8 @@ func setupCausticGlassCamera(cameraOverrides ...geometry.CameraConfig) geometry.
 
 // createCausticGlassSamplingConfig creates sampling configuration optimized for glass caustics
 // Based on PBRT scene using 8192 samples and max depth 20
-func createCausticGlassSamplingConfig() core.SamplingConfig {
-	return core.SamplingConfig{
+func createCausticGlassSamplingConfig() SamplingConfig {
+	return SamplingConfig{
 		SamplesPerPixel:           8192,  // Match PBRT pixelsamples
 		MaxDepth:                  20,    // Match PBRT maxdepth
 		RussianRouletteMinBounces: 16,    // Conservative for caustics

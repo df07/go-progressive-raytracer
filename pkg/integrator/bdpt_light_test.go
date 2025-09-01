@@ -4,11 +4,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/df07/go-progressive-raytracer/pkg/lights"
-	ls "github.com/df07/go-progressive-raytracer/pkg/lights"
-
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"github.com/df07/go-progressive-raytracer/pkg/material"
+	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
 
 // ============================================================================
@@ -18,7 +17,7 @@ import (
 
 // TestEvaluatePathTracingStrategy tests s=0 strategies
 func TestEvaluatePathTracingStrategy(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 3})
 
 	tests := []struct {
 		name                   string
@@ -160,12 +159,12 @@ func calculateExpectedDirectLighting(vertex Vertex, lightPoint core.Vec3, emissi
 
 // TestEvaluateDirectLightingStrategy tests s=1 strategies with various scenarios
 func TestEvaluateDirectLightingStrategy(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 3})
 
 	tests := []struct {
 		name                   string
 		cameraVertex           Vertex
-		light                  ls.Light
+		light                  lights.Light
 		sampler                *TestSampler
 		expectedLightPoint     core.Vec3
 		expectedContribution   core.Vec3
@@ -207,7 +206,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
-			light: ls.NewPointSpotLight(
+			light: lights.NewPointSpotLight(
 				core.NewVec3(0, 2, 0),       // light position above surface
 				core.NewVec3(0, 2, -10),     // pointing away from surface
 				core.NewVec3(5.0, 5.0, 5.0), // emission
@@ -233,7 +232,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
-			light: ls.NewQuadLight(
+			light: lights.NewQuadLight(
 				core.NewVec3(-0.5, -2.0, -0.5), // corner below surface
 				core.NewVec3(1.0, 0.0, 0.0),    // u vector
 				core.NewVec3(0.0, 0.0, 1.0),    // v vector
@@ -259,7 +258,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
 				IsSpecular: true,
 			},
-			light: ls.NewQuadLight(
+			light: lights.NewQuadLight(
 				core.NewVec3(-0.5, 2.0, -0.5),
 				core.NewVec3(1.0, 0.0, 0.0),
 				core.NewVec3(0.0, 0.0, 1.0),
@@ -284,7 +283,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 				Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
 				Beta:     core.Vec3{X: 0, Y: 0, Z: 0}, // zero throughput
 			},
-			light: ls.NewQuadLight(
+			light: lights.NewQuadLight(
 				core.NewVec3(-0.5, 2.0, -0.5),
 				core.NewVec3(1.0, 0.0, 0.0),
 				core.NewVec3(0.0, 0.0, 1.0),
@@ -361,7 +360,7 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 
 // TestEvaluateConnectionStrategy tests s>1,t>1 connection strategies
 func TestEvaluateConnectionStrategy(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 3})
 
 	// Use existing scene creation helper
 	scene, _ := createGlancingTestSceneAndRay(material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)))
@@ -614,7 +613,7 @@ func isClose(a, b core.Vec3, tolerance float64) bool {
 
 // TestEvaluateLightTracingStrategy tests t=1 strategies
 func TestEvaluateLightTracingStrategy(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 3})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 3})
 
 	// Use existing scene creation helper
 	scene, glancingRay := createGlancingTestSceneAndRay(material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)))
@@ -804,7 +803,7 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 
 // TestCameraPathBetaPropagation tests beta calculation through actual BDPT methods
 func TestCameraPathBetaPropagation(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 5})
 
 	// Create a glancing ray that comes from the camera and hits the sphere at an angle
 	// Camera is at origin, sphere is at (0,0,-2) with radius 1
@@ -914,7 +913,7 @@ func TestCameraPathBetaPropagation(t *testing.T) {
 
 // TestLightPathBetaPropagation tests beta calculation through light path generation
 func TestLightPathBetaPropagation(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 5})
 
 	sharedSampler := NewTestSampler(
 		[]float64{0.0, 0.5, 0.5}, // light selection + material sampling

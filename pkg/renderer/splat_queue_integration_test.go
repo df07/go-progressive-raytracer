@@ -46,7 +46,7 @@ func TestTileRendererWithSplats(t *testing.T) {
 	}
 	camera := geometry.NewCamera(cameraConfig)
 
-	samplingConfig := core.SamplingConfig{
+	samplingConfig := scene.SamplingConfig{
 		Width:           10,
 		Height:          10,
 		SamplesPerPixel: 2,
@@ -138,7 +138,7 @@ func TestTileRendererWithSplats(t *testing.T) {
 
 func TestSplatSystemIntegration(t *testing.T) {
 	// Create BDPT integrator to test real splat generation
-	config := core.SamplingConfig{
+	config := scene.SamplingConfig{
 		Width:                     20,
 		Height:                    20,
 		SamplesPerPixel:           1,

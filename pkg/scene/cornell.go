@@ -67,8 +67,8 @@ func setupCornellCamera(cameraOverrides ...geometry.CameraConfig) geometry.Camer
 }
 
 // createCornellSamplingConfig creates the sampling configuration for Cornell box scenes
-func createCornellSamplingConfig() core.SamplingConfig {
-	return core.SamplingConfig{
+func createCornellSamplingConfig() SamplingConfig {
+	return SamplingConfig{
 		SamplesPerPixel:           150,
 		MaxDepth:                  5,
 		RussianRouletteMinBounces: 16,    // Need a lot of bounces for indirect lighting

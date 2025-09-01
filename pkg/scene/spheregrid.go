@@ -66,7 +66,7 @@ func NewSphereGridScene(gridSize int, materialFinish string, cameraOverrides ...
 		cameraConfig = geometry.MergeCameraConfig(defaultCameraConfig, cameraOverrides[0])
 	}
 
-	samplingConfig := core.SamplingConfig{
+	samplingConfig := SamplingConfig{
 		SamplesPerPixel:           100,
 		MaxDepth:                  40,
 		RussianRouletteMinBounces: 12,    // Moderate bounces for metallic reflections

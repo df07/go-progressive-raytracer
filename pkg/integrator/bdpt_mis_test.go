@@ -142,7 +142,7 @@ func TestVertexConvertSolidAngleToAreaPdf(t *testing.T) {
 
 // TestCalculateMISWeight tests MIS weight computation with comprehensive scenarios
 func TestCalculateMISWeight(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 8})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 8})
 
 	// Helper to create test materials
 	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
@@ -428,7 +428,7 @@ func TestCalculateMISWeight(t *testing.T) {
 
 // TestCalculateMISWeightComparison tests that both MIS weight implementations produce identical results
 func TestCalculateMISWeightComparison(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 8})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 8})
 
 	// Helper to create test materials
 	white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
@@ -680,7 +680,7 @@ func TestCalculateMISWeightComparison(t *testing.T) {
 
 // TestCalculateVertexPdf tests individual PDF calculations
 func TestCalculateVertexPdf(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 5})
 	scene := createSimpleTestScene()
 
 	tests := []struct {
@@ -743,7 +743,7 @@ func TestCalculateVertexPdf(t *testing.T) {
 // TestPdfPropagation tests PDF forward/reverse calculation with comprehensive scenarios
 // This is critical for BDPT correctness - PDF propagation errors cause biased rendering
 func TestPdfPropagation(t *testing.T) {
-	integrator := NewBDPTIntegrator(core.SamplingConfig{MaxDepth: 5})
+	integrator := NewBDPTIntegrator(scene.SamplingConfig{MaxDepth: 5})
 
 	// Comprehensive table-driven test for PDF propagation in both camera and light paths
 	tests := []struct {

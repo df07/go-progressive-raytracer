@@ -68,8 +68,8 @@ func setupDragonCamera(cameraOverrides ...geometry.CameraConfig) geometry.Camera
 }
 
 // createDragonSamplingConfig creates sampling configuration optimized for complex mesh
-func createDragonSamplingConfig() core.SamplingConfig {
-	return core.SamplingConfig{
+func createDragonSamplingConfig() SamplingConfig {
+	return SamplingConfig{
 		SamplesPerPixel:           200,  // Higher samples for quality
 		MaxDepth:                  50,   // Deep bounces for complex geometry
 		RussianRouletteMinBounces: 15,   // More bounces before Russian Roulette
