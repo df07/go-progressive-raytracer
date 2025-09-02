@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
-	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 func TestDiscSpotLightFalloff(t *testing.T) {
@@ -223,8 +222,7 @@ func TestDiscSpotLightShapeInterface(t *testing.T) {
 
 	// Test Hit method
 	ray := core.NewRay(core.NewVec3(0, 2, 0), core.NewVec3(0, -1, 0))
-	hit := &material.HitRecord{}
-	didHit := spotLight.Hit(ray, 0.001, 10.0, hit)
+	hit, didHit := spotLight.Hit(ray, 0.001, 10.0)
 
 	if !didHit {
 		t.Errorf("Expected ray to hit spot light disc")

@@ -122,22 +122,21 @@ func (b *Box) generateFaces() {
 }
 
 // Hit tests if a ray intersects with any face of the box
-func (b *Box) Hit(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
-	hitAnything := false
+func (b *Box) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+	var closestHit *material.HitRecord
 	closestT := tMax
 
 	// Test intersection with all 6 faces
 	for _, face := range b.faces {
-		if face.Hit(ray, tMin, closestT, hit) {
+		if hit, isHit := face.Hit(ray, tMin, closestT); isHit {
 			if hit.T < closestT {
 				closestT = hit.T
-				hitAnything = true
-				// hit is already filled by the face - no copying needed!
+				closestHit = hit
 			}
 		}
 	}
 
-	return hitAnything
+	return closestHit, closestHit != nil
 }
 
 // BoundingBox returns the axis-aligned bounding box for this box

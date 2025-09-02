@@ -117,8 +117,7 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) LightSam
 
 	// Find intersection with sphere
 	ray := core.NewRay(point, direction)
-	hitRecord := &material.HitRecord{}
-	hit := sl.Sphere.Hit(ray, 0.001, math.Inf(1), hitRecord)
+	hitRecord, hit := sl.Sphere.Hit(ray, 0.001, math.Inf(1))
 	if !hit {
 		// This shouldn't happen if our math is correct, but handle it gracefully
 		return sl.sampleUniform(point, sample)
@@ -145,8 +144,7 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) LightSam
 func (sl *SphereLight) PDF(point, normal, direction core.Vec3) float64 {
 	// Check if ray from point in direction hits the sphere
 	ray := core.NewRay(point, direction)
-	hitRecord := &material.HitRecord{}
-	hit := sl.Sphere.Hit(ray, 0.001, math.Inf(1), hitRecord)
+	_, hit := sl.Sphere.Hit(ray, 0.001, math.Inf(1))
 	if !hit {
 		return 0.0
 	}

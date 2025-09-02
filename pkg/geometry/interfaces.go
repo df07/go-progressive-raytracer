@@ -7,7 +7,7 @@ import (
 
 // Shape interface for objects that can be hit by rays
 type Shape interface {
-	Hit(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool
+	Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 	BoundingBox() AABB
 }
 

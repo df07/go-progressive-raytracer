@@ -80,8 +80,7 @@ func (ql *QuadLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 func (ql *QuadLight) PDF(point, normal, direction core.Vec3) float64 {
 	// Check if ray from point in direction hits the quad
 	ray := core.NewRay(point, direction)
-	hitRecord := &material.HitRecord{}
-	hit := ql.Quad.Hit(ray, 0.001, math.Inf(1), hitRecord)
+	hitRecord, hit := ql.Quad.Hit(ray, 0.001, math.Inf(1))
 	if !hit {
 		return 0.0
 	}

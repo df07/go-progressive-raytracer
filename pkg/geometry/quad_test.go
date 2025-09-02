@@ -19,8 +19,7 @@ func TestQuad_Hit_BasicIntersection(t *testing.T) {
 	// Ray shooting down at the center of the quad
 	ray := core.NewRay(core.NewVec3(0.5, 1, 0.5), core.NewVec3(0, -1, 0))
 
-	hit := &material.HitRecord{}
-	isHit := quad.Hit(ray, 0.001, 1000.0, hit)
+	hit, isHit := quad.Hit(ray, 0.001, 1000.0)
 	if !isHit {
 		t.Fatal("Expected hit, but got miss")
 	}
@@ -76,8 +75,7 @@ func TestQuad_Hit_OutsideBounds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ray := core.NewRay(tt.rayOrigin, tt.rayDir)
-			hit := &material.HitRecord{}
-			isHit := quad.Hit(ray, 0.001, 1000.0, hit)
+			hit, isHit := quad.Hit(ray, 0.001, 1000.0)
 			if isHit {
 				t.Errorf("Expected miss for ray outside bounds, but got hit at t=%f", hit.T)
 			}
@@ -102,8 +100,7 @@ func TestQuad_Hit_CornerHits(t *testing.T) {
 	for i, cornerPoint := range corners {
 		t.Run(fmt.Sprintf("corner_%d", i), func(t *testing.T) {
 			ray := core.NewRay(cornerPoint.Add(core.NewVec3(0, 1, 0)), core.NewVec3(0, -1, 0))
-			hit := &material.HitRecord{}
-			isHit := quad.Hit(ray, 0.001, 1000.0, hit)
+			_, isHit := quad.Hit(ray, 0.001, 1000.0)
 			if !isHit {
 				t.Errorf("Expected hit at corner %v, but got miss", cornerPoint)
 			}
@@ -121,8 +118,7 @@ func TestQuad_Hit_ParallelRay(t *testing.T) {
 	// Ray parallel to the quad
 	ray := core.NewRay(core.NewVec3(0.5, 1, 0.5), core.NewVec3(1, 0, 0))
 
-	hit := &material.HitRecord{}
-	isHit := quad.Hit(ray, 0.001, 1000.0, hit)
+	_, isHit := quad.Hit(ray, 0.001, 1000.0)
 	if isHit {
 		t.Error("Expected miss for parallel ray, but got hit")
 	}

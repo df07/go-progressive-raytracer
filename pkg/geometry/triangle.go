@@ -61,7 +61,7 @@ func (t *Triangle) computeBoundingBox() {
 }
 
 // Hit tests if a ray intersects with the triangle using the Möller-Trumbore algorithm
-func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.HitRecord) bool {
+func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	const epsilon = 1e-8
 
 	// Calculate two edge vectors
@@ -74,7 +74,7 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.Hit
 
 	// If determinant is near zero, ray lies in plane of triangle
 	if a > -epsilon && a < epsilon {
-		return false
+		return nil, false
 	}
 
 	f := 1.0 / a
@@ -83,7 +83,7 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.Hit
 
 	// Check if intersection is outside triangle
 	if u < 0.0 || u > 1.0 {
-		return false
+		return nil, false
 	}
 
 	q := s.Cross(edge1)
@@ -91,7 +91,7 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.Hit
 
 	// Check if intersection is outside triangle
 	if v < 0.0 || u+v > 1.0 {
-		return false
+		return nil, false
 	}
 
 	// Calculate t parameter
@@ -99,21 +99,23 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.Hit
 
 	// Check if intersection is within valid range
 	if t_param < tMin || t_param > tMax {
-		return false
+		return nil, false
 	}
 
 	// Calculate intersection point
 	hitPoint := ray.At(t_param)
 
-	// Fill in hit record
-	hitRecord.T = t_param
-	hitRecord.Point = hitPoint
-	hitRecord.Material = t.Material
+	// Create hit record
+	hitRecord := &material.HitRecord{
+		T:        t_param,
+		Point:    hitPoint,
+		Material: t.Material,
+	}
 
 	// Set face normal
 	hitRecord.SetFaceNormal(ray, t.normal)
 
-	return true
+	return hitRecord, true
 }
 
 // BoundingBox returns the axis-aligned bounding box for this triangle

@@ -43,17 +43,17 @@ func NewDisc(center, normal core.Vec3, radius float64, material material.Materia
 }
 
 // Hit implements the Shape interface
-func (d *Disc) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.HitRecord) bool {
+func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
 	// Check if ray intersects the plane containing the disc
 	denom := d.Normal.Dot(ray.Direction)
 	if math.Abs(denom) < 1e-6 {
-		return false // Ray is parallel to disc
+		return nil, false // Ray is parallel to disc
 	}
 
 	// Calculate intersection with plane
 	t := d.Normal.Dot(d.Center.Subtract(ray.Origin)) / denom
 	if t < tMin || t > tMax {
-		return false
+		return nil, false
 	}
 
 	// Check if intersection point is within disc radius
@@ -62,18 +62,20 @@ func (d *Disc) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.HitReco
 	distanceSquared := centerToHit.LengthSquared()
 
 	if distanceSquared > d.Radius*d.Radius {
-		return false // Outside disc
+		return nil, false // Outside disc
 	}
 
-	// Fill in hit record
-	hitRecord.Point = hitPoint
-	hitRecord.T = t
-	hitRecord.Material = d.Material
+	// Create hit record
+	hitRecord := &material.HitRecord{
+		Point:    hitPoint,
+		T:        t,
+		Material: d.Material,
+	}
 
 	// Set face normal
 	hitRecord.SetFaceNormal(ray, d.Normal)
 
-	return true
+	return hitRecord, true
 }
 
 // BoundingBox implements the Shape interface

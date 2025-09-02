@@ -78,8 +78,7 @@ func (dl *DiscLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 func (dl *DiscLight) PDF(point, normal, direction core.Vec3) float64 {
 	// Check if ray from point in direction hits the disc
 	ray := core.NewRay(point, direction)
-	var hitRecord material.HitRecord
-	hit := dl.Disc.Hit(ray, 0.001, math.Inf(1), &hitRecord)
+	hitRecord, hit := dl.Disc.Hit(ray, 0.001, math.Inf(1))
 	if !hit {
 		return 0.0
 	}

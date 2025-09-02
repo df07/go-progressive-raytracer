@@ -123,8 +123,7 @@ func TestBox_Hit_AxisAligned(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hit := &material.HitRecord{}
-			isHit := box.Hit(tt.ray, tt.tMin, tt.tMax, hit)
+			hit, isHit := box.Hit(tt.ray, tt.tMin, tt.tMax)
 
 			if isHit != tt.shouldHit {
 				t.Errorf("Expected hit=%v, got hit=%v", tt.shouldHit, isHit)
@@ -213,8 +212,7 @@ func TestBox_Hit_Rotated(t *testing.T) {
 		core.NewVec3(0, 0, 1),  // direction (toward +Z)
 	)
 
-	hit := &material.HitRecord{}
-	isHit := box.Hit(ray, 0.001, 10.0, hit)
+	hit, isHit := box.Hit(ray, 0.001, 10.0)
 
 	if !isHit {
 		t.Error("Expected ray to hit rotated box")

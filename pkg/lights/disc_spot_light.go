@@ -171,8 +171,8 @@ func (dsl *DiscSpotLight) GetIntensityAt(point core.Vec3) core.Vec3 {
 }
 
 // Hit implements the Shape interface for caustic ray intersection
-func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
-	return dsl.discLight.Hit(ray, tMin, tMax, hit)
+func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+	return dsl.discLight.Hit(ray, tMin, tMax)
 }
 
 // BoundingBox implements the Shape interface

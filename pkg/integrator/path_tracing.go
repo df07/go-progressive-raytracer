@@ -45,8 +45,7 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene *scene.Sc
 	}
 
 	// Check for intersections with objects using scene's BVH
-	var hit material.HitRecord
-	isHit := scene.BVH.Hit(ray, 0.001, math.Inf(1), &hit)
+	hit, isHit := scene.BVH.Hit(ray, 0.001, math.Inf(1))
 	if !isHit {
 		// Check for infinite light emission
 		ls := scene.Lights
@@ -61,10 +60,10 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene *scene.Sc
 	}
 
 	// Start with emitted light from the hit material
-	colorEmitted := pt.GetEmittedLight(ray, &hit)
+	colorEmitted := pt.GetEmittedLight(ray, hit)
 
 	// Try to scatter the ray
-	scatter, didScatter := hit.Material.Scatter(ray, hit, sampler)
+	scatter, didScatter := hit.Material.Scatter(ray, *hit, sampler)
 	if !didScatter {
 		// Material absorbed the ray, only return emitted light
 		// pt.logf("      pt[%d]    light: contribution=%v\n", pt.config.MaxDepth-depth, colorEmitted)
@@ -77,7 +76,7 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene *scene.Sc
 	if scatter.IsSpecular() {
 		colorScattered = pt.calculateSpecularColor(scatter, scene, depth, throughput, sampler)
 	} else {
-		colorScattered = pt.calculateDiffuseColor(scatter, &hit, scene, depth, throughput, sampler)
+		colorScattered = pt.calculateDiffuseColor(scatter, hit, scene, depth, throughput, sampler)
 	}
 
 	// Apply Russian Roulette compensation to the final result
@@ -123,8 +122,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, sca
 
 	// Check if light is visible (shadow ray)
 	shadowRay := core.NewRay(hit.Point, lightSample.Direction)
-	var shadowHit material.HitRecord
-	blocked := scene.BVH.Hit(shadowRay, 0.001, lightSample.Distance-0.001, &shadowHit)
+	_, blocked := scene.BVH.Hit(shadowRay, 0.001, lightSample.Distance-0.001)
 	if blocked {
 		// Light is blocked, no direct contribution
 		return core.Vec3{X: 0, Y: 0, Z: 0}

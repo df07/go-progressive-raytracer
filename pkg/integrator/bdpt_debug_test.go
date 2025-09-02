@@ -290,8 +290,7 @@ func TestInfiniteLightEmissionSampling(t *testing.T) {
 		t.Logf("  Direction toward scene center: %f (should be > 0.5)", dotProduct)
 
 		// Test ray intersection with scene
-		hit := &material.HitRecord{}
-		isHit := testScene.BVH.Hit(emissionRay, 0.001, math.Inf(1), hit)
+		hit, isHit := testScene.BVH.Hit(emissionRay, 0.001, math.Inf(1))
 		if isHit {
 			intersectionCount++
 			t.Logf("  HIT: %v (material: %v)", hit.Point, hit.Material != nil)

@@ -124,8 +124,7 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 	ray := camera.GetRay(pixelX, pixelY, sampler.Get2D(), sampler.Get2D())
 
 	// Cast the ray and find the first intersection using scene's BVH
-	var hit material.HitRecord
-	isHit := sceneObj.BVH.Hit(ray, 0.001, math.Inf(1), &hit)
+	hit, isHit := sceneObj.BVH.Hit(ray, 0.001, math.Inf(1))
 	if !isHit {
 		return InspectResult{Hit: false}
 	}
@@ -133,13 +132,12 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 	// Find the specific shape that was hit by testing all shapes
 	// (BVH doesn't return the shape, just the hit record)
 	shapes := sceneObj.Shapes
-	var shapeHit material.HitRecord
 	for _, shape := range shapes {
-		if shape.Hit(ray, 0.001, hit.T+0.001, &shapeHit) {
+		if shapeHit, shapeIsHit := shape.Hit(ray, 0.001, hit.T+0.001); shapeIsHit {
 			if shapeHit.T == hit.T { // Same intersection
 				return InspectResult{
 					Hit:       true,
-					HitRecord: &hit,
+					HitRecord: hit,
 					Shape:     shape,
 				}
 			}
@@ -149,7 +147,7 @@ func inspectPixel(sceneObj *scene.Scene, width, height, pixelX, pixelY int) Insp
 	// Fallback: return hit without specific shape
 	return InspectResult{
 		Hit:       true,
-		HitRecord: &hit,
+		HitRecord: hit,
 		Shape:     nil,
 	}
 }
