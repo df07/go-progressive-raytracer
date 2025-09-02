@@ -206,7 +206,8 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		vertexPrev := &path.Vertices[vertexPrevIndex] // Still need copy for calculations
 
 		// Check for intersections
-		hit, isHit := scene.BVH.Hit(currentRay, 0.001, math.Inf(1))
+		var hit material.HitRecord
+		isHit := scene.BVH.Hit(currentRay, 0.001, math.Inf(1), &hit)
 		if !isHit {
 			if isCameraPath {
 				// Hit background - check for infinite light emission
@@ -237,7 +238,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		}
 
 		// Capture emitted light from this vertex
-		vertex.EmittedLight = bdpt.GetEmittedLight(currentRay, hit)
+		vertex.EmittedLight = bdpt.GetEmittedLight(currentRay, &hit)
 		vertex.IsLight = !vertex.EmittedLight.IsZero()
 
 		// Set forward PDF into this vertex, from the pdf of the previous vertex
@@ -245,7 +246,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		vertex.AreaPdfForward = vertexPrev.convertSolidAngleToAreaPdf(&vertex, pdfFwd)
 
 		// Try to scatter the ray
-		scatter, didScatter := hit.Material.Scatter(currentRay, *hit, sampler)
+		scatter, didScatter := hit.Material.Scatter(currentRay, hit, sampler)
 		if !didScatter {
 			// Material absorbed the ray - add vertex and terminate path
 			path.Vertices = append(path.Vertices, vertex)
@@ -363,7 +364,8 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 	// Check if light is visible (shadow ray)
 	shadowRay := core.NewRay(cameraVertex.Point, lightSample.Direction)
-	_, blocked := scene.BVH.Hit(shadowRay, 0.001, lightSample.Distance-0.001)
+	var shadowHit material.HitRecord
+	blocked := scene.BVH.Hit(shadowRay, 0.001, lightSample.Distance-0.001, &shadowHit)
 	if blocked {
 		// Light is blocked, no direct contribution
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil
@@ -444,7 +446,8 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	// Visibility test
 	shadowRay := core.NewRay(lightVertex.Point, cameraSample.Ray.Direction.Multiply(-1))
 	distance := lightVertex.Point.Subtract(cameraSample.Ray.Origin).Length()
-	_, blocked := scene.BVH.Hit(shadowRay, 0.001, distance-0.001)
+	var shadowHit material.HitRecord
+	blocked := scene.BVH.Hit(shadowRay, 0.001, distance-0.001, &shadowHit)
 	if blocked {
 		return nil, nil
 	}
@@ -538,7 +541,8 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 
 	// Visibility test
 	shadowRay := core.NewRay(cameraVertex.Point, direction)
-	_, blocked := scene.BVH.Hit(shadowRay, 0.001, distance-0.001)
+	var shadowHit material.HitRecord
+	blocked := scene.BVH.Hit(shadowRay, 0.001, distance-0.001, &shadowHit)
 	if blocked {
 		// bdpt.logf(" (s=%d,t=%d) evaluateConnectionStrategy: blocked hit=%v\n", s, t, hit)
 		return core.Vec3{X: 0, Y: 0, Z: 0}

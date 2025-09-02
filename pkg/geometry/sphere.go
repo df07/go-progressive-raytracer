@@ -24,7 +24,7 @@ func NewSphere(center core.Vec3, radius float64, material material.Material) *Sp
 }
 
 // Hit tests if a ray intersects with the sphere
-func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.HitRecord) bool {
 	// Vector from ray origin to sphere center
 	oc := ray.Origin.Subtract(s.Center)
 
@@ -38,7 +38,7 @@ func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, boo
 
 	// No intersection if discriminant is negative
 	if discriminant < 0 {
-		return nil, false
+		return false
 	}
 
 	// Find the nearest intersection point within the valid range
@@ -51,22 +51,20 @@ func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, boo
 		root = (-halfB + sqrtD) / a
 		if root < tMin || root > tMax {
 			// Both intersections are outside valid range
-			return nil, false
+			return false
 		}
 	}
 
-	// Create hit record with material
-	hitRecord := &material.HitRecord{
-		T:        root,
-		Point:    ray.At(root),
-		Material: s.Material,
-	}
+	// Fill in hit record
+	hitRecord.T = root
+	hitRecord.Point = ray.At(root)
+	hitRecord.Material = s.Material
 
 	// Calculate outward normal (from center to hit point)
 	outwardNormal := hitRecord.Point.Subtract(s.Center).Multiply(1.0 / s.Radius)
 	hitRecord.SetFaceNormal(ray, outwardNormal)
 
-	return hitRecord, true
+	return true
 }
 
 // BoundingBox returns the axis-aligned bounding box for this sphere

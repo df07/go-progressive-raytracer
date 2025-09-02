@@ -180,62 +180,60 @@ func sortShapesByAxis(shapes []Shape, axis int) {
 }
 
 // Hit tests if a ray intersects any shape in the BVH
-func (bvh *BVH) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (bvh *BVH) Hit(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
 	if bvh.Root == nil {
-		return nil, false
+		return false
 	}
-	return bvh.hitNode(bvh.Root, ray, tMin, tMax)
+	return bvh.hitNode(bvh.Root, ray, tMin, tMax, hit)
 }
 
 // hitNode recursively tests ray intersection with BVH nodes
-func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
 	// First check if ray hits the bounding box
 	if !node.BoundingBox.Hit(ray, tMin, tMax) {
-		return nil, false
+		return false
 	}
 
 	// If this is a leaf node, test against all shapes using linear search
 	if node.Shapes != nil {
-		var closestHit *material.HitRecord
 		hitAnything := false
 		closestSoFar := tMax
 
 		// Linear search through all shapes in the leaf
 		for _, shape := range node.Shapes {
-			if hit, isHit := shape.Hit(ray, tMin, closestSoFar); isHit {
+			if shape.Hit(ray, tMin, closestSoFar, hit) {
 				hitAnything = true
 				closestSoFar = hit.T
-				closestHit = hit
+				// hit is already filled by the shape - no copying needed!
 			}
 		}
 
-		return closestHit, hitAnything
+		return hitAnything
 	}
 
 	// Internal node - test both children
-	var closestHit *material.HitRecord
 	hitAnything := false
 	closestSoFar := tMax
 
 	// Test left child
 	if node.Left != nil {
-		if hit, isHit := bvh.hitNode(node.Left, ray, tMin, closestSoFar); isHit {
+		if bvh.hitNode(node.Left, ray, tMin, closestSoFar, hit) {
 			hitAnything = true
 			closestSoFar = hit.T
-			closestHit = hit
+			// hit is already filled by the recursive call
 		}
 	}
 
 	// Test right child
 	if node.Right != nil {
-		if hit, isHit := bvh.hitNode(node.Right, ray, tMin, closestSoFar); isHit {
+		if bvh.hitNode(node.Right, ray, tMin, closestSoFar, hit) {
 			hitAnything = true
 			closestSoFar = hit.T
-			closestHit = hit
+			// hit is already filled by the recursive call
 		}
 	}
 
-	return closestHit, hitAnything
+	return hitAnything
 }
 
 // BoundingBox implements the Shape interface - returns the overall bounding box of the BVH

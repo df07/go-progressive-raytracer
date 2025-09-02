@@ -130,13 +130,13 @@ func NewQuad(corner, u, v core.Vec3, material material.Material) *Quad {
 }
 
 // Hit tests if a ray intersects with the quad
-func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (q *Quad) Hit(ray core.Ray, tMin, tMax float64, hitRecord *material.HitRecord) bool {
 	// Calculate denominator: dot product of ray direction and quad normal
 	denominator := ray.Direction.Dot(q.Normal)
 
 	// If denominator is close to zero, ray is parallel to quad (no intersection)
 	if math.Abs(denominator) < 1e-8 {
-		return nil, false
+		return false
 	}
 
 	// Calculate t parameter for plane intersection
@@ -144,7 +144,7 @@ func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 
 	// Check if intersection is within valid range
 	if t < tMin || t > tMax {
-		return nil, false
+		return false
 	}
 
 	// Calculate intersection point
@@ -159,20 +159,18 @@ func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 
 	// Check if point is within quad bounds
 	if alpha < 0 || alpha > 1 || beta < 0 || beta > 1 {
-		return nil, false
+		return false
 	}
 
-	// Create hit record
-	hitRecord := &material.HitRecord{
-		T:        t,
-		Point:    hitPoint,
-		Material: q.Material,
-	}
+	// Fill in the hit record
+	hitRecord.T = t
+	hitRecord.Point = hitPoint
+	hitRecord.Material = q.Material
 
 	// Set face normal
 	hitRecord.SetFaceNormal(ray, q.Normal)
 
-	return hitRecord, true
+	return true
 }
 
 // BoundingBox returns the axis-aligned bounding box for this quad

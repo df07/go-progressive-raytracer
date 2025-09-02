@@ -67,7 +67,8 @@ func TestDiscHit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hit, didHit := disc.Hit(tt.ray, tt.tMin, tt.tMax)
+			hit := &material.HitRecord{}
+			didHit := disc.Hit(tt.ray, tt.tMin, tt.tMax, hit)
 
 			if didHit != tt.shouldHit {
 				t.Errorf("Expected hit=%v, got hit=%v", tt.shouldHit, didHit)

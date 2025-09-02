@@ -120,9 +120,9 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material material.Materi
 }
 
 // Hit tests if a ray intersects with any triangle in the mesh
-func (tm *TriangleMesh) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (tm *TriangleMesh) Hit(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
 	// Use the BVH for fast intersection
-	return tm.bvh.Hit(ray, tMin, tMax)
+	return tm.bvh.Hit(ray, tMin, tMax, hit)
 }
 
 // BoundingBox returns the axis-aligned bounding box for the entire mesh

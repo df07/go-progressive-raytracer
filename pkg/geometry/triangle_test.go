@@ -95,7 +95,8 @@ func TestTriangle_Hit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hit, isHit := triangle.Hit(tt.ray, tt.tMin, tt.tMax)
+			hit := &material.HitRecord{}
+			isHit := triangle.Hit(tt.ray, tt.tMin, tt.tMax, hit)
 
 			if isHit != tt.shouldHit {
 				t.Errorf("Expected hit=%v, got hit=%v", tt.shouldHit, isHit)
@@ -225,7 +226,8 @@ func TestTriangleMesh_Hit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hit, isHit := mesh.Hit(tt.ray, 0.001, 10.0)
+			hit := &material.HitRecord{}
+			isHit := mesh.Hit(tt.ray, 0.001, 10.0, hit)
 
 			if isHit != tt.shouldHit {
 				t.Errorf("Expected hit=%v, got hit=%v", tt.shouldHit, isHit)

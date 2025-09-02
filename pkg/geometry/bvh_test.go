@@ -11,11 +11,11 @@ import (
 // MockShape for testing
 type MockShape struct {
 	boundingBox AABB
-	hitFn       func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
+	hitFn       func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool
 }
 
-func (m MockShape) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-	return m.hitFn(ray, tMin, tMax)
+func (m MockShape) Hit(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
+	return m.hitFn(ray, tMin, tMax, hit)
 }
 
 func (m MockShape) BoundingBox() AABB {
@@ -30,8 +30,8 @@ func TestBVH_LeafThresholdBoundary(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		shapes[i] = MockShape{
 			boundingBox: NewAABB(core.NewVec3(float64(i), 0, 0), core.NewVec3(float64(i)+1, 1, 1)),
-			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-				return nil, false // Never hit for simplicity
+			hitFn: func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
+				return false // Never hit for simplicity
 			},
 		}
 	}
@@ -50,8 +50,8 @@ func TestBVH_LeafThresholdBoundary(t *testing.T) {
 	// Test with leafThreshold + 1 shapes - should split
 	shapes = append(shapes, MockShape{
 		boundingBox: NewAABB(core.NewVec3(8, 0, 0), core.NewVec3(9, 1, 1)),
-		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-			return nil, false
+		hitFn: func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
+			return false
 		},
 	})
 
@@ -75,19 +75,17 @@ func TestBVH_EmptyAndSingleShape(t *testing.T) {
 	}
 
 	ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0))
-	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
+	var hit material.HitRecord
+	isHit := bvh.Hit(ray, 0.001, 1000.0, &hit)
 	if isHit {
 		t.Error("Expected no hit for empty BVH")
-	}
-	if hit != nil {
-		t.Error("Expected nil hit record for empty BVH")
 	}
 
 	// Test single shape BVH
 	shape := MockShape{
 		boundingBox: NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(1, 1, 1)),
-		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-			return &material.HitRecord{T: 1.0}, true
+		hitFn: func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
+			return true
 		},
 	}
 
@@ -106,12 +104,13 @@ func TestBVH_MultipleHitsInLeaf(t *testing.T) {
 	// Test that BVH correctly finds closest hit when multiple shapes in leaf hit
 
 	// Helper function to create hit function with specific t value
-	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-		return func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
+		return func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
 			if ray.Direction.X > 0 && tValue >= tMin && tValue <= tMax {
-				return &material.HitRecord{T: tValue}, true
+				hit.T = tValue
+				return true
 			}
-			return nil, false
+			return false
 		}
 	}
 
@@ -134,7 +133,8 @@ func TestBVH_MultipleHitsInLeaf(t *testing.T) {
 	bvh := NewBVH(shapes)
 	ray := core.NewRay(core.NewVec3(-1, 0.5, 0.5), core.NewVec3(1, 0, 0))
 
-	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
+	hit := &material.HitRecord{}
+	isHit := bvh.Hit(ray, 0.001, 1000.0, hit)
 	if !isHit {
 		t.Fatal("Expected hit")
 	}
@@ -150,10 +150,10 @@ func TestBVH_RayHitsBoundingBoxButMissesShapes(t *testing.T) {
 
 	shape := MockShape{
 		boundingBox: NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(2, 2, 2)),
-		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+		hitFn: func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
 			// Shape occupies only a small part of its bounding box
 			// Ray hits bounding box but misses actual shape
-			return nil, false
+			return false
 		},
 	}
 
@@ -162,12 +162,10 @@ func TestBVH_RayHitsBoundingBoxButMissesShapes(t *testing.T) {
 	// Ray that goes through the bounding box but misses the shape
 	ray := core.NewRay(core.NewVec3(-1, 1, 1), core.NewVec3(1, 0, 0))
 
-	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
+	var hit material.HitRecord
+	isHit := bvh.Hit(ray, 0.001, 1000.0, &hit)
 	if isHit {
 		t.Error("Expected miss when ray hits bounding box but misses shape")
-	}
-	if hit != nil {
-		t.Error("Expected nil hit record when no shapes are hit")
 	}
 }
 
@@ -179,8 +177,8 @@ func TestBVH_StatsCollection(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		shapes[i] = MockShape{
 			boundingBox: NewAABB(core.NewVec3(float64(i), 0, 0), core.NewVec3(float64(i)+1, 1, 1)),
-			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-				return nil, false
+			hitFn: func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
+				return false
 			},
 		}
 	}
@@ -218,12 +216,13 @@ func TestBVH_IdenticalBoundingBoxes(t *testing.T) {
 	shapes := make([]Shape, 5)
 
 	// Helper function to create hit function with specific t value
-	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-		return func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
+		return func(ray core.Ray, tMin, tMax float64, hit *material.HitRecord) bool {
 			if ray.Direction.X > 0 && tValue >= tMin && tValue <= tMax {
-				return &material.HitRecord{T: tValue}, true
+				hit.T = tValue
+				return true
 			}
-			return nil, false
+			return false
 		}
 	}
 
@@ -237,7 +236,8 @@ func TestBVH_IdenticalBoundingBoxes(t *testing.T) {
 	bvh := NewBVH(shapes)
 	ray := core.NewRay(core.NewVec3(-1, 0.5, 0.5), core.NewVec3(1, 0, 0))
 
-	hit, isHit := bvh.Hit(ray, 0.001, 1000.0)
+	hit := &material.HitRecord{}
+	isHit := bvh.Hit(ray, 0.001, 1000.0, hit)
 	if !isHit {
 		t.Fatal("Expected hit")
 	}

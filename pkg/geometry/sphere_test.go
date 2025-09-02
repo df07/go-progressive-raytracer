@@ -27,7 +27,8 @@ func TestSphere_Hit_Miss(t *testing.T) {
 	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
 	ray := core.NewRay(core.NewVec3(2, 0, 0), core.NewVec3(0, 1, 0))
 
-	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
+	hit := &material.HitRecord{}
+	isHit := sphere.Hit(ray, 0.001, 1000.0, hit)
 	if isHit {
 		t.Errorf("Expected miss, but got hit at t=%f", hit.T)
 	}
@@ -65,7 +66,8 @@ func TestSphere_Hit_FrontAndBackFace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ray := core.NewRay(tt.rayOrigin, tt.rayDirection)
-			hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
+			hit := &material.HitRecord{}
+			isHit := sphere.Hit(ray, 0.001, 1000.0, hit)
 
 			if !isHit {
 				t.Fatal("Expected hit, but got miss")
@@ -93,7 +95,8 @@ func TestSphere_Hit_GlancingHit(t *testing.T) {
 	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
 	ray := core.NewRay(core.NewVec3(1, 0, 2), core.NewVec3(0, 0, -1))
 
-	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
+	hit := &material.HitRecord{}
+	isHit := sphere.Hit(ray, 0.001, 1000.0, hit)
 	if !isHit {
 		t.Fatal("Expected glancing hit, but got miss")
 	}
@@ -112,13 +115,14 @@ func TestSphere_Hit_Bounds(t *testing.T) {
 	ray := core.NewRay(core.NewVec3(0, 0, 2), core.NewVec3(0, 0, -1))
 
 	// Test tMax bound
-	hit, isHit := sphere.Hit(ray, 0.001, 0.5)
+	hit := &material.HitRecord{}
+	isHit := sphere.Hit(ray, 0.001, 0.5, hit)
 	if isHit {
 		t.Errorf("Expected miss due to tMax bound, but got hit at t=%f", hit.T)
 	}
 
 	// Test tMin bound
-	hit, isHit = sphere.Hit(ray, 3.5, 1000.0)
+	isHit = sphere.Hit(ray, 3.5, 1000.0, hit)
 	if isHit {
 		t.Errorf("Expected miss due to tMin bound, but got hit at t=%f", hit.T)
 	}
@@ -128,7 +132,8 @@ func TestSphere_Hit_ClosestIntersection(t *testing.T) {
 	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
 	ray := core.NewRay(core.NewVec3(0, 0, 2), core.NewVec3(0, 0, -1))
 
-	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
+	hit := &material.HitRecord{}
+	isHit := sphere.Hit(ray, 0.001, 1000.0, hit)
 	if !isHit {
 		t.Fatal("Expected hit, but got miss")
 	}
