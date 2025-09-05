@@ -60,7 +60,7 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene *scene.Sc
 	}
 
 	// Start with emitted light from the hit material
-	colorEmitted := pt.GetEmittedLight(ray, hit)
+	colorEmitted := getEmittedLight(ray, hit)
 
 	// Try to scatter the ray
 	scatter, didScatter := hit.Material.Scatter(ray, *hit, sampler)
@@ -105,7 +105,7 @@ func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter material.ScatterR
 }
 
 // getEmittedLight returns the emitted light from a material if it's emissive
-func (pt *PathTracingIntegrator) GetEmittedLight(ray core.Ray, hit *material.HitRecord) core.Vec3 {
+func getEmittedLight(ray core.Ray, hit *material.HitRecord) core.Vec3 {
 	if emitter, isEmissive := hit.Material.(material.Emitter); isEmissive {
 		return emitter.Emit(ray)
 	}

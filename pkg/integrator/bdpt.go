@@ -57,15 +57,15 @@ type Path struct {
 
 // BDPTIntegrator implements bidirectional path tracing
 type BDPTIntegrator struct {
-	*PathTracingIntegrator
+	Config  scene.SamplingConfig
 	Verbose bool
 }
 
 // NewBDPTIntegrator creates a new BDPT integrator
 func NewBDPTIntegrator(config scene.SamplingConfig) *BDPTIntegrator {
 	return &BDPTIntegrator{
-		PathTracingIntegrator: NewPathTracingIntegrator(config),
-		Verbose:               false,
+		Config:  config,
+		Verbose: false,
 	}
 }
 
@@ -74,8 +74,8 @@ func NewBDPTIntegrator(config scene.SamplingConfig) *BDPTIntegrator {
 func (bdpt *BDPTIntegrator) RayColor(ray core.Ray, scene *scene.Scene, sampler core.Sampler) (core.Vec3, []SplatRay) {
 
 	// Generate random camera and light paths
-	cameraPath := bdpt.generateCameraPath(ray, scene, sampler, bdpt.config.MaxDepth)
-	lightPath := bdpt.generateLightPath(scene, sampler, bdpt.config.MaxDepth)
+	cameraPath := bdpt.generateCameraPath(ray, scene, sampler, bdpt.Config.MaxDepth)
+	lightPath := bdpt.generateLightPath(scene, sampler, bdpt.Config.MaxDepth)
 
 	// Evaluate all combinations of camera and light paths with MIS weighting
 	var totalLight core.Vec3
@@ -237,7 +237,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 		}
 
 		// Capture emitted light from this vertex
-		vertex.EmittedLight = bdpt.GetEmittedLight(currentRay, hit)
+		vertex.EmittedLight = getEmittedLight(currentRay, hit)
 		vertex.IsLight = !vertex.EmittedLight.IsZero()
 
 		// Set forward PDF into this vertex, from the pdf of the previous vertex
