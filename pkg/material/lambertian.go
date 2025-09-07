@@ -41,9 +41,9 @@ func (l *Lambertian) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (l *Lambertian) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+func (l *Lambertian) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
 	// Lambertian BRDF is constant: albedo / π
-	cosTheta := outgoingDir.Dot(normal)
+	cosTheta := outgoingDir.Dot(hit.Normal)
 	if cosTheta <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0} // Below surface
 	}

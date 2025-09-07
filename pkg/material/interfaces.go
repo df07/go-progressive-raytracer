@@ -4,15 +4,24 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 )
 
+// TransportMode indicates the type of transport for proper BRDF evaluation
+// Matches PBRT's TransportMode enum semantics
+type TransportMode int
+
+const (
+	Radiance   TransportMode = iota // Radiance transport (used by camera vertices)
+	Importance                      // Importance transport (used by light vertices)
+)
+
 // Material interface for objects that can scatter rays
 type Material interface {
-	// Existing method - generates random scattered direction
+	// Generates random scattered direction
 	Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool)
 
-	// NEW: Evaluate BRDF for specific incoming/outgoing directions
-	EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3
+	// Evaluate BRDF for specific incoming/outgoing directions with transport mode
+	EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3
 
-	// NEW: Calculate PDF for specific incoming/outgoing directions
+	// Calculate PDF for specific incoming/outgoing directions
 	// Returns (pdf, isDelta) where isDelta indicates if this is a delta function (specular)
 	PDF(incomingDir, outgoingDir, normal core.Vec3) (pdf float64, isDelta bool)
 }

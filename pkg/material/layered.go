@@ -74,7 +74,7 @@ func (l *Layered) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (l *Layered) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+func (l *Layered) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
 	// Our layered material models two-step scattering:
 	// 1. Outer material scatters first
 	// 2. If outer scatters inward, inner material scatters (ignoring outer on exit)
@@ -83,12 +83,12 @@ func (l *Layered) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.
 	// We can check if the incoming/outgoing pair represents reflection or transmission
 
 	// Check if this looks like a reflection from the outer dielectric
-	if isReflectionPath(incomingDir, outgoingDir, normal) {
-		return l.Outer.EvaluateBRDF(incomingDir, outgoingDir, normal)
+	if isReflectionPath(incomingDir, outgoingDir, hit.Normal) {
+		return l.Outer.EvaluateBRDF(incomingDir, outgoingDir, hit, mode)
 	}
 
 	// Transmission path - inner material PDF
-	return l.Inner.EvaluateBRDF(incomingDir, outgoingDir, normal)
+	return l.Inner.EvaluateBRDF(incomingDir, outgoingDir, hit, mode)
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions

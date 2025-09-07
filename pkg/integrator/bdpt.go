@@ -17,6 +17,7 @@ type Vertex struct {
 	Light      lights.Light      // Light at this vertex (TODO: remove after cleanup)
 	LightIndex int               // Index of light in scene's light array (-1 if not a light vertex)
 	Material   material.Material // Material at this vertex
+	FrontFace  bool              // Whether hit was on the front face of the material TODO: replace with HitRecord
 
 	// Path tracing information
 	IncomingDirection core.Vec3 // Direction ray arrived from
@@ -232,6 +233,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 			Point:             hit.Point,
 			Normal:            hit.Normal,
 			Material:          hit.Material,
+			FrontFace:         hit.FrontFace,
 			IncomingDirection: currentRay.Direction.Multiply(-1),
 			Beta:              beta,
 		}
@@ -348,12 +350,21 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil // Light is behind the surface
 	}
 
+	// TODO: Replace with proper SurfaceInteraction struct to avoid redundant data
+	// For now, construct a temporary HitRecord from vertex data
+	hit := &material.HitRecord{
+		Point:     cameraVertex.Point,
+		Normal:    cameraVertex.Normal,
+		Material:  cameraVertex.Material,
+		FrontFace: cameraVertex.FrontFace,
+	}
+
 	// pbrt: L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta
 	// pbrt sampled.beta: light->Sample_Li / (Sample_Li &pdf * lightDistr &lightPdf)
 	// pbrt pdfFwd: sampled.PdfLightOrigin(scene, pt, lightDistr, lightToIndex)
 	//          => pdfPos * pdfChoice // Return solid angle density for non-infinite light sources
 	//          => pdfDir for light sample not used
-	brdf := cameraVertex.Material.EvaluateBRDF(cameraVertex.IncomingDirection, lightSample.Direction, cameraVertex.Normal)
+	brdf := cameraVertex.Material.EvaluateBRDF(cameraVertex.IncomingDirection, lightSample.Direction, hit, material.Radiance)
 	lightBeta := lightSample.Emission.Multiply(1 / lightSample.PDF) // light sample pdf contains light selection pdf
 	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosTheta)
 
@@ -415,14 +426,12 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	// PBRT formula: L = qs.beta * qs.f(sampled, TransportMode::Importance) * sampled.beta;
 	// where sampled.beta = Wi / pdf
 
-	// NOTE: PBRT uses TransportMode::Importance vs ::Radiance to handle the mathematical difference between
-	// radiance transport and importance transport in bidirectional path tracing. This matters for:
-	// 1. Non-symmetric BSDFs (especially dielectric materials with refraction)
-	// 2. Shading normals vs geometry normals
-	// Since we use symmetric materials with geometry normals, we can ignore the transport mode distinction.
-	// TODO: We do have dielectric materials with refraction - need to implement proper transport mode handling for those.
+	// NOTE: Bidirectional path tracing requires proper transport mode handling for non-symmetric BSDFs.
+	// This matters for dielectric materials with refraction where Fresnel coefficients depend on light direction.
+	// Forward transport: light → camera (PBRT calls this "radiance transport")
+	// Backward transport: camera → light (PBRT calls this "importance transport")
 
-	brdf := bdpt.evaluateBRDF(lightVertex, cameraSample.Ray.Direction.Multiply(-1))
+	brdf := bdpt.evaluateBRDF(lightVertex, cameraSample.Ray.Direction.Multiply(-1), material.Importance)
 	cameraBeta := cameraSample.Weight.Multiply(1 / cameraSample.PDF)
 
 	cosine := cameraSample.Ray.Direction.Multiply(-1).Dot(lightVertex.Normal)
@@ -517,7 +526,7 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	geometricTerm := (cosAtCamera * cosAtLight) / (distance * distance)
 
 	// Evaluate BRDF at camera vertex
-	cameraBRDF := bdpt.evaluateBRDF(cameraVertex, direction)
+	cameraBRDF := bdpt.evaluateBRDF(cameraVertex, direction, material.Radiance)
 
 	// Calculate path throughputs up to the connection vertices (not including them)
 	// For connection, we need throughput up to but not including the connection vertex
@@ -525,7 +534,7 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	lightPathThroughput := lightPath.Vertices[s-1].Beta
 
 	// Calculate light vertex BRDF for connection (PBRT: qs.f(pt, TransportMode::Importance))
-	lightBRDF := bdpt.evaluateBRDF(lightVertex, direction.Multiply(-1))
+	lightBRDF := bdpt.evaluateBRDF(lightVertex, direction.Multiply(-1), material.Importance)
 
 	// PBRT formula: L = qs.beta * qs.f(pt, TransportMode::Importance) * pt.f(qs, TransportMode::Radiance) * pt.beta * G
 	// Which translates to: lightThroughput * lightBRDF * cameraBRDF * cameraThroughput * G
@@ -547,8 +556,8 @@ func (bdpt *BDPTIntegrator) evaluateConnectionStrategy(cameraPath, lightPath Pat
 	return contribution
 }
 
-// evaluateBRDF evaluates the BRDF at a vertex for a given outgoing direction
-func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.Vec3) core.Vec3 {
+// evaluateBRDF evaluates the BRDF at a vertex for a given outgoing direction with transport mode
+func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.Vec3, mode material.TransportMode) core.Vec3 {
 	// Infinite lights don't scatter - they only emit (no BRDF)
 	if vertex.IsInfiniteLight {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
@@ -565,8 +574,17 @@ func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
-	// Use the new EvaluateBRDF method from the material interface
-	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, vertex.Normal)
+	// TODO: Replace with proper SurfaceInteraction struct to avoid redundant data
+	// For now, construct a temporary HitRecord from vertex data
+	hit := &material.HitRecord{
+		Point:     vertex.Point,
+		Normal:    vertex.Normal,
+		Material:  vertex.Material,
+		FrontFace: vertex.FrontFace,
+	}
+
+	// Use the EvaluateBRDF method from the material interface with the specified transport mode
+	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, hit, mode)
 }
 
 func createBackgroundVertex(ray core.Ray, bgColor core.Vec3, beta core.Vec3, pdfFwd float64) *Vertex {

@@ -27,7 +27,7 @@ func (e *Emissive) Emit(rayIn core.Ray) core.Vec3 {
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (e *Emissive) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+func (e *Emissive) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
 	// Lights don't reflect - they only emit
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

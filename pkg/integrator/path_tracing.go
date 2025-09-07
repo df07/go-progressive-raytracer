@@ -147,7 +147,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, sca
 	misWeight := powerHeuristic(1, lightSample.PDF, 1, materialPDF)
 
 	// Calculate BRDF for the new outgoing direction
-	brdf := hit.Material.EvaluateBRDF(scatter.Incoming.Direction, lightSample.Direction, hit.Normal)
+	brdf := hit.Material.EvaluateBRDF(scatter.Incoming.Direction, lightSample.Direction, hit, material.Radiance)
 
 	// Direct lighting contribution: BRDF * emission * cosine * MIS_weight / light_PDF
 	contribution := brdf.MultiplyVec(lightSample.Emission).Multiply(cosine * misWeight / lightSample.PDF)

@@ -36,10 +36,10 @@ func (m *Mix) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (Scat
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (m *Mix) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+func (m *Mix) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
 	// Combine BRDFs from both materials with appropriate weights
-	brdf1 := m.Material1.EvaluateBRDF(incomingDir, outgoingDir, normal)
-	brdf2 := m.Material2.EvaluateBRDF(incomingDir, outgoingDir, normal)
+	brdf1 := m.Material1.EvaluateBRDF(incomingDir, outgoingDir, hit, mode)
+	brdf2 := m.Material2.EvaluateBRDF(incomingDir, outgoingDir, hit, mode)
 	return brdf1.Multiply(1.0 - m.Ratio).Add(brdf2.Multiply(m.Ratio))
 }
 

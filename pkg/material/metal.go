@@ -47,9 +47,9 @@ func (m *Metal) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (Sc
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (m *Metal) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+func (m *Metal) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
 	// Perfect reflection only - delta function
-	reflected := reflect(incomingDir.Negate(), normal)
+	reflected := reflect(incomingDir.Negate(), hit.Normal)
 
 	// Check if outgoing direction matches perfect reflection (within tolerance)
 	if outgoingDir.Subtract(reflected).Length() < 0.001 {

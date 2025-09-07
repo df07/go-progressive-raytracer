@@ -27,7 +27,7 @@ func (gilm *gradientInfiniteLightMaterial) Emit(rayIn core.Ray) core.Vec3 {
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (gilm *gradientInfiniteLightMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
+func (gilm *gradientInfiniteLightMaterial) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *material.HitRecord, mode material.TransportMode) core.Vec3 {
 	// Lights don't reflect - they only emit
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
