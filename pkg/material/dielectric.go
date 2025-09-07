@@ -58,14 +58,87 @@ func (d *Dielectric) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler
 	}, true
 }
 
-// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-	// Check for perfect reflection or refraction
-	// Implementation similar to metal but also handles refraction case
-	// Return appropriate Fresnel-weighted contribution or zero
-
-	// Simplified - full implementation needs Fresnel calculations
-	return core.Vec3{X: 0, Y: 0, Z: 0} // Delta function materials
+// EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions with transport mode
 func (d *Dielectric) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
+	// For dielectric materials, we need to distinguish between reflection and refraction
+	// and handle transport mode properly for non-symmetric scattering
+
+	// Normalize directions
+	wi := incomingDir.Normalize()
+	wo := outgoingDir.Normalize()
+	n := hit.Normal.Normalize()
+
+	// Check if this is a reflection or refraction event
+	wiDotN := wi.Dot(n)
+	woDotN := wo.Dot(n)
+
+	// Different hemispheres = reflection, same hemisphere = refraction
+	sameHemisphere := (wiDotN > 0) == (woDotN > 0)
+
+	if !sameHemisphere {
+		// Reflection case
+		reflected := reflectVector(wi, n)
+		// Check if outgoing direction matches perfect reflection (within tolerance)
+		if wo.Subtract(reflected).Length() < 0.001 {
+			// Calculate Fresnel reflectance
+			cosTheta := math.Abs(wiDotN)
+			// For reflection, refractive index ratio depends on which side we're on
+			var etaRatio float64
+			if hit.FrontFace {
+				etaRatio = 1.0 / d.RefractiveIndex // Air to glass
+			} else {
+				etaRatio = d.RefractiveIndex // Glass to air
+			}
+
+			fresnel := Reflectance(cosTheta, etaRatio)
+
+			// Transport mode doesn't affect reflection for dielectrics
+			return core.Vec3{X: fresnel, Y: fresnel, Z: fresnel}
+		}
+	} else {
+		// Refraction case - this is where transport mode matters
+		var etaRatio float64
+		var cosTheta float64
+
+		if hit.FrontFace {
+			// Ray entering material from air side (air to glass)
+			// For transport mode scaling, use material's refractive index
+			etaRatio = 1.0 / d.RefractiveIndex // Still needed for Snell's law in refractVector
+			cosTheta = math.Abs(wiDotN)
+		} else {
+			// Ray exiting material to air side (glass to air)
+			// For transport mode scaling, use inverted refractive index
+			etaRatio = d.RefractiveIndex // Still needed for Snell's law in refractVector
+			cosTheta = math.Abs(wiDotN)
+		}
+
+		// Check if outgoing direction matches perfect refraction
+		refracted := refractVector(wi, n, etaRatio)
+		if wo.Subtract(refracted).Length() < 0.001 {
+			fresnel := Reflectance(cosTheta, etaRatio)
+			transmission := 1.0 - fresnel
+
+			// Transport mode correction for refraction
+			// PBRT: Account for non-symmetry with transmission to different medium
+			if mode == Radiance {
+				// Radiance transport: divide by η² to account for solid angle compression
+				// Use PBRT's etap logic: material index for front face, 1/material for back face
+				var etap float64
+				if hit.FrontFace {
+					etap = d.RefractiveIndex // Air to glass: use material index
+				} else {
+					etap = 1.0 / d.RefractiveIndex // Glass to air: use inverted index
+				}
+				transmission /= etap * etap
+			}
+			// For importance transport, no additional scaling needed
+
+			return core.Vec3{X: transmission, Y: transmission, Z: transmission}
+		}
+	}
+
+	// No contribution for non-perfect directions
+	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
 
 // PDF calculates the probability density function for specific incoming/outgoing directions
