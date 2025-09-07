@@ -21,7 +21,7 @@ func TestTriangleMesh_Creation(t *testing.T) {
 		0, 2, 3, // second triangle
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
+	mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), nil)
 
 	if mesh.GetTriangleCount() != 2 {
 		t.Errorf("Expected 2 triangles, got %d", mesh.GetTriangleCount())
@@ -55,7 +55,7 @@ func TestTriangleMesh_Hit(t *testing.T) {
 		0, 2, 3, // second triangle
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
+	mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), nil)
 
 	tests := []struct {
 		name      string
@@ -118,7 +118,7 @@ func TestTriangleMesh_ErrorHandling(t *testing.T) {
 	}()
 
 	invalidFaces := []int{0, 1} // Only 2 indices, not a multiple of 3
-	NewTriangleMesh(vertices, invalidFaces, MockTriangleMaterial{}, nil)
+	NewTriangleMesh(vertices, invalidFaces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), nil)
 }
 
 func TestTriangleMesh_WithCustomNormals(t *testing.T) {
@@ -137,7 +137,7 @@ func TestTriangleMesh_WithCustomNormals(t *testing.T) {
 		Normals: []core.Vec3{customNormal},
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, options)
+	mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), options)
 
 	if mesh.GetTriangleCount() != 1 {
 		t.Errorf("Expected 1 triangle, got %d", mesh.GetTriangleCount())
@@ -174,14 +174,14 @@ func TestTriangleMesh_WithPerTriangleMaterials(t *testing.T) {
 		0, 2, 3, // second triangle
 	}
 
-	material1 := MockTriangleMaterial{}
-	material2 := MockTriangleMaterial{}
+	material1 := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	material2 := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
 
 	options := &TriangleMeshOptions{
 		Materials: []material.Material{material1, material2},
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, options)
+	mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), options)
 
 	if mesh.GetTriangleCount() != 2 {
 		t.Errorf("Expected 2 triangles, got %d", mesh.GetTriangleCount())
@@ -232,7 +232,7 @@ func TestTriangleMesh_GetTriangles(t *testing.T) {
 		0, 2, 3, // second triangle
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
+	mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), nil)
 
 	triangles := mesh.GetTriangles()
 	if len(triangles) != 2 {
@@ -268,7 +268,7 @@ func TestTriangleMesh_ComplexGeometry(t *testing.T) {
 		3, 4, 0,
 	}
 
-	mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
+	mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), nil)
 
 	if mesh.GetTriangleCount() != 6 {
 		t.Errorf("Expected 6 triangles in pyramid, got %d", mesh.GetTriangleCount())
@@ -347,7 +347,7 @@ func TestTriangleMesh_EdgeCases(t *testing.T) {
 		}
 		faces := []int{} // Empty faces
 
-		mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
+		mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), nil)
 
 		if mesh.GetTriangleCount() != 0 {
 			t.Errorf("Expected 0 triangles for empty faces, got %d", mesh.GetTriangleCount())
@@ -376,7 +376,7 @@ func TestTriangleMesh_EdgeCases(t *testing.T) {
 		}
 		faces := []int{0, 1, 2}
 
-		mesh := NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, nil)
+		mesh := NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), nil)
 
 		if mesh.GetTriangleCount() != 1 {
 			t.Errorf("Expected 1 triangle, got %d", mesh.GetTriangleCount())
@@ -419,6 +419,6 @@ func TestTriangleMesh_EdgeCases(t *testing.T) {
 			},
 		}
 
-		NewTriangleMesh(vertices, faces, MockTriangleMaterial{}, options)
+		NewTriangleMesh(vertices, faces, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)), options)
 	})
 }

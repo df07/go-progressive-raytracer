@@ -14,7 +14,7 @@ func TestQuad_Hit_BasicIntersection(t *testing.T) {
 	corner := core.NewVec3(0, 0, 0)
 	u := core.NewVec3(1, 0, 0) // X direction
 	v := core.NewVec3(0, 0, 1) // Z direction
-	quad := NewQuad(corner, u, v, DummyMaterial{})
+	quad := NewQuad(corner, u, v, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	// Ray shooting down at the center of the quad
 	ray := core.NewRay(core.NewVec3(0.5, 1, 0.5), core.NewVec3(0, -1, 0))
@@ -43,7 +43,7 @@ func TestQuad_Hit_OutsideBounds(t *testing.T) {
 	corner := core.NewVec3(0, 0, 0)
 	u := core.NewVec3(1, 0, 0) // X direction
 	v := core.NewVec3(0, 0, 1) // Z direction
-	quad := NewQuad(corner, u, v, DummyMaterial{})
+	quad := NewQuad(corner, u, v, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	tests := []struct {
 		name      string
@@ -88,7 +88,7 @@ func TestQuad_Hit_CornerHits(t *testing.T) {
 	corner := core.NewVec3(0, 0, 0)
 	u := core.NewVec3(1, 0, 0) // X direction
 	v := core.NewVec3(0, 0, 1) // Z direction
-	quad := NewQuad(corner, u, v, DummyMaterial{})
+	quad := NewQuad(corner, u, v, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	corners := []core.Vec3{
 		{X: 0, Y: 0, Z: 0}, // corner
@@ -113,7 +113,7 @@ func TestQuad_Hit_ParallelRay(t *testing.T) {
 	corner := core.NewVec3(0, 0, 0)
 	u := core.NewVec3(1, 0, 0) // X direction
 	v := core.NewVec3(0, 0, 1) // Z direction
-	quad := NewQuad(corner, u, v, DummyMaterial{})
+	quad := NewQuad(corner, u, v, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	// Ray parallel to the quad
 	ray := core.NewRay(core.NewVec3(0.5, 1, 0.5), core.NewVec3(1, 0, 0))

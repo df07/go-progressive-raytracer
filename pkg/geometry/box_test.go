@@ -8,25 +8,10 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
-// DummyMaterial for testing (same as in quad_test.go)
-type DummyBoxMaterial struct{}
-
-func (d DummyBoxMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
-	return material.ScatterResult{}, false
-}
-
-func (d DummyBoxMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
-	return core.Vec3{X: 0, Y: 0, Z: 0}
-}
-
-func (d DummyBoxMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
-	return 0.0, false
-}
-
 func TestNewAxisAlignedBox(t *testing.T) {
 	center := core.NewVec3(0, 0, 0)
 	size := core.NewVec3(1, 1, 1)
-	material := DummyBoxMaterial{}
+	material := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
 
 	box := NewAxisAlignedBox(center, size, material)
 
@@ -45,7 +30,7 @@ func TestNewBox_WithRotation(t *testing.T) {
 	center := core.NewVec3(1, 2, 3)
 	size := core.NewVec3(0.5, 1, 1.5)
 	rotation := core.NewVec3(math.Pi/4, math.Pi/6, math.Pi/3)
-	material := DummyBoxMaterial{}
+	material := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
 
 	box := NewBox(center, size, rotation, material)
 
@@ -65,7 +50,7 @@ func TestBox_Hit_AxisAligned(t *testing.T) {
 	box := NewAxisAlignedBox(
 		core.NewVec3(0, 0, 0), // center
 		core.NewVec3(1, 1, 1), // size (half-extents)
-		DummyBoxMaterial{},
+		material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)),
 	)
 
 	tests := []struct {
@@ -153,7 +138,7 @@ func TestBox_Hit_AxisAligned(t *testing.T) {
 func TestBox_BoundingBox_AxisAligned(t *testing.T) {
 	center := core.NewVec3(2, 3, 4)
 	size := core.NewVec3(1, 2, 1.5)
-	box := NewAxisAlignedBox(center, size, DummyBoxMaterial{})
+	box := NewAxisAlignedBox(center, size, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	bbox := box.BoundingBox()
 
@@ -174,7 +159,7 @@ func TestBox_BoundingBox_Rotated(t *testing.T) {
 	center := core.NewVec3(0, 0, 0)
 	size := core.NewVec3(1, 1, 1)
 	rotation := core.NewVec3(0, math.Pi/4, 0) // 45 degrees around Y
-	box := NewBox(center, size, rotation, DummyBoxMaterial{})
+	box := NewBox(center, size, rotation, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	bbox := box.BoundingBox()
 
@@ -203,7 +188,7 @@ func TestBox_Hit_Rotated(t *testing.T) {
 		core.NewVec3(0, 0, 0),         // center
 		core.NewVec3(1, 1, 1),         // size
 		core.NewVec3(0, math.Pi/4, 0), // 45 degree rotation around Y
-		DummyBoxMaterial{},
+		material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)),
 	)
 
 	// Ray that should hit the rotated box

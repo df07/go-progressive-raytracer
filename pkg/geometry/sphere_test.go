@@ -8,23 +8,9 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
-// DummyMaterial for testing - doesn't actually scatter
-type DummyMaterial struct{}
-
-func (d DummyMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
-	return material.ScatterResult{}, false
-}
-
-func (d DummyMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
-	return core.Vec3{X: 0, Y: 0, Z: 0}
-}
-
-func (d DummyMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
-	return 0.0, false
-}
-
 func TestSphere_Hit_Miss(t *testing.T) {
-	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	testMaterial := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, testMaterial)
 	ray := core.NewRay(core.NewVec3(2, 0, 0), core.NewVec3(0, 1, 0))
 
 	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
@@ -34,7 +20,7 @@ func TestSphere_Hit_Miss(t *testing.T) {
 }
 
 func TestSphere_Hit_FrontAndBackFace(t *testing.T) {
-	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	tests := []struct {
 		name           string
@@ -90,7 +76,7 @@ func TestSphere_Hit_FrontAndBackFace(t *testing.T) {
 }
 
 func TestSphere_Hit_GlancingHit(t *testing.T) {
-	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 	ray := core.NewRay(core.NewVec3(1, 0, 2), core.NewVec3(0, 0, -1))
 
 	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)
@@ -108,7 +94,7 @@ func TestSphere_Hit_GlancingHit(t *testing.T) {
 }
 
 func TestSphere_Hit_Bounds(t *testing.T) {
-	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 	ray := core.NewRay(core.NewVec3(0, 0, 2), core.NewVec3(0, 0, -1))
 
 	// Test tMax bound
@@ -125,7 +111,7 @@ func TestSphere_Hit_Bounds(t *testing.T) {
 }
 
 func TestSphere_Hit_ClosestIntersection(t *testing.T) {
-	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, DummyMaterial{})
+	sphere := NewSphere(core.NewVec3(0, 0, 0), 1.0, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 	ray := core.NewRay(core.NewVec3(0, 0, 2), core.NewVec3(0, 0, -1))
 
 	hit, isHit := sphere.Hit(ray, 0.001, 1000.0)

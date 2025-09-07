@@ -8,27 +8,12 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
-// MockMaterial for testing
-type MockTriangleMaterial struct{}
-
-func (m MockTriangleMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
-	return material.ScatterResult{}, false
-}
-
-func (m MockTriangleMaterial) EvaluateBRDF(incomingDir, outgoingDir, normal core.Vec3) core.Vec3 {
-	return core.Vec3{X: 0, Y: 0, Z: 0}
-}
-
-func (m MockTriangleMaterial) PDF(incomingDir, outgoingDir, normal core.Vec3) (float64, bool) {
-	return 0.0, false
-}
-
 func TestTriangle_Hit(t *testing.T) {
 	// Create a triangle in the XY plane
 	v0 := core.NewVec3(0, 0, 0)
 	v1 := core.NewVec3(1, 0, 0)
 	v2 := core.NewVec3(0, 1, 0)
-	triangle := NewTriangle(v0, v1, v2, MockTriangleMaterial{})
+	triangle := NewTriangle(v0, v1, v2, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	tests := []struct {
 		name      string
@@ -126,7 +111,7 @@ func TestTriangle_BoundingBox(t *testing.T) {
 	v0 := core.NewVec3(0, 0, 0)
 	v1 := core.NewVec3(2, 0, 0)
 	v2 := core.NewVec3(1, 3, 0)
-	triangle := NewTriangle(v0, v1, v2, MockTriangleMaterial{})
+	triangle := NewTriangle(v0, v1, v2, material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5)))
 
 	bbox := triangle.BoundingBox()
 
