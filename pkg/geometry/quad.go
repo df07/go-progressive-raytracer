@@ -130,7 +130,7 @@ func NewQuad(corner, u, v core.Vec3, material material.Material) *Quad {
 }
 
 // Hit tests if a ray intersects with the quad
-func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	// Calculate denominator: dot product of ray direction and quad normal
 	denominator := ray.Direction.Dot(q.Normal)
 
@@ -163,7 +163,7 @@ func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 	}
 
 	// Create hit record
-	hitRecord := &material.HitRecord{
+	hitRecord := &material.SurfaceInteraction{
 		T:        t,
 		Point:    hitPoint,
 		Material: q.Material,

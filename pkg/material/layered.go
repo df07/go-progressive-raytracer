@@ -21,7 +21,7 @@ func NewLayered(outer, inner Material) *Layered {
 }
 
 // Scatter implements the Material interface for layered scattering
-func (l *Layered) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
+func (l *Layered) Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.Sampler) (ScatterResult, bool) {
 	// Step 1: Ray hits the outer material first
 	outerHit := hit
 	outerHit.Material = l.Outer
@@ -74,7 +74,7 @@ func (l *Layered) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (l *Layered) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
+func (l *Layered) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *SurfaceInteraction, mode TransportMode) core.Vec3 {
 	// Our layered material models two-step scattering:
 	// 1. Outer material scatters first
 	// 2. If outer scatters inward, inner material scatters (ignoring outer on exit)

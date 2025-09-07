@@ -17,7 +17,7 @@ func NewDielectric(refractiveIndex float64) *Dielectric {
 }
 
 // Scatter implements the Material interface for dielectric scattering
-func (d *Dielectric) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
+func (d *Dielectric) Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.Sampler) (ScatterResult, bool) {
 	// Dielectrics always attenuate by 1.0 (no color absorption for clear glass)
 	attenuation := core.NewVec3(1.0, 1.0, 1.0)
 
@@ -59,7 +59,7 @@ func (d *Dielectric) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions with transport mode
-func (d *Dielectric) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
+func (d *Dielectric) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *SurfaceInteraction, mode TransportMode) core.Vec3 {
 	// For dielectric materials, we need to distinguish between reflection and refraction
 	// and handle transport mode properly for non-symmetric scattering
 

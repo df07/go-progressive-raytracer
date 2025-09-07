@@ -16,7 +16,7 @@ func TestDielectricBasicBehavior(t *testing.T) {
 	rayDirection := core.NewVec3(1, -1, 0).Normalize() // 45-degree angle
 	ray := core.Ray{Origin: core.NewVec3(0, 1, 0), Direction: rayDirection}
 
-	hit := HitRecord{
+	hit := SurfaceInteraction{
 		Point:     core.NewVec3(0, 0, 0),
 		Normal:    core.NewVec3(0, 1, 0), // Normal pointing up
 		T:         1.0,
@@ -83,7 +83,7 @@ func TestDielectricTotalInternalReflection(t *testing.T) {
 	ray := core.Ray{Origin: core.NewVec3(0, 0, 0), Direction: rayDirection}
 
 	// Create hit record for back face (exiting material)
-	hit := HitRecord{
+	hit := SurfaceInteraction{
 		Point:     core.NewVec3(0, 0, 0),
 		Normal:    core.NewVec3(0, 1, 0), // Normal pointing up
 		T:         1.0,
@@ -162,7 +162,7 @@ func TestDielectricEvaluateBRDF_Reflection(t *testing.T) {
 	outgoingDir := core.NewVec3(1, 1, 0).Normalize()  // Perfect reflection
 
 	// Create a hit record for front face
-	hit := &HitRecord{
+	hit := &SurfaceInteraction{
 		Normal:    normal,
 		FrontFace: true,
 	}
@@ -203,7 +203,7 @@ func TestDielectricEvaluateBRDF_Refraction_TransportModes(t *testing.T) {
 	outgoingDir := refractVector(incomingDir, normal, etaRatio)
 
 	// Create a hit record for front face (air to glass)
-	hit := &HitRecord{
+	hit := &SurfaceInteraction{
 		Normal:    normal,
 		FrontFace: true,
 	}
@@ -253,7 +253,7 @@ func TestDielectricEvaluateBRDF_Refraction_GlassToAir(t *testing.T) {
 	outgoingDir := refractVector(incomingDir, normal, etaRatio)
 
 	// Test both transport modes
-	hit := &HitRecord{
+	hit := &SurfaceInteraction{
 		Normal:    normal,
 		FrontFace: false,
 	}
@@ -288,7 +288,7 @@ func TestDielectricEvaluateBRDF_NonPerfectDirections(t *testing.T) {
 	// Test with random outgoing direction (not perfect reflection/refraction)
 	randomDir := core.NewVec3(0.5, 0.3, 0.7).Normalize()
 
-	hit := &HitRecord{
+	hit := &SurfaceInteraction{
 		Normal:    normal,
 		FrontFace: true,
 	}
@@ -313,7 +313,7 @@ func TestDielectricEvaluateBRDF_EdgeCases(t *testing.T) {
 	grazingDir := core.NewVec3(1, -0.01, 0).Normalize()
 	reflectedDir := core.NewVec3(1, 0.01, 0).Normalize()
 
-	hit := &HitRecord{
+	hit := &SurfaceInteraction{
 		Normal:    normal,
 		FrontFace: true,
 	}

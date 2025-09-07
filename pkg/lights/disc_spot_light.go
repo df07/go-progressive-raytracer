@@ -18,7 +18,7 @@ type discSpotLightMaterial struct {
 }
 
 // Scatter implements the Material interface (spot lights don't scatter, only emit)
-func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit material.HitRecord, sampler core.Sampler) (material.ScatterResult, bool) {
+func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit material.SurfaceInteraction, sampler core.Sampler) (material.ScatterResult, bool) {
 	return material.ScatterResult{}, false // No scattering, only emission
 }
 
@@ -45,7 +45,7 @@ func (dslm *discSpotLightMaterial) Emit(rayIn core.Ray) core.Vec3 {
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (dslm *discSpotLightMaterial) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *material.HitRecord, mode material.TransportMode) core.Vec3 {
+func (dslm *discSpotLightMaterial) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *material.SurfaceInteraction, mode material.TransportMode) core.Vec3 {
 	// Lights don't reflect - they only emit
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }
@@ -171,7 +171,7 @@ func (dsl *DiscSpotLight) GetIntensityAt(point core.Vec3) core.Vec3 {
 }
 
 // Hit implements the Shape interface for caustic ray intersection
-func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (dsl *DiscSpotLight) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	return dsl.discLight.Hit(ray, tMin, tMax)
 }
 

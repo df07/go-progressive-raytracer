@@ -104,8 +104,8 @@ func (s *Server) extractMaterialInfo(mat material.Material) (string, map[string]
 // InspectResult contains rich information about an object hit by an inspection ray
 type InspectResult struct {
 	Hit       bool
-	HitRecord *material.HitRecord // Full hit record with material reference
-	Shape     geometry.Shape      // The actual shape that was hit
+	HitRecord *material.SurfaceInteraction // Full hit record with material reference
+	Shape     geometry.Shape               // The actual shape that was hit
 }
 
 // inspectPixel casts a ray through the specified pixel coordinates and returns information about the first object hit

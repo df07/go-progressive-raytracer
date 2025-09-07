@@ -61,7 +61,7 @@ func (t *Triangle) computeBoundingBox() {
 }
 
 // Hit tests if a ray intersects with the triangle using the Möller-Trumbore algorithm
-func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	const epsilon = 1e-8
 
 	// Calculate two edge vectors
@@ -106,7 +106,7 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, b
 	hitPoint := ray.At(t_param)
 
 	// Create hit record
-	hitRecord := &material.HitRecord{
+	hitRecord := &material.SurfaceInteraction{
 		T:        t_param,
 		Point:    hitPoint,
 		Material: t.Material,

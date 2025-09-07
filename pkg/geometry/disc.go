@@ -43,7 +43,7 @@ func NewDisc(center, normal core.Vec3, radius float64, material material.Materia
 }
 
 // Hit implements the Shape interface
-func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	// Check if ray intersects the plane containing the disc
 	denom := d.Normal.Dot(ray.Direction)
 	if math.Abs(denom) < 1e-6 {
@@ -66,7 +66,7 @@ func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
 	}
 
 	// Create hit record
-	hitRecord := &material.HitRecord{
+	hitRecord := &material.SurfaceInteraction{
 		Point:    hitPoint,
 		T:        t,
 		Material: d.Material,

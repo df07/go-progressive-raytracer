@@ -97,7 +97,7 @@ func (pt *PathTracingIntegrator) calculateSpecularColor(scatter material.Scatter
 }
 
 // calculateDiffuseColor handles diffuse material scattering with throughput tracking
-func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter material.ScatterResult, hit *material.HitRecord, scene *scene.Scene, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
+func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter material.ScatterResult, hit *material.SurfaceInteraction, scene *scene.Scene, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
 	// Combine direct lighting and indirect lighting using Multiple Importance Sampling
 	directLight := pt.CalculateDirectLighting(scene, scatter, hit, sampler, depth)
 	indirectLight := pt.CalculateIndirectLighting(scene, scatter, hit, depth, throughput, sampler)
@@ -105,7 +105,7 @@ func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter material.ScatterR
 }
 
 // getEmittedLight returns the emitted light from a material if it's emissive
-func getEmittedLight(ray core.Ray, hit *material.HitRecord) core.Vec3 {
+func getEmittedLight(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	if emitter, isEmissive := hit.Material.(material.Emitter); isEmissive {
 		return emitter.Emit(ray)
 	}
@@ -113,7 +113,7 @@ func getEmittedLight(ray core.Ray, hit *material.HitRecord) core.Vec3 {
 }
 
 // calculateDirectLighting samples lights directly for direct illumination with the provided random generator
-func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, scatter material.ScatterResult, hit *material.HitRecord, sampler core.Sampler, depth int) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, scatter material.ScatterResult, hit *material.SurfaceInteraction, sampler core.Sampler, depth int) core.Vec3 {
 	// Sample a light
 	lightSample, _, _, hasLight := lights.SampleLight(scene.Lights, scene.LightSampler, hit.Point, hit.Normal, sampler)
 	if !hasLight || lightSample.Emission.Luminance() <= 0 || lightSample.PDF <= 0 {
@@ -157,7 +157,7 @@ func (pt *PathTracingIntegrator) CalculateDirectLighting(scene *scene.Scene, sca
 }
 
 // calculateIndirectLighting handles indirect illumination via material sampling with throughput tracking
-func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene *scene.Scene, scatter material.ScatterResult, hit *material.HitRecord, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
+func (pt *PathTracingIntegrator) CalculateIndirectLighting(scene *scene.Scene, scatter material.ScatterResult, hit *material.SurfaceInteraction, depth int, throughput core.Vec3, sampler core.Sampler) core.Vec3 {
 	if scatter.PDF <= 0 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}

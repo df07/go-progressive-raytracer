@@ -16,10 +16,10 @@ const (
 // Material interface for objects that can scatter rays
 type Material interface {
 	// Generates random scattered direction
-	Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool)
+	Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.Sampler) (ScatterResult, bool)
 
 	// Evaluate BRDF for specific incoming/outgoing directions with transport mode
-	EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3
+	EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *SurfaceInteraction, mode TransportMode) core.Vec3
 
 	// Calculate PDF for specific incoming/outgoing directions
 	// Returns (pdf, isDelta) where isDelta indicates if this is a delta function (specular)
@@ -44,8 +44,8 @@ func (s ScatterResult) IsSpecular() bool {
 	return s.PDF <= 0
 }
 
-// HitRecord contains information about a ray-object intersection
-type HitRecord struct {
+// SurfaceInteraction contains information about a ray-object intersection
+type SurfaceInteraction struct {
 	Point     core.Vec3 // Point of intersection
 	Normal    core.Vec3 // Surface normal at intersection
 	T         float64   // Parameter t along the ray
@@ -54,7 +54,7 @@ type HitRecord struct {
 }
 
 // SetFaceNormal sets the normal vector and determines front/back face
-func (h *HitRecord) SetFaceNormal(ray core.Ray, outwardNormal core.Vec3) {
+func (h *SurfaceInteraction) SetFaceNormal(ray core.Ray, outwardNormal core.Vec3) {
 	h.FrontFace = ray.Direction.Dot(outwardNormal) < 0
 	if h.FrontFace {
 		h.Normal = outwardNormal

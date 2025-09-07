@@ -11,10 +11,10 @@ import (
 // MockShape for testing
 type MockShape struct {
 	boundingBox AABB
-	hitFn       func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool)
+	hitFn       func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool)
 }
 
-func (m MockShape) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (m MockShape) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	return m.hitFn(ray, tMin, tMax)
 }
 
@@ -30,7 +30,7 @@ func TestBVH_LeafThresholdBoundary(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		shapes[i] = MockShape{
 			boundingBox: NewAABB(core.NewVec3(float64(i), 0, 0), core.NewVec3(float64(i)+1, 1, 1)),
-			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 				return nil, false // Never hit for simplicity
 			},
 		}
@@ -50,7 +50,7 @@ func TestBVH_LeafThresholdBoundary(t *testing.T) {
 	// Test with leafThreshold + 1 shapes - should split
 	shapes = append(shapes, MockShape{
 		boundingBox: NewAABB(core.NewVec3(8, 0, 0), core.NewVec3(9, 1, 1)),
-		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 			return nil, false
 		},
 	})
@@ -86,8 +86,8 @@ func TestBVH_EmptyAndSingleShape(t *testing.T) {
 	// Test single shape BVH
 	shape := MockShape{
 		boundingBox: NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(1, 1, 1)),
-		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-			return &material.HitRecord{T: 1.0}, true
+		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
+			return &material.SurfaceInteraction{T: 1.0}, true
 		},
 	}
 
@@ -106,10 +106,10 @@ func TestBVH_MultipleHitsInLeaf(t *testing.T) {
 	// Test that BVH correctly finds closest hit when multiple shapes in leaf hit
 
 	// Helper function to create hit function with specific t value
-	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-		return func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
+		return func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 			if ray.Direction.X > 0 && tValue >= tMin && tValue <= tMax {
-				return &material.HitRecord{T: tValue}, true
+				return &material.SurfaceInteraction{T: tValue}, true
 			}
 			return nil, false
 		}
@@ -150,7 +150,7 @@ func TestBVH_RayHitsBoundingBoxButMissesShapes(t *testing.T) {
 
 	shape := MockShape{
 		boundingBox: NewAABB(core.NewVec3(0, 0, 0), core.NewVec3(2, 2, 2)),
-		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+		hitFn: func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 			// Shape occupies only a small part of its bounding box
 			// Ray hits bounding box but misses actual shape
 			return nil, false
@@ -179,7 +179,7 @@ func TestBVH_StatsCollection(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		shapes[i] = MockShape{
 			boundingBox: NewAABB(core.NewVec3(float64(i), 0, 0), core.NewVec3(float64(i)+1, 1, 1)),
-			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+			hitFn: func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 				return nil, false
 			},
 		}
@@ -218,10 +218,10 @@ func TestBVH_IdenticalBoundingBoxes(t *testing.T) {
 	shapes := make([]Shape, 5)
 
 	// Helper function to create hit function with specific t value
-	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-		return func(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+	makeHitFn := func(tValue float64) func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
+		return func(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 			if ray.Direction.X > 0 && tValue >= tMin && tValue <= tMax {
-				return &material.HitRecord{T: tValue}, true
+				return &material.SurfaceInteraction{T: tValue}, true
 			}
 			return nil, false
 		}

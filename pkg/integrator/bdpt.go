@@ -352,7 +352,7 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 	// TODO: Replace with proper SurfaceInteraction struct to avoid redundant data
 	// For now, construct a temporary HitRecord from vertex data
-	hit := &material.HitRecord{
+	hit := &material.SurfaceInteraction{
 		Point:     cameraVertex.Point,
 		Normal:    cameraVertex.Normal,
 		Material:  cameraVertex.Material,
@@ -576,7 +576,7 @@ func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.
 
 	// TODO: Replace with proper SurfaceInteraction struct to avoid redundant data
 	// For now, construct a temporary HitRecord from vertex data
-	hit := &material.HitRecord{
+	hit := &material.SurfaceInteraction{
 		Point:     vertex.Point,
 		Normal:    vertex.Normal,
 		Material:  vertex.Material,

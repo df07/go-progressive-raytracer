@@ -15,7 +15,7 @@ func TestLambertian_PDFCalculation(t *testing.T) {
 
 	// Normal pointing up (z-axis)
 	normal := core.NewVec3(0, 0, 1)
-	hit := HitRecord{
+	hit := SurfaceInteraction{
 		Point:  core.NewVec3(0, 0, 0),
 		Normal: normal,
 	}
@@ -44,7 +44,7 @@ func TestLambertian_EnergyConservation(t *testing.T) {
 	lambertian := NewLambertian(albedo)
 	sampler := core.NewRandomSampler(rand.New(rand.NewSource(42)))
 
-	hit := HitRecord{
+	hit := SurfaceInteraction{
 		Point:  core.NewVec3(0, 0, 0),
 		Normal: core.NewVec3(0, 0, 1),
 	}

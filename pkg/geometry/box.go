@@ -122,8 +122,8 @@ func (b *Box) generateFaces() {
 }
 
 // Hit tests if a ray intersects with any face of the box
-func (b *Box) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
-	var closestHit *material.HitRecord
+func (b *Box) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
+	var closestHit *material.SurfaceInteraction
 	closestT := tMax
 
 	// Test intersection with all 6 faces

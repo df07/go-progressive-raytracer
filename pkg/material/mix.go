@@ -26,7 +26,7 @@ func NewMix(material1, material2 Material, ratio float64) *Mix {
 }
 
 // Scatter implements the Material interface for mix material
-func (m *Mix) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
+func (m *Mix) Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.Sampler) (ScatterResult, bool) {
 	// Choose material based on ratio
 	if sampler.Get1D() < m.Ratio {
 		return m.Material2.Scatter(rayIn, hit, sampler)
@@ -36,7 +36,7 @@ func (m *Mix) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (Scat
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (m *Mix) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
+func (m *Mix) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *SurfaceInteraction, mode TransportMode) core.Vec3 {
 	// Combine BRDFs from both materials with appropriate weights
 	brdf1 := m.Material1.EvaluateBRDF(incomingDir, outgoingDir, hit, mode)
 	brdf2 := m.Material2.EvaluateBRDF(incomingDir, outgoingDir, hit, mode)

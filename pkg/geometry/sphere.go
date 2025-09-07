@@ -24,7 +24,7 @@ func NewSphere(center core.Vec3, radius float64, material material.Material) *Sp
 }
 
 // Hit tests if a ray intersects with the sphere
-func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	// Vector from ray origin to sphere center
 	oc := ray.Origin.Subtract(s.Center)
 
@@ -56,7 +56,7 @@ func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, boo
 	}
 
 	// Create hit record with material
-	hitRecord := &material.HitRecord{
+	hitRecord := &material.SurfaceInteraction{
 		T:        root,
 		Point:    ray.At(root),
 		Material: s.Material,

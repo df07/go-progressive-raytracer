@@ -180,7 +180,7 @@ func sortShapesByAxis(shapes []Shape, axis int) {
 }
 
 // Hit tests if a ray intersects any shape in the BVH
-func (bvh *BVH) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (bvh *BVH) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	if bvh.Root == nil {
 		return nil, false
 	}
@@ -188,7 +188,7 @@ func (bvh *BVH) Hit(ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool
 }
 
 // hitNode recursively tests ray intersection with BVH nodes
-func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64) (*material.HitRecord, bool) {
+func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
 	// First check if ray hits the bounding box
 	if !node.BoundingBox.Hit(ray, tMin, tMax) {
 		return nil, false
@@ -196,7 +196,7 @@ func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64) (*mater
 
 	// If this is a leaf node, test against all shapes using linear search
 	if node.Shapes != nil {
-		var closestHit *material.HitRecord
+		var closestHit *material.SurfaceInteraction
 		hitAnything := false
 		closestSoFar := tMax
 
@@ -213,7 +213,7 @@ func (bvh *BVH) hitNode(node *BVHNode, ray core.Ray, tMin, tMax float64) (*mater
 	}
 
 	// Internal node - test both children
-	var closestHit *material.HitRecord
+	var closestHit *material.SurfaceInteraction
 	hitAnything := false
 	closestSoFar := tMax
 

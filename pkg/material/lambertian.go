@@ -17,7 +17,7 @@ func NewLambertian(albedo core.Vec3) *Lambertian {
 }
 
 // Scatter implements the Material interface for lambertian scattering
-func (l *Lambertian) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
+func (l *Lambertian) Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.Sampler) (ScatterResult, bool) {
 	// Generate cosine-weighted random direction in hemisphere around normal
 	scatterDirection := core.SampleCosineHemisphere(hit.Normal, sampler.Get2D())
 	scattered := core.Ray{Origin: hit.Point, Direction: scatterDirection}
@@ -41,7 +41,7 @@ func (l *Lambertian) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (l *Lambertian) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
+func (l *Lambertian) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *SurfaceInteraction, mode TransportMode) core.Vec3 {
 	// Lambertian BRDF is constant: albedo / π
 	cosTheta := outgoingDir.Dot(hit.Normal)
 	if cosTheta <= 0 {

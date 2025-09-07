@@ -22,7 +22,7 @@ func TestLayeredBasicBehavior(t *testing.T) {
 		Direction: core.NewVec3(0, -1, 0), // Ray going straight down
 	}
 
-	hit := HitRecord{
+	hit := SurfaceInteraction{
 		Point:     core.NewVec3(0, 0, 0),
 		Normal:    core.NewVec3(0, 1, 0), // Normal pointing up
 		T:         1.0,
@@ -64,7 +64,7 @@ func TestLayeredOutwardScattering(t *testing.T) {
 		Direction: core.NewVec3(1, -1, 0).Normalize(), // 45 degree angle
 	}
 
-	hit := HitRecord{
+	hit := SurfaceInteraction{
 		Point:     core.NewVec3(0, 0, 0),
 		Normal:    core.NewVec3(0, 1, 0),
 		T:         1.0,
@@ -107,7 +107,7 @@ func TestLayeredInwardScattering(t *testing.T) {
 		Direction: core.NewVec3(0, -1, 0), // Straight down - should refract inward
 	}
 
-	hit := HitRecord{
+	hit := SurfaceInteraction{
 		Point:     core.NewVec3(0, 0, 0),
 		Normal:    core.NewVec3(0, 1, 0),
 		T:         1.0,

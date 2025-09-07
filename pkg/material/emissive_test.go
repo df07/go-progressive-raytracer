@@ -36,7 +36,7 @@ func TestEmissive_Scatter(t *testing.T) {
 
 			// Test that emissive materials don't scatter
 			ray := core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0))
-			hit := HitRecord{
+			hit := SurfaceInteraction{
 				Point:  core.NewVec3(1, 0, 0),
 				Normal: core.NewVec3(-1, 0, 0),
 				T:      1.0,

@@ -23,7 +23,7 @@ func NewMetal(albedo core.Vec3, fuzzness float64) *Metal {
 }
 
 // Scatter implements the Material interface for metal scattering
-func (m *Metal) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (ScatterResult, bool) {
+func (m *Metal) Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.Sampler) (ScatterResult, bool) {
 	// Calculate perfect reflection direction
 	reflected := reflect(rayIn.Direction.Normalize(), hit.Normal)
 
@@ -47,7 +47,7 @@ func (m *Metal) Scatter(rayIn core.Ray, hit HitRecord, sampler core.Sampler) (Sc
 }
 
 // EvaluateBRDF evaluates the BRDF for specific incoming/outgoing directions
-func (m *Metal) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *HitRecord, mode TransportMode) core.Vec3 {
+func (m *Metal) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *SurfaceInteraction, mode TransportMode) core.Vec3 {
 	// Perfect reflection only - delta function
 	reflected := reflect(incomingDir.Negate(), hit.Normal)
 
