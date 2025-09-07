@@ -447,11 +447,13 @@ func createLightSceneWithMaterial(mat material.Material) *scene.Scene {
 	return scene
 }
 
-func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera bool, material material.Material) Vertex {
+func createTestVertex(point core.Vec3, normal core.Vec3, isLight bool, isCamera bool, mat material.Material) Vertex {
 	return Vertex{
-		Point:             point,
-		Normal:            normal,
-		Material:          material,
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:    point,
+			Normal:   normal,
+			Material: mat,
+		},
 		IsLight:           isLight,
 		IsCamera:          isCamera,
 		IsSpecular:        false,
@@ -727,8 +729,10 @@ func createTestCameraPathWithLight(materials []material.Material, positions []co
 
 	// First vertex is always camera
 	vertices[0] = Vertex{
-		Point:          positions[0],
-		Normal:         core.NewVec3(0, 0, 1), // camera "normal"
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:  positions[0],
+			Normal: core.NewVec3(0, 0, 1), // camera "normal"
+		},
 		IsCamera:       true,
 		Beta:           core.Vec3{X: 1, Y: 1, Z: 1},
 		AreaPdfForward: 1.0,
@@ -745,9 +749,11 @@ func createTestCameraPathWithLight(materials []material.Material, positions []co
 		_, isEmissive := mat.(*material.Emissive)
 
 		vertices[i] = Vertex{
-			Point:          positions[i],
-			Normal:         core.NewVec3(0, 1, 0), // upward normal
-			Material:       mat,
+			SurfaceInteraction: &material.SurfaceInteraction{
+				Point:    positions[i],
+				Normal:   core.NewVec3(0, 1, 0), // upward normal
+				Material: mat,
+			},
 			IsSpecular:     isSpecular,
 			IsLight:        isEmissive,
 			Beta:           core.Vec3{X: 0.7, Y: 0.7, Z: 0.7}, // typical diffuse reflectance
@@ -784,9 +790,11 @@ func createTestLightPath(materials []material.Material, positions []core.Vec3) P
 	// First vertex is always a light source
 	testLight := createTestAreaLight()
 	vertices[0] = Vertex{
-		Point:          positions[0],
-		Normal:         core.NewVec3(0, -1, 0), // downward-facing light
-		Material:       materials[0],
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:    positions[0],
+			Normal:   core.NewVec3(0, -1, 0), // downward-facing light
+			Material: materials[0],
+		},
 		IsLight:        true,
 		Light:          testLight,
 		LightIndex:     0,                           // Test light at index 0
@@ -804,9 +812,11 @@ func createTestLightPath(materials []material.Material, positions []core.Vec3) P
 		isSpecular := isMetalSpecular || isDielectricSpecular
 
 		vertices[i] = Vertex{
-			Point:          positions[i],
-			Normal:         core.NewVec3(0, 1, 0),
-			Material:       mat,
+			SurfaceInteraction: &material.SurfaceInteraction{
+				Point:    positions[i],
+				Normal:   core.NewVec3(0, 1, 0),
+				Material: mat,
+			},
 			IsSpecular:     isSpecular,
 			Beta:           core.Vec3{X: 0.7, Y: 0.7, Z: 0.7},
 			AreaPdfForward: 1.0 / math.Pi,
@@ -825,14 +835,18 @@ func createPathWithInfiniteLight() Path {
 	return Path{
 		Vertices: []Vertex{
 			{
-				Point:    core.NewVec3(0, 0, 0),
-				Normal:   core.NewVec3(0, 0, 1),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:  core.NewVec3(0, 0, 0),
+					Normal: core.NewVec3(0, 0, 1),
+				},
 				IsCamera: true,
 				Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
 			},
 			{
-				Point:           core.NewVec3(0, 0, -1000), // Far away
-				Normal:          core.NewVec3(0, 0, 1),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:  core.NewVec3(0, 0, -1000),
+					Normal: core.NewVec3(0, 0, 1),
+				},
 				IsInfiniteLight: true,
 				IsLight:         true,
 				Beta:            core.Vec3{X: 1, Y: 1, Z: 1},

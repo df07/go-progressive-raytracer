@@ -12,12 +12,10 @@ import (
 
 // Vertex represents a single vertex in a light transport path
 type Vertex struct {
-	Point      core.Vec3         // 3D position
-	Normal     core.Vec3         // Surface normal
-	Light      lights.Light      // Light at this vertex (TODO: remove after cleanup)
-	LightIndex int               // Index of light in scene's light array (-1 if not a light vertex)
-	Material   material.Material // Material at this vertex
-	FrontFace  bool              // Whether hit was on the front face of the material TODO: replace with HitRecord
+	*material.SurfaceInteraction // Embedded surface interaction
+
+	Light      lights.Light // Light at this vertex (TODO: remove after cleanup)
+	LightIndex int          // Index of light in scene's light array (-1 if not a light vertex)
 
 	// Path tracing information
 	IncomingDirection core.Vec3 // Direction ray arrived from
@@ -117,8 +115,10 @@ func (bdpt *BDPTIntegrator) generateCameraPath(ray core.Ray, scene *scene.Scene,
 
 	// Create the initial camera vertex (like light path does for light sources)
 	cameraVertex := Vertex{
-		Point:    ray.Origin,
-		Normal:   ray.Direction.Multiply(-1), // Camera "normal" points back along ray
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:  ray.Origin,
+			Normal: ray.Direction.Multiply(-1), // Camera "normal" points back along ray
+		},
 		IsCamera: true,
 		Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
 	}
@@ -154,8 +154,10 @@ func (bdpt *BDPTIntegrator) generateLightPath(scene *scene.Scene, sampler core.S
 	cosTheta := emissionSample.Direction.AbsDot(emissionSample.Normal)
 
 	lightVertex := Vertex{
-		Point:           emissionSample.Point,
-		Normal:          emissionSample.Normal,
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:  emissionSample.Point,
+			Normal: emissionSample.Normal,
+		},
 		Light:           sampledLight, // TODO: remove after cleanup
 		LightIndex:      lightIndex,
 		AreaPdfForward:  emissionSample.AreaPDF * lightSelectionPdf, // probability of generating this point is the light sampling pdf
@@ -230,12 +232,9 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 
 		// Create vertex for the intersection
 		vertex := Vertex{
-			Point:             hit.Point,
-			Normal:            hit.Normal,
-			Material:          hit.Material,
-			FrontFace:         hit.FrontFace,
-			IncomingDirection: currentRay.Direction.Multiply(-1),
-			Beta:              beta,
+			SurfaceInteraction: hit, // Use the existing SurfaceInteraction
+			IncomingDirection:  currentRay.Direction.Multiply(-1),
+			Beta:               beta,
 		}
 
 		// Capture emitted light from this vertex
@@ -382,8 +381,10 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 
 	// Create sampled light vertex for PBRT MIS calculation
 	sampledVertex := &Vertex{
-		Point:           lightSample.Point,
-		Normal:          lightSample.Normal,
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:  lightSample.Point,
+			Normal: lightSample.Normal,
+		},
 		Light:           sampledLight, // TODO: remove after cleanup
 		LightIndex:      lightIndex,
 		AreaPdfForward:  lightSample.PDF, // probability of generating this point is the light sampling pdf
@@ -464,8 +465,10 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 	// Create the sampled camera vertex for MIS weight calculation
 	// This represents the dynamically sampled camera vertex
 	sampledCameraVertex := &Vertex{
-		Point:    cameraSample.Ray.Origin,
-		Normal:   cameraSample.Ray.Direction.Multiply(-1), // Camera "normal" points back along ray
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:  cameraSample.Ray.Origin,
+			Normal: cameraSample.Ray.Direction.Multiply(-1), // Camera "normal" points back along ray
+		},
 		IsCamera: true,
 		Beta:     cameraBeta, // Wi / pdf from camera sampling
 	}
@@ -574,25 +577,18 @@ func (bdpt *BDPTIntegrator) evaluateBRDF(vertex *Vertex, outgoingDirection core.
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 
-	// TODO: Replace with proper SurfaceInteraction struct to avoid redundant data
-	// For now, construct a temporary HitRecord from vertex data
-	hit := &material.SurfaceInteraction{
-		Point:     vertex.Point,
-		Normal:    vertex.Normal,
-		Material:  vertex.Material,
-		FrontFace: vertex.FrontFace,
-	}
-
-	// Use the EvaluateBRDF method from the material interface with the specified transport mode
-	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, hit, mode)
+	// Use the embedded SurfaceInteraction directly
+	return vertex.Material.EvaluateBRDF(vertex.IncomingDirection, outgoingDirection, vertex.SurfaceInteraction, mode)
 }
 
 func createBackgroundVertex(ray core.Ray, bgColor core.Vec3, beta core.Vec3, pdfFwd float64) *Vertex {
 	// For background (infinite area light), we should use solid angle PDF directly
 	// Don't convert to area PDF since background is at infinite distance
 	return &Vertex{
-		Point:             ray.Origin.Add(ray.Direction.Multiply(1000.0)), // Far background
-		Normal:            ray.Direction.Multiply(-1),                     // Reverse direction
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:  ray.Origin.Add(ray.Direction.Multiply(1000.0)), // Far background
+			Normal: ray.Direction.Multiply(-1),                     // Reverse direction
+		},
 		IncomingDirection: ray.Direction.Multiply(-1),
 		AreaPdfForward:    pdfFwd,            // Keep as solid angle PDF for infinite area light
 		AreaPdfReverse:    0.0,               // Cannot generate rays towards background

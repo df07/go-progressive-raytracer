@@ -32,9 +32,11 @@ func TestEvaluatePathTracingStrategy(t *testing.T) {
 			pathVertices: []Vertex{
 				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
 				{
-					Point:        core.NewVec3(0, 0, -1),
-					Normal:       core.NewVec3(0, 0, 1),
-					Material:     nil,
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(0, 0, -1),
+						Normal:   core.NewVec3(0, 0, 1),
+						Material: nil,
+					},
 					IsLight:      true,
 					Beta:         core.Vec3{X: 0.8, Y: 0.6, Z: 0.4}, // throughput from camera
 					EmittedLight: core.Vec3{X: 2.0, Y: 1.5, Z: 1.0}, // emissive surface
@@ -49,9 +51,11 @@ func TestEvaluatePathTracingStrategy(t *testing.T) {
 			pathVertices: []Vertex{
 				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
 				{
-					Point:        core.NewVec3(0, 0, -1),
-					Normal:       core.NewVec3(0, 0, 1),
-					Material:     material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(0, 0, -1),
+						Normal:   core.NewVec3(0, 0, 1),
+						Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+					},
 					IsLight:      false,
 					Beta:         core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 					EmittedLight: core.Vec3{X: 0, Y: 0, Z: 0}, // no emission
@@ -66,9 +70,11 @@ func TestEvaluatePathTracingStrategy(t *testing.T) {
 			pathVertices: []Vertex{
 				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
 				{
-					Point:           core.NewVec3(0, 0, -1000),
-					Normal:          core.NewVec3(0, 0, 1),
-					Material:        nil,
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(0, 0, -1000),
+						Normal:   core.NewVec3(0, 0, 1),
+						Material: nil,
+					},
 					IsLight:         true,
 					IsInfiniteLight: true,
 					Beta:            core.Vec3{X: 1, Y: 1, Z: 1},       // no attenuation to background
@@ -94,9 +100,10 @@ func TestEvaluatePathTracingStrategy(t *testing.T) {
 			pathVertices: []Vertex{
 				createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 0, -1), false, true, nil), // camera
 				{
-					Point:        core.NewVec3(0, 0, -1),
-					Normal:       core.NewVec3(0, 0, 1),
-					Material:     nil,
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:  core.NewVec3(0, 0, -1),
+						Normal: core.NewVec3(0, 0, 1),
+					},
 					IsLight:      true,
 					Beta:         core.Vec3{X: 0, Y: 0, Z: 0}, // zero throughput
 					EmittedLight: core.Vec3{X: 2.0, Y: 1.5, Z: 1.0},
@@ -175,9 +182,11 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 		{
 			name: "DiffuseSurfaceWithQuadLight",
 			cameraVertex: Vertex{
-				Point:             core.NewVec3(0, 0, 0),
-				Normal:            core.NewVec3(0, 1, 0), // pointing up
-				Material:          material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:    core.NewVec3(0, 0, 0),
+					Normal:   core.NewVec3(0, 1, 0), // pointing up
+					Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				},
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
@@ -200,9 +209,11 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 		{
 			name: "DiffuseSurfaceWithPointSpotLightAway",
 			cameraVertex: Vertex{
-				Point:             core.NewVec3(0, 0, 0),
-				Normal:            core.NewVec3(0, 1, 0), // pointing up
-				Material:          material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:    core.NewVec3(0, 0, 0),
+					Normal:   core.NewVec3(0, 1, 0), // pointing up
+					Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				},
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
@@ -226,9 +237,11 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 		{
 			name: "SurfaceWithNegativeCosine",
 			cameraVertex: Vertex{
-				Point:             core.NewVec3(0, 0, 0),
-				Normal:            core.NewVec3(0, 1, 0), // pointing up
-				Material:          material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:    core.NewVec3(0, 0, 0),
+					Normal:   core.NewVec3(0, 1, 0), // pointing up
+					Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				},
 				Beta:              core.Vec3{X: 0.8, Y: 0.6, Z: 0.4},
 				IncomingDirection: core.NewVec3(0, 0, 1),
 			},
@@ -252,9 +265,11 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 		{
 			name: "SpecularSurface",
 			cameraVertex: Vertex{
-				Point:      core.NewVec3(0, 0, 0),
-				Normal:     core.NewVec3(0, 1, 0),
-				Material:   material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:    core.NewVec3(0, 0, 0),
+					Normal:   core.NewVec3(0, 1, 0),
+					Material: material.NewMetal(core.NewVec3(0.8, 0.8, 0.8), 0.0),
+				},
 				Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
 				IsSpecular: true,
 			},
@@ -278,10 +293,12 @@ func TestEvaluateDirectLightingStrategy(t *testing.T) {
 		{
 			name: "ZeroBetaThroughput",
 			cameraVertex: Vertex{
-				Point:    core.NewVec3(0, 0, 0),
-				Normal:   core.NewVec3(0, 1, 0),
-				Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
-				Beta:     core.Vec3{X: 0, Y: 0, Z: 0}, // zero throughput
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:    core.NewVec3(0, 0, 0),
+					Normal:   core.NewVec3(0, 1, 0),
+					Material: material.NewLambertian(core.NewVec3(0.7, 0.5, 0.3)),
+				},
+				Beta: core.Vec3{X: 0, Y: 0, Z: 0}, // zero throughput
 			},
 			light: lights.NewQuadLight(
 				core.NewVec3(-0.5, 2.0, -0.5),
@@ -377,6 +394,10 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		return path
 	}
 
+	// reused materials for tests
+	lambertian := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
+	metal := material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0)
+
 	tests := []struct {
 		name                 string
 		cameraPath           Path
@@ -391,11 +412,11 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "InvalidIndices_s_TooSmall",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
-				{Point: core.NewVec3(0, 0, -1), Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -1), Material: lambertian}},
 			}),
 			lightPath: createLightPath([]Vertex{
-				{Point: core.NewVec3(0, 1, -1), IsLight: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 1, -1)}, IsLight: true},
 			}),
 			s:               0, // s < 1 should return zero
 			t:               1,
@@ -405,10 +426,10 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "InvalidIndices_t_TooSmall",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true},
 			}),
 			lightPath: createLightPath([]Vertex{
-				{Point: core.NewVec3(0, 1, -1), IsLight: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 1, -1)}, IsLight: true},
 			}),
 			s:               1,
 			t:               0, // t < 1 should return zero
@@ -418,11 +439,11 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "InvalidIndices_s_TooLarge",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
-				{Point: core.NewVec3(0, 0, -1), Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -1), Material: lambertian}},
 			}),
 			lightPath: createLightPath([]Vertex{
-				{Point: core.NewVec3(0, 1, -1), IsLight: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 1, -1)}, IsLight: true},
 			}),
 			s:               2, // s > lightPath.Length should return zero
 			t:               1,
@@ -432,21 +453,18 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "SpecularVertex_Camera",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true},
 				{
-					Point:      core.NewVec3(0, 0, -1),
-					Normal:     core.NewVec3(0, 0, 1),
-					Material:   material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0),
-					IsSpecular: true, // Can't connect through delta functions
-					Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -1), Normal: core.NewVec3(0, 0, 1), Material: metal},
+					IsSpecular:         true, // Can't connect through delta functions
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 			}),
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:   core.NewVec3(0, 1, -1),
-					Normal:  core.NewVec3(0, -1, 0),
-					IsLight: true,
-					Beta:    core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 1, -1), Normal: core.NewVec3(0, -1, 0)},
+					IsLight:            true,
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 			}),
 			s:               1,
@@ -457,21 +475,17 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "SpecularVertex_Light",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true},
 				{
-					Point:    core.NewVec3(0, 0, -1),
-					Normal:   core.NewVec3(0, 0, 1),
-					Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
-					Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -1), Normal: core.NewVec3(0, 0, 1), Material: lambertian},
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 			}),
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:      core.NewVec3(0, 1, -1),
-					Normal:     core.NewVec3(0, -1, 0),
-					Material:   material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0),
-					IsSpecular: true, // Can't connect through delta functions
-					Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 1, -1), Normal: core.NewVec3(0, -1, 0), Material: metal},
+					IsSpecular:         true, // Can't connect through delta functions
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 			}),
 			s:               1,
@@ -482,20 +496,21 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "ValidConnection_SurfaceToSurface",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
 				{
-					Point:    core.NewVec3(5, 5, 5),                               // far from scene geometry
-					Normal:   core.NewVec3(0, 1, 0),                               // pointing up toward light (different direction)
-					Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)), // different reflectance
-					Beta:     core.Vec3{X: 0.9, Y: 0.7, Z: 0.5},                   // different throughput
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(5, 5, 5),                               // far from scene geometry
+						Normal:   core.NewVec3(0, 1, 0),                               // pointing up toward light (different direction)
+						Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)), // different reflectance
+					},
+					Beta: core.Vec3{X: 0.9, Y: 0.7, Z: 0.5}, // different throughput
 				},
 			}),
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:   core.NewVec3(5, 7, 5),  // directly above camera vertex, distance=2
-					Normal:  core.NewVec3(0, -1, 0), // pointing down toward camera vertex
-					IsLight: true,
-					Beta:    core.Vec3{X: 2, Y: 2, Z: 2}, // different light intensity
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(5, 7, 5), Normal: core.NewVec3(0, -1, 0)},
+					IsLight:            true,
+					Beta:               core.Vec3{X: 2, Y: 2, Z: 2}, // different light intensity
 				},
 			}),
 			s:                    1,
@@ -507,20 +522,21 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "ValidConnection_LightToSurface",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
 				{
-					Point:    core.NewVec3(7, 7, 7),                               // far from scene geometry
-					Normal:   core.NewVec3(0, 0, 1),                               // pointing toward light in Z direction
-					Material: material.NewLambertian(core.NewVec3(0.5, 0.9, 0.3)), // green-ish reflectance
-					Beta:     core.Vec3{X: 0.6, Y: 1.2, Z: 0.4},                   // different throughput pattern
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(7, 7, 7),
+						Normal:   core.NewVec3(0, 0, 1),
+						Material: material.NewLambertian(core.NewVec3(0.5, 0.9, 0.3)),
+					},
+					Beta: core.Vec3{X: 0.6, Y: 1.2, Z: 0.4}, // different throughput pattern
 				},
 			}),
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:   core.NewVec3(7, 7, 9),  // 2 units away in Z direction
-					Normal:  core.NewVec3(0, 0, -1), // pointing back toward camera vertex
-					IsLight: true,
-					Beta:    core.Vec3{X: 1.5, Y: 1.5, Z: 1.5}, // different light intensity
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(7, 7, 9), Normal: core.NewVec3(0, 0, -1)},
+					IsLight:            true,
+					Beta:               core.Vec3{X: 1.5, Y: 1.5, Z: 1.5}, // different light intensity
 				},
 			}),
 			s:                    1,
@@ -532,20 +548,21 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "ValidConnection_LargeDistance",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
 				{
-					Point:    core.NewVec3(20, 20, 20),                            // far from scene geometry
-					Normal:   core.NewVec3(-1, -1, 0).Normalize(),                 // pointing toward light
-					Material: material.NewLambertian(core.NewVec3(0.9, 0.5, 0.1)), // orange reflectance
-					Beta:     core.Vec3{X: 2, Y: 1, Z: 0.5},                       // asymmetric throughput
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(20, 20, 20),                            // far from scene geometry
+						Normal:   core.NewVec3(-1, -1, 0).Normalize(),                 // pointing toward light
+						Material: material.NewLambertian(core.NewVec3(0.9, 0.5, 0.1)), // orange reflectance
+					},
+					Beta: core.Vec3{X: 2, Y: 1, Z: 0.5}, // asymmetric throughput
 				},
 			}),
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:   core.NewVec3(15, 15, 20),          // distance=√50≈7.07 units away
-					Normal:  core.NewVec3(1, 1, 0).Normalize(), // pointing toward camera vertex
-					IsLight: true,
-					Beta:    core.Vec3{X: 10, Y: 10, Z: 10}, // bright light
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(15, 15, 20), Normal: core.NewVec3(1, 1, 0).Normalize()},
+					IsLight:            true,
+					Beta:               core.Vec3{X: 10, Y: 10, Z: 10}, // bright light
 				},
 			}),
 			s:                    1,
@@ -557,20 +574,21 @@ func TestEvaluateConnectionStrategy(t *testing.T) {
 		{
 			name: "DebugConnection_ClearPath",
 			cameraPath: createCameraPath([]Vertex{
-				{Point: core.NewVec3(0, 0, 0), IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, 0)}, IsCamera: true, Beta: core.Vec3{X: 1, Y: 1, Z: 1}},
 				{
-					Point:    core.NewVec3(10, 10, 10), // far from scene geometry
-					Normal:   core.NewVec3(1, 0, 0),    // pointing toward light (positive cosine)
-					Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
-					Beta:     core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(10, 10, 10), // far from scene geometry
+						Normal:   core.NewVec3(1, 0, 0),    // pointing toward light (positive cosine)
+						Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7)),
+					},
+					Beta: core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 			}),
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:   core.NewVec3(11, 10, 10), // close to camera vertex, clear line of sight
-					Normal:  core.NewVec3(-1, 0, 0),   // pointing toward camera vertex (positive cosine)
-					IsLight: true,
-					Beta:    core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(11, 10, 10), Normal: core.NewVec3(-1, 0, 0)},
+					IsLight:            true,
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 			}),
 			s:                    1,
@@ -639,7 +657,7 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 		{
 			name: "InvalidPathLength_TooShort",
 			lightPath: createLightPath([]Vertex{
-				{Point: core.NewVec3(0, 2, 0), IsLight: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 2, 0)}, IsLight: true},
 			}),
 			s:               1, // s <= 1 should fail
 			sampler:         NewTestSampler([]float64{}, []core.Vec2{core.NewVec2(0.5, 0.5)}, []core.Vec3{}),
@@ -650,8 +668,8 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 		{
 			name: "InvalidPathLength_TooLong",
 			lightPath: createLightPath([]Vertex{
-				{Point: core.NewVec3(0, 2, 0), IsLight: true},
-				{Point: core.NewVec3(0, 1, 0), Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 2, 0)}, IsLight: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 1, 0), Normal: core.NewVec3(0, 1, 0), Material: material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))}},
 			}),
 			s:               3, // s > lightPath.Length should fail
 			sampler:         NewTestSampler([]float64{}, []core.Vec2{core.NewVec2(0.5, 0.5)}, []core.Vec3{}),
@@ -662,13 +680,11 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 		{
 			name: "SpecularVertex_ShouldSkip",
 			lightPath: createLightPath([]Vertex{
-				{Point: core.NewVec3(0, 2, 0), IsLight: true},
+				{SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 2, 0)}, IsLight: true},
 				{
-					Point:      core.NewVec3(0, 1, 0),
-					Normal:     core.NewVec3(0, 1, 0),
-					Material:   material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0),
-					IsSpecular: true, // Cannot connect through delta functions
-					Beta:       core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 1, 0), Normal: core.NewVec3(0, 1, 0), Material: material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.0)},
+					IsSpecular:         true, // Cannot connect through delta functions
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 			}),
 			s:               2,
@@ -681,15 +697,21 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 			name: "ValidDiffuseConnection_SlightOffset",
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:        core.NewVec3(0, 0, -4), // same as working test
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(0, 0, -4),
+						Normal:   core.NewVec3(0, 0, -1),
+						Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)),
+					},
 					IsLight:      true,
 					EmittedLight: core.NewVec3(2, 2, 2),
 					Beta:         core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 				{
-					Point:             core.NewVec3(0.1, 0, -1.005),            // slight offset from center
-					Normal:            core.NewVec3(0.1, 0, 0.995).Normalize(), // normal pointing toward camera
-					Material:          material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)),
+					SurfaceInteraction: &material.SurfaceInteraction{
+						Point:    core.NewVec3(0.1, 0, -1.005),
+						Normal:   core.NewVec3(0.1, 0, 0.995).Normalize(), // normal pointing toward camera
+						Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)),
+					},
 					Beta:              core.Vec3{X: 0.9, Y: 0.7, Z: 0.5},
 					IncomingDirection: core.NewVec3(0, 0, 1), // same as working test
 					IsSpecular:        false,
@@ -710,18 +732,16 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 			name: "ValidDiffuseConnection_CenterHit",
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:        core.NewVec3(0, 0, -4), // light behind sphere
-					IsLight:      true,
-					EmittedLight: core.NewVec3(2, 2, 2),
-					Beta:         core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -4), Normal: core.NewVec3(0, 0, -1), Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4))},
+					IsLight:            true,
+					EmittedLight:       core.NewVec3(2, 2, 2),
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 				{
-					Point:             core.NewVec3(0, 0, -1), // front of sphere toward camera
-					Normal:            core.NewVec3(0, 0, 1),  // pointing toward camera
-					Material:          material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4)),
-					Beta:              core.Vec3{X: 0.9, Y: 0.7, Z: 0.5},
-					IncomingDirection: core.NewVec3(0, 0, 1), // from light behind
-					IsSpecular:        false,
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -1), Normal: core.NewVec3(0, 0, 1), Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4))},
+					Beta:               core.Vec3{X: 0.9, Y: 0.7, Z: 0.5},
+					IncomingDirection:  core.NewVec3(0, 0, 1), // from light behind
+					IsSpecular:         false,
 				},
 			}),
 			s: 2,
@@ -739,18 +759,16 @@ func TestEvaluateLightTracingStrategy(t *testing.T) {
 			name: "MetalSurface_NonSpecular",
 			lightPath: createLightPath([]Vertex{
 				{
-					Point:        core.NewVec3(0, 0, -4), // same as working tests
-					IsLight:      true,
-					EmittedLight: core.NewVec3(2, 2, 2),
-					Beta:         core.Vec3{X: 1, Y: 1, Z: 1},
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -4), Normal: core.NewVec3(0, 0, -1), Material: material.NewLambertian(core.NewVec3(0.8, 0.6, 0.4))},
+					IsLight:            true,
+					EmittedLight:       core.NewVec3(2, 2, 2),
+					Beta:               core.Vec3{X: 1, Y: 1, Z: 1},
 				},
 				{
-					Point:             core.NewVec3(0, 0, -1), // front of sphere
-					Normal:            core.NewVec3(0, 0, 1),
-					Material:          material.NewMetal(core.NewVec3(0.9, 0.8, 0.7), 0.1), // rough metal
-					Beta:              core.Vec3{X: 0.85, Y: 0.75, Z: 0.65},
-					IncomingDirection: core.NewVec3(0, 0, 1), // same as working tests
-					IsSpecular:        false,                 // roughened metal can be connected
+					SurfaceInteraction: &material.SurfaceInteraction{Point: core.NewVec3(0, 0, -1), Normal: core.NewVec3(0, 0, 1), Material: material.NewMetal(core.NewVec3(0.9, 0.8, 0.7), 0.1)},
+					Beta:               core.Vec3{X: 0.85, Y: 0.75, Z: 0.65},
+					IncomingDirection:  core.NewVec3(0, 0, 1), // same as working tests
+					IsSpecular:         false,                 // roughened metal can be connected
 				},
 			}),
 			s: 2,

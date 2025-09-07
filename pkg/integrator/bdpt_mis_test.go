@@ -694,8 +694,10 @@ func TestCalculateVertexPdf(t *testing.T) {
 		{
 			name: "CameraVertex",
 			curr: Vertex{
-				Point:    core.NewVec3(0, 0, 0),
-				Normal:   core.NewVec3(0, 0, -1),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:  core.NewVec3(0, 0, 0),
+					Normal: core.NewVec3(0, 0, -1),
+				},
 				IsCamera: true,
 			},
 			prev:        nil, // camera has no predecessor
@@ -707,8 +709,10 @@ func TestCalculateVertexPdf(t *testing.T) {
 			name: "MaterialVertex",
 			curr: createTestVertex(core.NewVec3(0, 0, -1), core.NewVec3(0, 0, 1), false, false, material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))),
 			prev: &Vertex{
-				Point:  core.NewVec3(0, 0, 0),
-				Normal: core.NewVec3(0, 0, -1),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:  core.NewVec3(0, 0, 0),
+					Normal: core.NewVec3(0, 0, -1),
+				},
 			},
 			next:        createTestVertex(core.NewVec3(1, 0, -1), core.NewVec3(-1, 0, 1), false, false, nil),
 			expectedPdf: 0.0, // material PDF calculation returns 0 for this configuration
@@ -717,8 +721,10 @@ func TestCalculateVertexPdf(t *testing.T) {
 		{
 			name: "LightVertex",
 			curr: Vertex{
-				Point:   core.NewVec3(0, 1, 0),
-				Normal:  core.NewVec3(0, -1, 0),
+				SurfaceInteraction: &material.SurfaceInteraction{
+					Point:  core.NewVec3(0, 1, 0),
+					Normal: core.NewVec3(0, -1, 0),
+				},
 				IsLight: true,
 				Light:   createTestAreaLight(),
 			},
@@ -960,17 +966,19 @@ func createSampledLightVertex() *Vertex {
 	emissive := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
 
 	return &Vertex{
-		Point:             core.NewVec3(0, 2, -1), // Light position above scene
-		Normal:            core.NewVec3(0, -1, 0), // Light normal pointing down
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:    core.NewVec3(0, 2, -1), // Light position above scene
+			Normal:   core.NewVec3(0, -1, 0), // Light normal pointing down
+			Material: emissive,
+		},
 		Light:             createTestAreaLight(),
-		Material:          emissive,
+		Beta:              core.NewVec3(5.0, 5.0, 5.0), // Light emission
 		IncomingDirection: core.Vec3{},
 		AreaPdfForward:    1.0, // Light sampling PDF
 		AreaPdfReverse:    0.0, // Will be calculated during MIS
 		IsLight:           true,
 		IsCamera:          false,
 		IsSpecular:        false,
-		Beta:              core.NewVec3(5.0, 5.0, 5.0), // Light emission
 		EmittedLight:      core.NewVec3(5.0, 5.0, 5.0),
 	}
 }
@@ -978,17 +986,18 @@ func createSampledLightVertex() *Vertex {
 // createSampledCameraVertex creates a realistic sampled camera vertex for t=1 (light tracing) strategies
 func createSampledCameraVertex() *Vertex {
 	return &Vertex{
-		Point:             core.NewVec3(0, 0, 0),  // Camera position
-		Normal:            core.NewVec3(0, 0, -1), // Camera "normal"
+		SurfaceInteraction: &material.SurfaceInteraction{
+			Point:  core.NewVec3(0, 0, 0),  // Camera position
+			Normal: core.NewVec3(0, 0, -1), // Camera "normal"
+		},
 		Light:             nil,
-		Material:          nil,
+		Beta:              core.NewVec3(1, 1, 1), // Camera importance
 		IncomingDirection: core.Vec3{},
 		AreaPdfForward:    0.0, // Camera is starting point
 		AreaPdfReverse:    0.0, // Will be calculated during MIS
 		IsLight:           false,
 		IsCamera:          true,
 		IsSpecular:        false,
-		Beta:              core.NewVec3(1, 1, 1), // Camera importance
 		EmittedLight:      core.Vec3{},
 	}
 }
