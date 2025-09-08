@@ -458,6 +458,7 @@ class ProgressiveRaytracer {
       document.getElementById('totalPixels').textContent = '-';
       document.getElementById('primitiveCount').textContent = '-';
       document.getElementById('elapsed').textContent = '-';
+      document.getElementById('avgLuminance').textContent = '-';
   }
 
   setStatus(type, message) {
@@ -723,6 +724,9 @@ class ProgressiveRaytracer {
       }
       if (data.primitiveCount !== undefined) {
           document.getElementById('primitiveCount').textContent = data.primitiveCount.toLocaleString();
+      }
+      if (data.averageLuminance !== undefined) {
+          document.getElementById('avgLuminance').textContent = data.averageLuminance.toFixed(4);
       }
       
       // Update status for pass completion (tile updates will handle in-progress status)

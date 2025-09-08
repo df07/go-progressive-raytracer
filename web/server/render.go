@@ -285,30 +285,35 @@ func (s *Server) handlePassComplete(ctx context.Context, sseEventChan chan SSEEv
 	elapsed := time.Since(startTime)
 	primitiveCount := scene.GetPrimitiveCount()
 
+	// Calculate average luminance from the image
+	avgLuminance := calculateAverageLuminance(passResult.Image)
+
 	passUpdate := struct {
-		Event          string  `json:"event"`
-		PassNumber     int     `json:"passNumber"`
-		TotalPasses    int     `json:"totalPasses"`
-		ElapsedMs      int64   `json:"elapsedMs"`
-		TotalPixels    int     `json:"totalPixels"`
-		TotalSamples   int     `json:"totalSamples"`
-		AverageSamples float64 `json:"averageSamples"`
-		MaxSamples     int     `json:"maxSamples"`
-		MinSamples     int     `json:"minSamples"`
-		MaxSamplesUsed int     `json:"maxSamplesUsed"`
-		PrimitiveCount int     `json:"primitiveCount"`
+		Event            string  `json:"event"`
+		PassNumber       int     `json:"passNumber"`
+		TotalPasses      int     `json:"totalPasses"`
+		ElapsedMs        int64   `json:"elapsedMs"`
+		TotalPixels      int     `json:"totalPixels"`
+		TotalSamples     int     `json:"totalSamples"`
+		AverageSamples   float64 `json:"averageSamples"`
+		MaxSamples       int     `json:"maxSamples"`
+		MinSamples       int     `json:"minSamples"`
+		MaxSamplesUsed   int     `json:"maxSamplesUsed"`
+		PrimitiveCount   int     `json:"primitiveCount"`
+		AverageLuminance float64 `json:"averageLuminance"`
 	}{
-		Event:          "passComplete",
-		PassNumber:     passResult.PassNumber,
-		TotalPasses:    req.MaxPasses,
-		ElapsedMs:      elapsed.Milliseconds(),
-		TotalPixels:    passResult.Stats.TotalPixels,
-		TotalSamples:   passResult.Stats.TotalSamples,
-		AverageSamples: passResult.Stats.AverageSamples,
-		MaxSamples:     passResult.Stats.MaxSamples,
-		MinSamples:     passResult.Stats.MinSamples,
-		MaxSamplesUsed: passResult.Stats.MaxSamplesUsed,
-		PrimitiveCount: primitiveCount,
+		Event:            "passComplete",
+		PassNumber:       passResult.PassNumber,
+		TotalPasses:      req.MaxPasses,
+		ElapsedMs:        elapsed.Milliseconds(),
+		TotalPixels:      passResult.Stats.TotalPixels,
+		TotalSamples:     passResult.Stats.TotalSamples,
+		AverageSamples:   passResult.Stats.AverageSamples,
+		MaxSamples:       passResult.Stats.MaxSamples,
+		MinSamples:       passResult.Stats.MinSamples,
+		MaxSamplesUsed:   passResult.Stats.MaxSamplesUsed,
+		PrimitiveCount:   primitiveCount,
+		AverageLuminance: avgLuminance,
 	}
 
 	data, err := json.Marshal(passUpdate)
@@ -444,4 +449,36 @@ func (s *Server) drainRemainingChannels(ctx context.Context, sseEventChan chan S
 			return
 		}
 	}
+}
+
+// calculateAverageLuminance calculates the average luminance of an RGBA image
+func calculateAverageLuminance(img *image.RGBA) float64 {
+	bounds := img.Bounds()
+	width := bounds.Max.X - bounds.Min.X
+	height := bounds.Max.Y - bounds.Min.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return 0.0
+	}
+
+	var totalLuminance float64
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// Convert from 16-bit to 8-bit values (0-255)
+			r8 := float64(r>>8) / 255.0
+			g8 := float64(g>>8) / 255.0
+			b8 := float64(b>>8) / 255.0
+
+			// Calculate luminance using standard RGB to luminance conversion
+			// Y = 0.299*R + 0.587*G + 0.114*B
+			luminance := 0.299*r8 + 0.587*g8 + 0.114*b8
+			totalLuminance += luminance
+		}
+	}
+
+	return totalLuminance / float64(totalPixels)
 }
