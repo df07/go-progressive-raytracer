@@ -473,10 +473,9 @@ func calculateAverageLuminance(img *image.RGBA) float64 {
 			g8 := float64(g>>8) / 255.0
 			b8 := float64(b>>8) / 255.0
 
-			// Calculate luminance using standard RGB to luminance conversion
-			// Y = 0.299*R + 0.587*G + 0.114*B
-			luminance := 0.299*r8 + 0.587*g8 + 0.114*b8
-			totalLuminance += luminance
+			// Use Vec3's Luminance method
+			color := core.Vec3{X: r8, Y: g8, Z: b8}
+			totalLuminance += color.Luminance()
 		}
 	}
 
