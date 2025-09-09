@@ -1001,3 +1001,162 @@ func createSampledCameraVertex() *Vertex {
 		EmittedLight:      core.Vec3{},
 	}
 }
+
+// ============================================================================
+// COPY OF OLD PBRT MIS WEIGHTING CODE FOR TESTING PURPOSES
+// ============================================================================
+
+// calculateMISWeightPBRT implements PBRT's MIS weighting for BDPT strategies
+// This compares forward vs reverse PDFs to properly weight different path construction strategies
+func (bdpt *BDPTIntegrator) calculateMISWeightPBRT(cameraPath, lightPath *Path, sampledVertex *Vertex, s, t int, scene *scene.Scene) float64 {
+	disableMISWeight := false
+	if disableMISWeight {
+		return 1.0 / float64(s+t-1)
+	}
+
+	if s+t == 2 {
+		// bdpt.logf(" (s=%d,t=%d) calculateMISWeight: s+t==2, weight=1.0\n", s, t)
+		return 1.0
+	}
+
+	sumRi := 0.0
+
+	// Look up connection vertices and their predecessors
+	var qs, pt, qsMinus, ptMinus *Vertex
+	if s > 0 {
+		qs = &lightPath.Vertices[s-1]
+	}
+	if t > 0 {
+		pt = &cameraPath.Vertices[t-1]
+	}
+	if s > 1 {
+		qsMinus = &lightPath.Vertices[s-2]
+	}
+	if t > 1 {
+		ptMinus = &cameraPath.Vertices[t-2]
+	}
+
+	// Store original values to restore later (Go's defer equivalent of PBRT's ScopedAssignment)
+	var originalPtPdfRev, originalPtMinusPdfRev, originalQsPdfRev, originalQsMinusPdfRev float64
+	var originalPtDelta, originalQsDelta bool
+
+	defer func() {
+		// Restore original values
+		if pt != nil {
+			pt.AreaPdfReverse = originalPtPdfRev
+			pt.IsSpecular = originalPtDelta
+		}
+		if ptMinus != nil {
+			ptMinus.AreaPdfReverse = originalPtMinusPdfRev
+		}
+		if qs != nil {
+			qs.AreaPdfReverse = originalQsPdfRev
+			qs.IsSpecular = originalQsDelta
+		}
+		if qsMinus != nil {
+			qsMinus.AreaPdfReverse = originalQsMinusPdfRev
+		}
+	}()
+
+	// Update sampled vertex for s=1 or t=1 strategy
+	if s == 1 && qs != nil && sampledVertex != nil {
+		*qs = *sampledVertex
+	} else if t == 1 && pt != nil && sampledVertex != nil {
+		*pt = *sampledVertex
+	}
+
+	// Mark connection vertices as non-degenerate and store originals
+	if pt != nil {
+		originalPtDelta = pt.IsSpecular
+		pt.IsSpecular = false
+	}
+	if qs != nil {
+		originalQsDelta = qs.IsSpecular
+		qs.IsSpecular = false
+	}
+
+	// Update reverse density of vertex pt_{t-1}
+	if pt != nil {
+		originalPtPdfRev = pt.AreaPdfReverse
+		if s > 0 {
+			// pt.AreaPdfReverse = qs.Pdf(scene, qsMinus, *pt)
+			pt.AreaPdfReverse = bdpt.calculateVertexPdf(qs, qsMinus, pt, scene)
+			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight 1 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
+		} else {
+			// pt.AreaPdfReverse = pt.PdfLightOrigin(scene, *ptMinus, lightPdf, lightToIndex)
+			pt.AreaPdfReverse = bdpt.calculateLightOriginPdf(pt, ptMinus, scene)
+			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight 2 remap pt: pt.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtPdfRev, pt.AreaPdfReverse)
+		}
+	}
+
+	// Update reverse density of vertex pt_{t-2}
+	if ptMinus != nil {
+		originalPtMinusPdfRev = ptMinus.AreaPdfReverse
+		if s > 0 {
+			// ptMinus.AreaPdfReverse = pt.Pdf(scene, qs, *ptMinus)
+			ptMinus.AreaPdfReverse = bdpt.calculateVertexPdf(pt, qs, ptMinus, scene)
+			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight 1 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
+		} else {
+			// ptMinus.AreaPdfReverse = pt.PdfLight(scene, *ptMinus)
+			ptMinus.AreaPdfReverse = bdpt.calculateLightPdf(pt, ptMinus, scene)
+			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight 2 remap ptMinus: ptMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalPtMinusPdfRev, ptMinus.AreaPdfReverse)
+		}
+	}
+
+	// Update reverse density of vertices qs_{s-1} and qs_{s-2}
+	if qs != nil {
+		originalQsPdfRev = qs.AreaPdfReverse
+		if pt != nil {
+			// qs.AreaPdfReverse = pt.Pdf(scene, ptMinus, *qs)
+			qs.AreaPdfReverse = bdpt.calculateVertexPdf(pt, ptMinus, qs, scene)
+			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight 3 remap qs: qs.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalQsPdfRev, qs.AreaPdfReverse)
+		}
+	}
+	if qsMinus != nil {
+		originalQsMinusPdfRev = qsMinus.AreaPdfReverse
+		if qs != nil && pt != nil {
+			// qsMinus.AreaPdfReverse = qs.Pdf(scene, pt, *qsMinus)
+			qsMinus.AreaPdfReverse = bdpt.calculateVertexPdf(qs, pt, qsMinus, scene)
+			// bdpt.logf(" (s=%d,t=%d) calculateMISWeight 4 remap qsMinus: qsMinus.AreaPdfReverse=%0.3g -> %0.3g\n", s, t, originalQsMinusPdfRev, qsMinus.AreaPdfReverse)
+		}
+	}
+
+	// Consider hypothetical connection strategies along the camera subpath
+	ri := 1.0
+	for i := t - 1; i > 0; i-- {
+		vertex := &cameraPath.Vertices[i]
+		ri *= remap0(vertex.AreaPdfReverse) / remap0(vertex.AreaPdfForward)
+
+		// Only add to sumRi if no specular vertex follows (meaning connection is viable)
+		if !vertex.IsSpecular && !cameraPath.Vertices[i-1].IsSpecular {
+			sumRi += ri
+		}
+		// bdpt.logf(" (s=%d,t=%d) calculateMISWeight cameraPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi)
+	}
+
+	// Consider hypothetical connection strategies along the light subpath
+	ri = 1.0
+	for i := s - 1; i >= 0; i-- {
+		vertex := &lightPath.Vertices[i]
+		ri *= remap0(vertex.AreaPdfReverse) / remap0(vertex.AreaPdfForward)
+
+		var deltaLightVertex bool
+		if i > 0 {
+			// PBRT: Check if predecessor is delta (either specular material or delta light)
+			predecessor := &lightPath.Vertices[i-1]
+			deltaLightVertex = predecessor.IsSpecular || (predecessor.IsLight && predecessor.Light != nil && predecessor.Light.Type() == lights.LightTypePoint)
+		} else {
+			// PBRT: Check if current vertex is a delta light
+			deltaLightVertex = vertex.IsLight && vertex.Light != nil && vertex.Light.Type() == lights.LightTypePoint
+		}
+
+		if !vertex.IsSpecular && !deltaLightVertex {
+			sumRi += ri
+		}
+		// bdpt.logf(" (s=%d,t=%d) calculateMISWeight lightPath[%d]: pdfFwd=%.3g, pdfRev=%.3g, ri=%.3g, sumRi=%.3g\n", s, t, i, remap0(vertex.AreaPdfForward), remap0(vertex.AreaPdfReverse), ri, sumRi)
+	}
+
+	// bdpt.logf(" (s=%d,t=%d) calculateMISWeight: sumRi=%0.3g, weight=%0.3f\n", s, t, sumRi, 1.0/(1.0+sumRi))
+
+	return 1.0 / (1.0 + sumRi)
+}
