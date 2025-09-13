@@ -225,6 +225,18 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 	case "caustic-glass":
 		loadMesh := !configOnly
 		return scene.NewCausticGlassScene(loadMesh, req.LightType, logger, cameraOverride)
+	case "cornell-pbrt":
+		if configOnly {
+			// For config-only requests, return a basic cornell scene for dimensions
+			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
+		}
+		// Load actual PBRT scene
+		pbrtScene, err := scene.NewPBRTScene("scenes/cornell-empty.pbrt")
+		if err != nil {
+			log.Printf("Failed to load PBRT scene: %v", err)
+			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
+		}
+		return pbrtScene
 	default:
 		return nil
 	}

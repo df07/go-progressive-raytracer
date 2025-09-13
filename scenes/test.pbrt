@@ -1,0 +1,6 @@
+LookAt 0 0 1  0 0 0  0 1 0
+Camera "perspective" "float fov" 40
+Film "rgb" "string filename" "test.png" "integer xresolution" 100 "integer yresolution" 100
+WorldBegin
+Shape "bilinearPatch" "point3 P00" [0 0 0] "point3 P01" [1 0 0] "point3 P10" [0 1 0] "point3 P11" [1 1 0]
+WorldEnd

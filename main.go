@@ -97,6 +97,7 @@ func showHelp() {
 	fmt.Println("  default      - Default scene with spheres and plane ground")
 	fmt.Println("  cornell      - Cornell box scene with spheres")
 	fmt.Println("  cornell-boxes - Cornell box scene with rotated boxes")
+	fmt.Println("  cornell-pbrt - Cornell box scene loaded from PBRT file")
 	fmt.Println("  spheregrid   - 10x10 grid of rainbow-colored metallic spheres (perfect for BVH testing)")
 	fmt.Println("  trianglemesh - Scene showcasing triangle mesh geometry (boxes, pyramids, icosahedrons)")
 	fmt.Println("  dragon       - Dragon PLY mesh from PBRT book")
@@ -134,6 +135,14 @@ func createScene(sceneType string) *scene.Scene {
 	case "caustic-glass":
 		fmt.Println("Using caustic glass scene...")
 		sceneObj = scene.NewCausticGlassScene(true, lights.LightTypeArea, renderer.NewDefaultLogger())
+	case "cornell-pbrt":
+		fmt.Println("Using PBRT Cornell scene...")
+		var err error
+		sceneObj, err = scene.NewPBRTScene("scenes/cornell-empty.pbrt")
+		if err != nil {
+			fmt.Printf("Failed to load PBRT scene: %v. Using default scene.\n", err)
+			sceneObj = scene.NewDefaultScene()
+		}
 	case "default":
 		fmt.Println("Using default scene...")
 		sceneObj = scene.NewDefaultScene()
