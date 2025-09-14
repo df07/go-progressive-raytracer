@@ -12,7 +12,7 @@ import (
 )
 
 // NewPBRTScene creates a scene from a PBRT file
-func NewPBRTScene(filepath string) (*Scene, error) {
+func NewPBRTScene(filepath string, cameraOverrides ...geometry.CameraConfig) (*Scene, error) {
 	// Parse PBRT file
 	pbrtScene, err := loaders.LoadPBRT(filepath)
 	if err != nil {
@@ -27,25 +27,33 @@ func NewPBRTScene(filepath string) (*Scene, error) {
 	}
 
 	// Convert camera
-	if err := convertCamera(pbrtScene, scene); err != nil {
+	if err := convertCamera(pbrtScene, scene, cameraOverrides...); err != nil {
 		return nil, fmt.Errorf("failed to convert camera: %v", err)
 	}
 
 	// Convert materials and shapes
 	materialMap := make(map[string]material.Material)
 
-	// Process top-level materials
-	for _, matStmt := range pbrtScene.Materials {
+	// Convert all materials first
+	materials := make([]material.Material, len(pbrtScene.Materials))
+	for i, matStmt := range pbrtScene.Materials {
 		mat, err := convertMaterial(&matStmt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert material: %v", err)
 		}
-		materialMap["current"] = mat // PBRT materials apply to subsequent shapes
+		materials[i] = mat
 	}
 
-	// Process top-level shapes
+	// Process shapes using their assigned material index
 	for _, shapeStmt := range pbrtScene.Shapes {
-		shape, err := convertShape(&shapeStmt, materialMap["current"])
+		var shapeMaterial material.Material
+		if shapeStmt.MaterialIndex >= 0 && shapeStmt.MaterialIndex < len(materials) {
+			shapeMaterial = materials[shapeStmt.MaterialIndex]
+		} else {
+			return nil, fmt.Errorf("shape has no valid material (MaterialIndex: %d)", shapeStmt.MaterialIndex)
+		}
+
+		shape, err := convertShape(&shapeStmt, shapeMaterial)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert shape: %v", err)
 		}
@@ -89,7 +97,7 @@ func createDefaultPBRTSamplingConfig() SamplingConfig {
 }
 
 // convertCamera converts PBRT camera to our camera system
-func convertCamera(pbrtScene *loaders.PBRTScene, scene *Scene) error {
+func convertCamera(pbrtScene *loaders.PBRTScene, scene *Scene, cameraOverrides ...geometry.CameraConfig) error {
 	// Default camera config
 	cameraConfig := geometry.CameraConfig{
 		Center:        core.NewVec3(0, 0, 0),
@@ -136,6 +144,16 @@ func convertCamera(pbrtScene *loaders.PBRTScene, scene *Scene) error {
 			}
 			scene.SamplingConfig.Height = int(height)
 			cameraConfig.AspectRatio = float64(cameraConfig.Width) / height
+		}
+	}
+
+	// Apply camera overrides if provided
+	if len(cameraOverrides) > 0 {
+		cameraConfig = geometry.MergeCameraConfig(cameraConfig, cameraOverrides[0])
+		// Update sampling config dimensions if width/aspect ratio were overridden
+		if cameraOverrides[0].Width > 0 {
+			scene.SamplingConfig.Width = cameraOverrides[0].Width
+			scene.SamplingConfig.Height = int(float64(cameraOverrides[0].Width) / cameraConfig.AspectRatio)
 		}
 	}
 
@@ -305,6 +323,19 @@ func convertLight(stmt *loaders.PBRTStatement) (lights.Light, error) {
 		}
 
 		return lights.NewUniformInfiniteLight(radiance), nil
+
+	case "infinite-gradient":
+		topColor := core.NewVec3(0.5, 0.7, 1.0)    // Default blue sky
+		bottomColor := core.NewVec3(1.0, 1.0, 1.0) // Default white horizon
+
+		if rgb, ok := stmt.GetRGBParam("topColor"); ok {
+			topColor = *rgb
+		}
+		if rgb, ok := stmt.GetRGBParam("bottomColor"); ok {
+			bottomColor = *rgb
+		}
+
+		return lights.NewGradientInfiniteLight(topColor, bottomColor), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported light type: %s", stmt.Subtype)

@@ -13,9 +13,10 @@ import (
 
 // PBRTStatement represents a parsed PBRT statement
 type PBRTStatement struct {
-	Type       string               // Statement type (Camera, Material, Shape, etc.)
-	Subtype    string               // Subtype (perspective, diffuse, sphere, etc.)
-	Parameters map[string]PBRTParam // Named parameters
+	Type          string               // Statement type (Camera, Material, Shape, etc.)
+	Subtype       string               // Subtype (perspective, diffuse, sphere, etc.)
+	Parameters    map[string]PBRTParam // Named parameters
+	MaterialIndex int                  // For shapes: index of material to use (-1 = no material)
 }
 
 // PBRTParam represents a parameter with type and value(s)
@@ -119,6 +120,7 @@ func LoadPBRT(filename string) (*PBRTScene, error) {
 	scanner := bufio.NewScanner(file)
 	inWorld := false
 	var currentAttribute *AttributeBlock
+	currentMaterialIndex := -1 // Track current material for shapes
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -203,7 +205,9 @@ func LoadPBRT(filename string) (*PBRTScene, error) {
 				switch stmt.Type {
 				case "Material":
 					target.Materials = append(target.Materials, *stmt)
+					currentMaterialIndex = len(target.Materials) - 1 // Update current material index
 				case "Shape":
+					stmt.MaterialIndex = currentMaterialIndex // Assign current material to shape
 					target.Shapes = append(target.Shapes, *stmt)
 				case "LightSource", "AreaLightSource":
 					target.LightSources = append(target.LightSources, *stmt)

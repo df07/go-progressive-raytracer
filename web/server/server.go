@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
@@ -73,6 +74,7 @@ func (s *Server) Start() error {
 	http.HandleFunc("/api/render", s.handleRender) // Real-time tile streaming
 	http.HandleFunc("/api/health", s.handleHealth)
 	http.HandleFunc("/api/scene-config", s.handleSceneConfig)
+	http.HandleFunc("/api/scenes", s.handleScenes) // Scene discovery
 	http.HandleFunc("/api/inspect", s.handleInspect)
 
 	addr := fmt.Sprintf(":%d", s.port)
@@ -85,6 +87,26 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// handleScenes returns all available scenes (built-in and PBRT)
+func (s *Server) handleScenes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get all scenes using the scene discovery service
+	scenes, err := scene.ListAllScenes()
+	if err != nil {
+		log.Printf("Error listing scenes: %v", err)
+		http.Error(w, "Failed to list scenes", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(scenes)
 }
 
 // parseIntParam parses an integer parameter from URL query with validation
@@ -199,7 +221,39 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 		}
 	}
 
-	// Single switch statement - pass override (which may be empty for defaults)
+	// Handle PBRT scenes first (they start with "pbrt:")
+	if strings.HasPrefix(req.Scene, "pbrt:") {
+		// Security: Validate scene ID against known PBRT scenes to prevent path traversal
+		pbrtScenes, err := scene.ListPBRTScenes()
+		if err != nil {
+			log.Printf("Failed to list PBRT scenes for validation: %v", err)
+			return nil
+		}
+
+		// Find the scene with matching ID
+		var scenePath string
+		for _, pbrtScene := range pbrtScenes {
+			if pbrtScene.ID == req.Scene {
+				scenePath = pbrtScene.FilePath
+				break
+			}
+		}
+
+		if scenePath == "" {
+			log.Printf("Invalid PBRT scene ID: %s", req.Scene)
+			return nil // Unknown scene ID
+		}
+
+		// Load actual PBRT scene with camera override using validated path
+		pbrtScene, err := scene.NewPBRTScene(scenePath, cameraOverride)
+		if err != nil {
+			log.Printf("Failed to load PBRT scene %s: %v", scenePath, err)
+			return nil // Return nil to trigger proper error response
+		}
+		return pbrtScene
+	}
+
+	// Single switch statement for built-in scenes - pass override (which may be empty for defaults)
 	switch req.Scene {
 	case "cornell-box":
 		// Parse Cornell geometry type
@@ -231,7 +285,7 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
 		}
 		// Load actual PBRT scene
-		pbrtScene, err := scene.NewPBRTScene("scenes/cornell-empty.pbrt")
+		pbrtScene, err := scene.NewPBRTScene("scenes/cornell-empty.pbrt", cameraOverride)
 		if err != nil {
 			log.Printf("Failed to load PBRT scene: %v", err)
 			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)

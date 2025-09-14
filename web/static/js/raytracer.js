@@ -8,6 +8,7 @@ class ProgressiveRaytracer {
       this.initializeTheme();
       this.bindEvents();
       this.initializeSections();
+      this.loadAvailableScenes(); // Load available scenes first
       this.loadSceneDefaults(); // Load initial defaults
   }
 
@@ -78,6 +79,55 @@ class ProgressiveRaytracer {
       } else {
           header.classList.add('active');
           content.classList.add('expanded');
+      }
+  }
+
+  async loadAvailableScenes() {
+      try {
+          const response = await fetch('/api/scenes');
+          if (response.ok) {
+              const scenes = await response.json();
+              this.populateSceneDropdown(scenes);
+          } else {
+              console.warn('Failed to load available scenes, using fallback');
+          }
+      } catch (error) {
+          console.warn('Error loading available scenes:', error);
+      }
+  }
+
+  populateSceneDropdown(scenesData) {
+      const sceneSelect = document.getElementById('scene');
+      const currentValue = sceneSelect.value; // Remember current selection
+
+      // Clear existing options
+      sceneSelect.innerHTML = '';
+
+      // Populate with grouped options
+      scenesData.groups.forEach(group => {
+          if (group.scenes.length === 0) return;
+
+          const optgroup = document.createElement('optgroup');
+          optgroup.label = group.name;
+
+          group.scenes.forEach(scene => {
+              const option = document.createElement('option');
+              option.value = scene.id;
+              option.textContent = scene.displayName;
+              if (scene.description) {
+                  option.title = scene.description; // Tooltip
+              }
+              optgroup.appendChild(option);
+          });
+
+          sceneSelect.appendChild(optgroup);
+      });
+
+      // Restore previous selection or default to first option
+      if (currentValue && sceneSelect.querySelector(`option[value="${currentValue}"]`)) {
+          sceneSelect.value = currentValue;
+      } else if (sceneSelect.options.length > 0) {
+          sceneSelect.selectedIndex = 0;
       }
   }
 

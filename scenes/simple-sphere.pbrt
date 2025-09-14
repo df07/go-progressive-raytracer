@@ -1,0 +1,22 @@
+# Scene: Simple Sphere
+# Description: A basic scene with a single sphere for testing
+# Group: Test Scenes
+
+LookAt 0 0 5  0 0 0  0 1 0
+Camera "perspective" "float fov" 40
+Film "rgb" "string filename" "simple-sphere.png" "integer xresolution" 200 "integer yresolution" 200
+
+WorldBegin
+
+# Add gradient infinite light for nice sky effect
+LightSource "infinite-gradient" "rgb topColor" [0.4 0.6 1.0] "rgb bottomColor" [1.0 1.0 1.0]
+
+# Ground plane
+Material "diffuse" "rgb reflectance" [0.5 0.5 0.5]
+Shape "bilinearPatch" "point3 P00" [-10 -1 -10] "point3 P01" [10 -1 -10] "point3 P10" [-10 -1 10] "point3 P11" [10 -1 10]
+
+# Green diffuse sphere
+Material "diffuse" "rgb reflectance" [0.2 0.8 0.2]
+Shape "sphere" "float radius" 1.0
+
+WorldEnd

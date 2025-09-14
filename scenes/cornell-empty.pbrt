@@ -1,3 +1,8 @@
+# Scene: Cornell Box
+# Variant: Empty Room
+# Description: Classic Cornell box with no objects for testing area lighting
+# Group: Cornell Variants
+#
 # Cornell Box Empty Scene (PBRT Format)
 # Matches the empty Cornell box from our Go implementation
 
