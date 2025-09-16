@@ -31,9 +31,6 @@ func NewPBRTScene(filepath string, cameraOverrides ...geometry.CameraConfig) (*S
 		return nil, fmt.Errorf("failed to convert camera: %v", err)
 	}
 
-	// Convert materials and shapes
-	materialMap := make(map[string]material.Material)
-
 	// Convert all materials first
 	materials := make([]material.Material, len(pbrtScene.Materials))
 	for i, matStmt := range pbrtScene.Materials {
@@ -75,7 +72,7 @@ func NewPBRTScene(filepath string, cameraOverrides ...geometry.CameraConfig) (*S
 
 	// Process attribute blocks
 	for _, attrBlock := range pbrtScene.Attributes {
-		if err := processAttributeBlock(&attrBlock, scene, materialMap); err != nil {
+		if err := processAttributeBlock(&attrBlock, scene, materials); err != nil {
 			return nil, fmt.Errorf("failed to process attribute block: %v", err)
 		}
 	}
@@ -343,31 +340,44 @@ func convertLight(stmt *loaders.PBRTStatement) (lights.Light, error) {
 }
 
 // processAttributeBlock processes an AttributeBegin/AttributeEnd block
-func processAttributeBlock(block *loaders.AttributeBlock, scene *Scene, materialMap map[string]material.Material) error {
-	// Process materials in this block
-	var currentMaterial material.Material = materialMap["current"]
-
-	for _, matStmt := range block.Materials {
+func processAttributeBlock(block *loaders.AttributeBlock, scene *Scene, globalMaterials []material.Material) error {
+	// Convert local materials in this block
+	localMaterials := make([]material.Material, len(block.Materials))
+	for i, matStmt := range block.Materials {
 		mat, err := convertMaterial(&matStmt)
 		if err != nil {
 			return fmt.Errorf("failed to convert material in attribute block: %v", err)
 		}
-		currentMaterial = mat
-	}
-
-	// Check for area lights and override material if present
-	for _, lightStmt := range block.LightSources {
-		if lightStmt.Type == "AreaLightSource" {
-			if rgb, ok := lightStmt.GetRGBParam("L"); ok {
-				currentMaterial = material.NewEmissive(*rgb)
-				break // Only handle one area light per attribute block
-			}
-		}
+		localMaterials[i] = mat
 	}
 
 	// Process shapes in this block
 	for _, shapeStmt := range block.Shapes {
-		shape, err := convertShape(&shapeStmt, currentMaterial)
+		var shapeMaterial material.Material
+
+		// Determine which material to use based on MaterialIndex
+		if shapeStmt.MaterialIndex >= 0 && shapeStmt.MaterialIndex < len(localMaterials) {
+			// Use local material from this attribute block
+			shapeMaterial = localMaterials[shapeStmt.MaterialIndex]
+		} else if shapeStmt.MaterialIndex >= 0 && shapeStmt.MaterialIndex < len(globalMaterials) {
+			// Use global material
+			shapeMaterial = globalMaterials[shapeStmt.MaterialIndex]
+		} else {
+			return fmt.Errorf("shape has no valid material (MaterialIndex: %d, local materials: %d, global materials: %d)",
+				shapeStmt.MaterialIndex, len(localMaterials), len(globalMaterials))
+		}
+
+		// Check for area lights and override material if present
+		for _, lightStmt := range block.LightSources {
+			if lightStmt.Type == "AreaLightSource" {
+				if rgb, ok := lightStmt.GetRGBParam("L"); ok {
+					shapeMaterial = material.NewEmissive(*rgb)
+					break // Only handle one area light per attribute block
+				}
+			}
+		}
+
+		shape, err := convertShape(&shapeStmt, shapeMaterial)
 		if err != nil {
 			return fmt.Errorf("failed to convert shape in attribute block: %v", err)
 		}
