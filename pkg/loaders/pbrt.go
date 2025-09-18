@@ -54,7 +54,8 @@ type AttributeBlock struct {
 
 // GraphicsState represents the current graphics state (for AttributeBegin/AttributeEnd stack)
 type GraphicsState struct {
-	MaterialIndex int // Current material index
+	MaterialIndex   int            // Current material index
+	AreaLightSource *PBRTStatement // Current area light source (nil if none)
 }
 
 // PBRTParser encapsulates the state and logic for parsing PBRT files
@@ -169,10 +170,19 @@ func (p *PBRTParser) processAttributeBegin() error {
 		return err
 	}
 
-	// Push current state onto stack
-	p.stateStack = append(p.stateStack, GraphicsState{
-		MaterialIndex: p.currentMaterialIndex,
-	})
+	// Copy current state and push onto stack
+	currentState := GraphicsState{
+		MaterialIndex:   p.currentMaterialIndex,
+		AreaLightSource: nil, // Area light state is inherited but starts fresh in new block
+	}
+
+	// Inherit area light state from parent if we're in nested attribute blocks
+	if len(p.stateStack) > 0 {
+		parentState := p.stateStack[len(p.stateStack)-1]
+		currentState.AreaLightSource = parentState.AreaLightSource
+	}
+
+	p.stateStack = append(p.stateStack, currentState)
 
 	// Create new attribute block and push onto stack
 	newAttribute := &AttributeBlock{
@@ -280,8 +290,34 @@ func (p *PBRTParser) routeStatement(stmt *PBRTStatement) error {
 				// No materials defined in this attribute block, use global material index
 				stmt.MaterialIndex = p.currentMaterialIndex
 			}
+
+			// Check if there's an active area light source in the current graphics state
+			if len(p.stateStack) > 0 && p.stateStack[len(p.stateStack)-1].AreaLightSource != nil {
+				areaLight := p.stateStack[len(p.stateStack)-1].AreaLightSource
+				// Copy area light parameters to the shape
+				if stmt.Parameters == nil {
+					stmt.Parameters = make(map[string]PBRTParam)
+				}
+				// Add a special marker to indicate this shape is an area light
+				stmt.Parameters["_areaLight"] = PBRTParam{Type: "bool", Values: []string{"true"}}
+				// Copy emission parameters from area light to shape
+				for paramName, param := range areaLight.Parameters {
+					// Copy emission-related parameters
+					if paramName == "L" || paramName == "power" {
+						stmt.Parameters[paramName] = param
+					}
+				}
+			}
+
 			currentAttribute.Shapes = append(currentAttribute.Shapes, *stmt)
-		case "LightSource", "AreaLightSource":
+		case "LightSource":
+			currentAttribute.LightSources = append(currentAttribute.LightSources, *stmt)
+		case "AreaLightSource":
+			// AreaLightSource modifies graphics state - it affects subsequent shapes
+			if len(p.stateStack) > 0 {
+				p.stateStack[len(p.stateStack)-1].AreaLightSource = stmt
+			}
+			// Also store it in the attribute block for processing
 			currentAttribute.LightSources = append(currentAttribute.LightSources, *stmt)
 		case "Translate", "Rotate", "Scale", "Transform":
 			currentAttribute.Transforms = append(currentAttribute.Transforms, *stmt)
@@ -308,8 +344,34 @@ func (p *PBRTParser) routeStatement(stmt *PBRTStatement) error {
 				p.currentMaterialIndex = len(p.scene.Materials) - 1 // Update current material index
 			case "Shape":
 				stmt.MaterialIndex = p.currentMaterialIndex // Assign current material to shape
+
+				// Check if there's an active area light source in the current graphics state
+				if len(p.stateStack) > 0 && p.stateStack[len(p.stateStack)-1].AreaLightSource != nil {
+					areaLight := p.stateStack[len(p.stateStack)-1].AreaLightSource
+					// Copy area light parameters to the shape
+					if stmt.Parameters == nil {
+						stmt.Parameters = make(map[string]PBRTParam)
+					}
+					// Add a special marker to indicate this shape is an area light
+					stmt.Parameters["_areaLight"] = PBRTParam{Type: "bool", Values: []string{"true"}}
+					// Copy emission parameters from area light to shape
+					for paramName, param := range areaLight.Parameters {
+						// Copy emission-related parameters
+						if paramName == "L" || paramName == "power" {
+							stmt.Parameters[paramName] = param
+						}
+					}
+				}
+
 				p.scene.Shapes = append(p.scene.Shapes, *stmt)
-			case "LightSource", "AreaLightSource":
+			case "LightSource":
+				p.scene.LightSources = append(p.scene.LightSources, *stmt)
+			case "AreaLightSource":
+				// AreaLightSource at global level - set global area light state
+				if len(p.stateStack) > 0 {
+					p.stateStack[len(p.stateStack)-1].AreaLightSource = stmt
+				}
+				// Also store it for processing
 				p.scene.LightSources = append(p.scene.LightSources, *stmt)
 			case "Translate", "Rotate", "Scale", "Transform":
 				p.scene.Transforms = append(p.scene.Transforms, *stmt)
@@ -603,6 +665,12 @@ func (stmt *PBRTStatement) GetRGBParam(name string) (*core.Vec3, bool) {
 		return nil, false
 	}
 	return &core.Vec3{X: r, Y: g, Z: b}, true
+}
+
+// IsAreaLight checks if a shape statement is marked as an area light
+func (stmt *PBRTStatement) IsAreaLight() bool {
+	areaLightParam, exists := stmt.Parameters["_areaLight"]
+	return exists && len(areaLightParam.Values) > 0 && areaLightParam.Values[0] == "true"
 }
 
 // GetPoint3Param extracts a point3 parameter from a PBRT statement

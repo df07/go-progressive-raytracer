@@ -61,7 +61,7 @@ func NewPBRTScene(filepath string, cameraOverrides ...geometry.CameraConfig) (*S
 
 	// Process top-level lights
 	for _, lightStmt := range pbrtScene.LightSources {
-		light, err := convertLight(&lightStmt)
+		light, err := convertLight(&lightStmt, nil) // No associated shapes for top-level lights
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert light: %v", err)
 		}
@@ -81,15 +81,16 @@ func NewPBRTScene(filepath string, cameraOverrides ...geometry.CameraConfig) (*S
 }
 
 // createDefaultPBRTSamplingConfig creates default sampling configuration
+// Uses Cornell-optimized settings for better convergence with indirect lighting
 func createDefaultPBRTSamplingConfig() SamplingConfig {
 	return SamplingConfig{
 		Width:                     400,
 		Height:                    400,
-		SamplesPerPixel:           100,
+		SamplesPerPixel:           150,
 		MaxDepth:                  5,
-		RussianRouletteMinBounces: 3,
-		AdaptiveMinSamples:        0.25,
-		AdaptiveThreshold:         0.01,
+		RussianRouletteMinBounces: 16,    // Need a lot of bounces for indirect lighting
+		AdaptiveMinSamples:        0.20,  // 20% of max samples minimum to avoid black pixels
+		AdaptiveThreshold:         0.005, // Lower threshold (0.5%) for better convergence
 	}
 }
 
@@ -221,6 +222,9 @@ func convertShape(stmt *loaders.PBRTStatement, mat material.Material) (geometry.
 		}
 
 		center := core.NewVec3(0, 0, 0)
+		if c, ok := stmt.GetPoint3Param("center"); ok {
+			center = *c
+		}
 		return geometry.NewSphere(center, radius, mat), nil
 
 	case "bilinearPatch":
@@ -280,13 +284,63 @@ func convertShape(stmt *loaders.PBRTStatement, mat material.Material) (geometry.
 
 		return geometry.NewTriangleMesh(vertices, indices, mat, nil), nil
 
+	case "box":
+		// Box shape - use our NewBox function
+		center := core.NewVec3(0, 0, 0)
+		if c, ok := stmt.GetPoint3Param("center"); ok {
+			center = *c
+		}
+
+		size := core.NewVec3(1, 1, 1) // Default size (half-extents)
+		if s, ok := stmt.GetPoint3Param("size"); ok {
+			size = *s
+		}
+
+		rotation := core.NewVec3(0, 0, 0) // Default no rotation
+		if r, ok := stmt.GetPoint3Param("rotation"); ok {
+			rotation = *r
+		}
+
+		return geometry.NewBox(center, size, rotation, mat), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported shape type: %s", stmt.Subtype)
 	}
 }
 
+// convertAreaLight converts a PBRT shape marked as an area light to a Light object
+func convertAreaLight(stmt *loaders.PBRTStatement) (lights.Light, error) {
+	// Extract emission parameters
+	emission, ok := stmt.GetRGBParam("L")
+	if !ok {
+		return nil, fmt.Errorf("area light missing emission parameter 'L'")
+	}
+	emissiveMat := material.NewEmissive(*emission)
+
+	// Use convertShape to parse the shape, then create appropriate Light
+	// We pass a dummy material since we only need the shape geometry
+	dummyMat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	shape, err := convertShape(stmt, dummyMat)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse area light shape: %v", err)
+	}
+
+	// Create Light object based on the actual shape type
+	switch s := shape.(type) {
+	case *geometry.Quad:
+		return lights.NewQuadLight(s.Corner, s.U, s.V, emissiveMat), nil
+	case *geometry.Sphere:
+		return lights.NewSphereLight(s.Center, s.Radius, emissiveMat), nil
+	case *geometry.Disc:
+		return lights.NewDiscLight(s.Center, s.Normal, s.Radius, emissiveMat), nil
+	default:
+		return nil, fmt.Errorf("shape type %T is not supported as an area light", shape)
+	}
+}
+
 // convertLight converts a PBRT light to our light system
-func convertLight(stmt *loaders.PBRTStatement) (lights.Light, error) {
+// For area lights, associatedShapes should contain the shapes in the same attribute block
+func convertLight(stmt *loaders.PBRTStatement, associatedShapes []loaders.PBRTStatement) (lights.Light, error) {
 	switch stmt.Subtype {
 	case "point":
 		intensity := core.NewVec3(10, 10, 10) // Default intensity
@@ -334,6 +388,11 @@ func convertLight(stmt *loaders.PBRTStatement) (lights.Light, error) {
 
 		return lights.NewGradientInfiniteLight(topColor, bottomColor), nil
 
+	case "diffuse": // AreaLightSource "diffuse"
+		// AreaLightSource should be handled as state during parsing, not as a standalone light
+		// If we reach here, it means the parser didn't handle it correctly
+		return nil, fmt.Errorf("AreaLightSource should be handled as graphics state, not converted as standalone light")
+
 	default:
 		return nil, fmt.Errorf("unsupported light type: %s", stmt.Subtype)
 	}
@@ -367,13 +426,11 @@ func processAttributeBlock(block *loaders.AttributeBlock, scene *Scene, globalMa
 				shapeStmt.MaterialIndex, len(localMaterials), len(globalMaterials))
 		}
 
-		// Check for area lights and override material if present
-		for _, lightStmt := range block.LightSources {
-			if lightStmt.Type == "AreaLightSource" {
-				if rgb, ok := lightStmt.GetRGBParam("L"); ok {
-					shapeMaterial = material.NewEmissive(*rgb)
-					break // Only handle one area light per attribute block
-				}
+		// Check if this shape is marked as an area light
+		if shapeStmt.IsAreaLight() {
+			// This shape is an area light - check for emission parameters
+			if rgb, ok := shapeStmt.GetRGBParam("L"); ok {
+				shapeMaterial = material.NewEmissive(*rgb)
 			}
 		}
 
@@ -386,14 +443,23 @@ func processAttributeBlock(block *loaders.AttributeBlock, scene *Scene, globalMa
 		}
 	}
 
-	// Process lights in this block (including AreaLightSource)
+	// Process area light shapes to create Light objects
+	for _, shapeStmt := range block.Shapes {
+		if shapeStmt.IsAreaLight() {
+			light, err := convertAreaLight(&shapeStmt)
+			if err != nil {
+				return fmt.Errorf("failed to convert area light: %v", err)
+			}
+			if light != nil {
+				scene.Lights = append(scene.Lights, light)
+			}
+		}
+	}
+
+	// Process other lights in this block (non-area lights)
 	for _, lightStmt := range block.LightSources {
-		if lightStmt.Type == "AreaLightSource" {
-			// Area light - we need to process this BEFORE shapes to set emissive material
-			// For now, this is handled in the main processing flow above
-			// AreaLightSource creates emissive shapes, not separate light objects
-		} else {
-			light, err := convertLight(&lightStmt)
+		if lightStmt.Type != "AreaLightSource" {
+			light, err := convertLight(&lightStmt, block.Shapes)
 			if err != nil {
 				return fmt.Errorf("failed to convert light in attribute block: %v", err)
 			}

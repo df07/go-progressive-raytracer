@@ -85,7 +85,7 @@ func TestTryLoadPBRTScene(t *testing.T) {
 		// Non-existent files (should not load)
 		{"nonexistent PBRT", "nonexistent", false},
 		{"invalid path", "scenes/nonexistent.pbrt", false},
-		{"built-in scene name", "cornell", false}, // Built-in scenes shouldn't load as PBRT
+		{"built-in scene without PBRT file", "default", false}, // Default scene has no PBRT file
 	}
 
 	for _, tt := range tests {

@@ -1,0 +1,76 @@
+# Scene: Cornell Box with Spheres
+# Variant: Two Spheres (Metal and Glass)
+# Description: Classic Cornell box with a metallic sphere and glass sphere
+# Group: Cornell Variants
+#
+# Cornell Box with Spheres Scene (PBRT Format)
+# Matches the Cornell scene with spheres from our Go implementation
+
+# Camera setup - matches CornellScene camera configuration
+LookAt 278 278 -800   278 278 0   0 1 0
+Camera "perspective" "float fov" 40
+
+# Film/output configuration
+Film "rgb"
+    "string filename" "cornell.png"
+    "integer xresolution" 400
+    "integer yresolution" 400
+
+# Sampler and integrator
+Sampler "halton" "integer pixelsamples" 150
+Integrator "volpath"
+
+WorldBegin
+
+# Materials - match cornell.go colors exactly
+Material "diffuse" "rgb reflectance" [0.73 0.73 0.73]  # White
+AttributeBegin
+    # Floor - XZ plane at y=0
+    Shape "bilinearPatch" "point3 P00" [0 0 0] "point3 P01" [556 0 0] "point3 P10" [0 0 556] "point3 P11" [556 0 556]
+AttributeEnd
+
+AttributeBegin
+    # Ceiling - XZ plane at y=556 (matches our ceiling height)
+    Shape "bilinearPatch" "point3 P00" [0 556 0] "point3 P01" [556 556 0] "point3 P10" [0 556 556] "point3 P11" [556 556 556]
+AttributeEnd
+
+AttributeBegin
+    # Back wall - XY plane at z=556
+    Shape "bilinearPatch" "point3 P00" [0 0 556] "point3 P01" [556 0 556] "point3 P10" [0 556 556] "point3 P11" [556 556 556]
+AttributeEnd
+
+# Left wall (red) - YZ plane at x=0
+AttributeBegin
+    Material "diffuse" "rgb reflectance" [0.65 0.05 0.05]  # Red
+    Shape "bilinearPatch" "point3 P00" [0 0 0] "point3 P01" [0 0 556] "point3 P10" [0 556 0] "point3 P11" [0 556 556]
+AttributeEnd
+
+# Right wall (green) - YZ plane at x=556
+AttributeBegin
+    Material "diffuse" "rgb reflectance" [0.12 0.45 0.15]  # Green
+    Shape "bilinearPatch" "point3 P00" [556 0 0] "point3 P01" [556 0 556] "point3 P10" [556 556 0] "point3 P11" [556 556 556]
+AttributeEnd
+
+# Area light - matches addCornellLight() exactly
+# Corner: 213, 555.999, 227 (slightly below ceiling)
+# Size: 130 x 105 (343-213=130, 332-227=105)
+# Emission: warm yellowish white [45 37.5 20] (18*2.5, 15*2.5, 8*2.5)
+AttributeBegin
+    Material "diffuse" "rgb reflectance" [0 0 0]  # Non-reflective
+    AreaLightSource "diffuse" "rgb L" [45 37.5 20]  # Warm light emission
+    Shape "bilinearPatch" "point3 P00" [213 555.999 227] "point3 P01" [343 555.999 227] "point3 P10" [213 555.999 332] "point3 P11" [343 555.999 332]
+AttributeEnd
+
+# Left sphere (metallic) - position: 185, 82.5, 169, radius: 82.5
+AttributeBegin
+    Material "conductor" "rgb eta" [0.8 0.8 0.9] "rgb k" [0.0 0.0 0.0] "float roughness" 0.0  # Shiny metal
+    Shape "sphere" "float radius" 82.5 "point3 center" [185 82.5 169]
+AttributeEnd
+
+# Right sphere (glass) - position: 370, 90, 351, radius: 90
+AttributeBegin
+    Material "dielectric" "float eta" 1.5  # Glass
+    Shape "sphere" "float radius" 90 "point3 center" [370 90 351]
+AttributeEnd
+
+WorldEnd

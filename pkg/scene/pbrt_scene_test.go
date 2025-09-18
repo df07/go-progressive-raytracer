@@ -156,7 +156,7 @@ func TestConvertLight(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			light, err := convertLight(tt.stmt)
+			light, err := convertLight(tt.stmt, nil)
 			if err != nil {
 				t.Fatalf("convertLight() error = %v", err)
 			}
@@ -461,6 +461,205 @@ WorldEnd`,
 				if err != nil {
 					t.Errorf("Expected no error, but got: %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestConvertLightTypes(t *testing.T) {
+	tests := []struct {
+		name         string
+		stmt         *loaders.PBRTStatement
+		expectedType string
+	}{
+		{
+			name: "point light",
+			stmt: &loaders.PBRTStatement{
+				Type:    "LightSource",
+				Subtype: "point",
+				Parameters: map[string]loaders.PBRTParam{
+					"I":    {Type: "rgb", Values: []string{"10", "8", "6"}},
+					"from": {Type: "point3", Values: []string{"1", "2", "3"}},
+				},
+			},
+			expectedType: "*lights.SphereLight",
+		},
+		{
+			name: "distant light",
+			stmt: &loaders.PBRTStatement{
+				Type:    "LightSource",
+				Subtype: "distant",
+				Parameters: map[string]loaders.PBRTParam{
+					"L": {Type: "rgb", Values: []string{"3", "3", "3"}},
+				},
+			},
+			expectedType: "*lights.UniformInfiniteLight",
+		},
+		{
+			name: "infinite light",
+			stmt: &loaders.PBRTStatement{
+				Type:    "LightSource",
+				Subtype: "infinite",
+				Parameters: map[string]loaders.PBRTParam{
+					"L": {Type: "rgb", Values: []string{"1", "1", "1"}},
+				},
+			},
+			expectedType: "*lights.UniformInfiniteLight",
+		},
+		{
+			name: "infinite gradient light",
+			stmt: &loaders.PBRTStatement{
+				Type:    "LightSource",
+				Subtype: "infinite-gradient",
+				Parameters: map[string]loaders.PBRTParam{
+					"topColor":    {Type: "rgb", Values: []string{"0.4", "0.6", "1.0"}},
+					"bottomColor": {Type: "rgb", Values: []string{"1.0", "1.0", "1.0"}},
+				},
+			},
+			expectedType: "*lights.GradientInfiniteLight",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			light, err := convertLight(tt.stmt, nil)
+			if err != nil {
+				t.Fatalf("convertLight() error = %v", err)
+			}
+
+			actualType := fmt.Sprintf("%T", light)
+			if actualType != tt.expectedType {
+				t.Errorf("convertLight() = %v, want %v", actualType, tt.expectedType)
+			}
+		})
+	}
+}
+
+func TestAreaLightProcessing(t *testing.T) {
+	// Test that AreaLightSource creates both emissive shapes and QuadLight objects
+	content := `# Area light test scene
+LookAt 0 0 1  0 0 0  0 1 0
+Camera "perspective" "float fov" 40
+Film "rgb" "string filename" "test.png" "integer xresolution" 100 "integer yresolution" 100
+WorldBegin
+
+AttributeBegin
+    Material "diffuse" "rgb reflectance" [0 0 0]
+    AreaLightSource "diffuse" "rgb L" [15 12 8]
+    Shape "bilinearPatch" "point3 P00" [0 2 0] "point3 P01" [1 2 0] "point3 P10" [0 2 1] "point3 P11" [1 2 1]
+AttributeEnd
+
+WorldEnd
+`
+
+	tmpFile, err := os.CreateTemp("", "pbrt_arealight_test_*.pbrt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	scene, err := NewPBRTScene(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("NewPBRTScene() error = %v", err)
+	}
+
+	// Check that we have exactly one light (QuadLight)
+	if len(scene.Lights) != 1 {
+		t.Errorf("Expected 1 light, got %d", len(scene.Lights))
+	}
+
+	// Check light type
+	lightType := fmt.Sprintf("%T", scene.Lights[0])
+	if lightType != "*lights.QuadLight" {
+		t.Errorf("Expected *lights.QuadLight, got %s", lightType)
+	}
+
+	// Check that we have exactly one shape (the emissive quad)
+	if len(scene.Shapes) != 1 {
+		t.Errorf("Expected 1 shape, got %d", len(scene.Shapes))
+	}
+
+	// Check shape type
+	shapeType := fmt.Sprintf("%T", scene.Shapes[0])
+	if shapeType != "*geometry.Quad" {
+		t.Errorf("Expected *geometry.Quad, got %s", shapeType)
+	}
+}
+
+func TestLightLoadingIntegration(t *testing.T) {
+	// Test various light types in complete scenes
+	tests := []struct {
+		name           string
+		scenePath      string
+		expectedLights int
+		expectedType   string
+	}{
+		{
+			name:           "simple-sphere gradient light",
+			scenePath:      "../../scenes/simple-sphere.pbrt",
+			expectedLights: 1,
+			expectedType:   "*lights.GradientInfiniteLight",
+		},
+		{
+			name:           "test uniform infinite light",
+			scenePath:      "../../scenes/test.pbrt",
+			expectedLights: 1,
+			expectedType:   "*lights.UniformInfiniteLight",
+		},
+		{
+			name:           "cornell area light",
+			scenePath:      "../../scenes/cornell.pbrt",
+			expectedLights: 1,
+			expectedType:   "*lights.QuadLight",
+		},
+		{
+			name:           "cornell-empty area light",
+			scenePath:      "../../scenes/cornell-empty.pbrt",
+			expectedLights: 1,
+			expectedType:   "*lights.QuadLight",
+		},
+		{
+			name:           "cornell-boxes area light",
+			scenePath:      "../../scenes/cornell-boxes.pbrt",
+			expectedLights: 1,
+			expectedType:   "*lights.QuadLight",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Check if file exists
+			if _, err := os.Stat(tt.scenePath); os.IsNotExist(err) {
+				t.Skipf("Scene file %s does not exist, skipping test", tt.scenePath)
+				return
+			}
+
+			scene, err := NewPBRTScene(tt.scenePath)
+			if err != nil {
+				t.Fatalf("NewPBRTScene() error = %v", err)
+			}
+
+			// Check number of lights
+			if len(scene.Lights) != tt.expectedLights {
+				t.Errorf("Expected %d lights, got %d", tt.expectedLights, len(scene.Lights))
+			}
+
+			// Check light type
+			if len(scene.Lights) > 0 {
+				actualType := fmt.Sprintf("%T", scene.Lights[0])
+				if actualType != tt.expectedType {
+					t.Errorf("Expected light type %s, got %s", tt.expectedType, actualType)
+				}
+			}
+
+			// Ensure no scene has zero lights (critical for rendering)
+			if len(scene.Lights) == 0 {
+				t.Errorf("Scene has no lights - this will cause poor rendering convergence")
 			}
 		})
 	}
