@@ -12,12 +12,7 @@ import (
 )
 
 // NewPBRTScene creates a scene from a PBRT file
-func NewPBRTScene(filepath string, cameraOverrides ...geometry.CameraConfig) (*Scene, error) {
-	// Parse PBRT file
-	pbrtScene, err := loaders.LoadPBRT(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load PBRT file: %v", err)
-	}
+func NewPBRTScene(pbrtScene *loaders.PBRTScene, cameraOverrides ...geometry.CameraConfig) (*Scene, error) {
 
 	// Create scene
 	scene := &Scene{

@@ -264,20 +264,15 @@ AttributeEnd
 WorldEnd
 `
 
-	// Write to temporary file
-	tmpFile, err := os.CreateTemp("", "integration_*.pbrt")
+	// Parse PBRT content and create scene
+	reader := strings.NewReader(content)
+	pbrtScene, err := loaders.ParsePBRT(reader)
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatalf("Failed to parse PBRT content: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(content); err != nil {
-		t.Fatalf("Failed to write temp file: %v", err)
-	}
-	tmpFile.Close()
 
 	// Test scene creation
-	scene, err := NewPBRTScene(tmpFile.Name())
+	scene, err := NewPBRTScene(pbrtScene)
 	if err != nil {
 		t.Fatalf("NewPBRTScene() error = %v", err)
 	}
@@ -328,31 +323,21 @@ WorldEnd
 }
 
 func TestPBRTSceneErrorHandling(t *testing.T) {
-	// Test with non-existent file
-	_, err := NewPBRTScene("nonexistent.pbrt")
-	if err == nil {
-		t.Error("NewPBRTScene() should error on non-existent file")
-	}
-
 	// Test with invalid PBRT content
 	content := `# Invalid PBRT - missing WorldBegin
 LookAt 0 0 1  0 0 0  0 1 0
 Shape "sphere" "float radius" 1.0
 `
 
-	tmpFile, err := os.CreateTemp("", "invalid_*.pbrt")
+	// Parse PBRT content
+	reader := strings.NewReader(content)
+	pbrtScene, err := loaders.ParsePBRT(reader)
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatalf("Failed to parse PBRT content: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(content); err != nil {
-		t.Fatalf("Failed to write temp file: %v", err)
-	}
-	tmpFile.Close()
 
 	// Should still work (shapes outside WorldBegin are ignored)
-	scene, err := NewPBRTScene(tmpFile.Name())
+	scene, err := NewPBRTScene(pbrtScene)
 	if err != nil {
 		t.Fatalf("NewPBRTScene() error = %v", err)
 	}
@@ -439,18 +424,14 @@ WorldEnd`,
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpFile, err := os.CreateTemp("", "validation_*.pbrt")
+			// Parse PBRT content
+			reader := strings.NewReader(tc.content)
+			pbrtScene, err := loaders.ParsePBRT(reader)
 			if err != nil {
-				t.Fatalf("Failed to create temp file: %v", err)
+				t.Fatalf("Failed to parse PBRT content: %v", err)
 			}
-			defer os.Remove(tmpFile.Name())
 
-			if _, err := tmpFile.WriteString(tc.content); err != nil {
-				t.Fatalf("Failed to write temp file: %v", err)
-			}
-			tmpFile.Close()
-
-			_, err = NewPBRTScene(tmpFile.Name())
+			_, err = NewPBRTScene(pbrtScene)
 			if tc.expectError {
 				if err == nil {
 					t.Errorf("Expected error containing '%s', but got no error", tc.errorMsg)
@@ -552,18 +533,14 @@ AttributeEnd
 WorldEnd
 `
 
-	tmpFile, err := os.CreateTemp("", "pbrt_arealight_test_*.pbrt")
+	// Parse PBRT content and create scene
+	reader := strings.NewReader(content)
+	pbrtScene, err := loaders.ParsePBRT(reader)
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatalf("Failed to parse PBRT content: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
 
-	if _, err := tmpFile.WriteString(content); err != nil {
-		t.Fatalf("Failed to write temp file: %v", err)
-	}
-	tmpFile.Close()
-
-	scene, err := NewPBRTScene(tmpFile.Name())
+	scene, err := NewPBRTScene(pbrtScene)
 	if err != nil {
 		t.Fatalf("NewPBRTScene() error = %v", err)
 	}
@@ -639,7 +616,11 @@ func TestLightLoadingIntegration(t *testing.T) {
 				return
 			}
 
-			scene, err := NewPBRTScene(tt.scenePath)
+			pbrtScene, err := loaders.LoadPBRT(tt.scenePath)
+			if err != nil {
+				t.Fatalf("Failed to load PBRT file: %v", err)
+			}
+			scene, err := NewPBRTScene(pbrtScene)
 			if err != nil {
 				t.Fatalf("NewPBRTScene() error = %v", err)
 			}

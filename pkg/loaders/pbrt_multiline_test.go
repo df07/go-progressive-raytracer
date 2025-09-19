@@ -1,7 +1,7 @@
 package loaders
 
 import (
-	"os"
+	"strings"
 	"testing"
 )
 
@@ -122,21 +122,9 @@ WorldEnd`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary file
-			tmpFile, err := os.CreateTemp("", "test_*.pbrt")
-			if err != nil {
-				t.Fatalf("Failed to create temp file: %v", err)
-			}
-			defer os.Remove(tmpFile.Name())
-
-			// Write test content
-			if _, err := tmpFile.WriteString(tt.pbrtContent); err != nil {
-				t.Fatalf("Failed to write test content: %v", err)
-			}
-			tmpFile.Close()
-
-			// Test parsing
-			scene, err := LoadPBRT(tmpFile.Name())
+			// Test parsing using ParsePBRT with string reader
+			reader := strings.NewReader(tt.pbrtContent)
+			scene, err := ParsePBRT(reader)
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -179,20 +167,9 @@ Shape "bilinearPatch"
     "point3 P11" [1 1 0]
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "test_materials_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		t.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
-	// Parse scene
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Parse scene using ParsePBRT with string reader
+	reader := strings.NewReader(pbrtContent)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("Failed to parse scene: %v", err)
 	}
@@ -280,20 +257,9 @@ Shape "sphere" "float radius" 1.0
 LightSource "infinite" "rgb L" [1 1 1]
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "test_sections_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		t.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
-	// Parse scene
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Parse scene using ParsePBRT with string reader
+	reader := strings.NewReader(pbrtContent)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("Failed to parse scene: %v", err)
 	}
@@ -355,20 +321,9 @@ Material "diffuse" "rgb reflectance" [0.0 1.0 0.0]
 Shape "sphere" "float radius" 1.0
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "test_attr_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		t.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
-	// Parse scene
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Parse scene using ParsePBRT with string reader
+	reader := strings.NewReader(pbrtContent)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("Failed to parse scene: %v", err)
 	}
@@ -449,20 +404,9 @@ AttributeEnd
 
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "test_complex_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		t.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
-	// Parse scene
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Parse scene using ParsePBRT with string reader
+	reader := strings.NewReader(pbrtContent)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("Failed to parse scene: %v", err)
 	}
@@ -530,21 +474,11 @@ Shape "sphere"
     "float radius" 1.0
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "bench_*.pbrt")
-	if err != nil {
-		b.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		b.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := LoadPBRT(tmpFile.Name())
+		// Parse using ParsePBRT with string reader
+		reader := strings.NewReader(pbrtContent)
+		_, err := ParsePBRT(reader)
 		if err != nil {
 			b.Fatalf("Parse error: %v", err)
 		}

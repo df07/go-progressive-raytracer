@@ -1,7 +1,7 @@
 package loaders
 
 import (
-	"os"
+	"strings"
 	"testing"
 )
 
@@ -30,20 +30,9 @@ Shape "sphere" "float radius" 0.7
 
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "test_state_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		t.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
-	// Parse scene
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Parse scene using ParsePBRT with string reader
+	reader := strings.NewReader(pbrtContent)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("Failed to parse scene: %v", err)
 	}
@@ -118,20 +107,9 @@ Shape "sphere" "float radius" 0.2
 
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "test_nested_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		t.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
-	// Parse scene
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Parse scene using ParsePBRT with string reader
+	reader := strings.NewReader(pbrtContent)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("Failed to parse scene: %v", err)
 	}
@@ -216,20 +194,9 @@ Shape "sphere" "float radius" 0.6  # Should have MaterialIndex 1
 
 WorldEnd`
 
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "test_restore_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(pbrtContent); err != nil {
-		t.Fatalf("Failed to write test content: %v", err)
-	}
-	tmpFile.Close()
-
-	// Parse scene
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Parse scene using ParsePBRT with string reader
+	reader := strings.NewReader(pbrtContent)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("Failed to parse scene: %v", err)
 	}

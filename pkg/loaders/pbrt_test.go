@@ -1,7 +1,7 @@
 package loaders
 
 import (
-	"os"
+	"strings"
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -232,20 +232,9 @@ LightSource "infinite" "rgb L" [1 1 1]
 WorldEnd
 `
 
-	// Write to temporary file
-	tmpFile, err := os.CreateTemp("", "test_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(content); err != nil {
-		t.Fatalf("Failed to write temp file: %v", err)
-	}
-	tmpFile.Close()
-
-	// Test loading
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Test loading using ParsePBRT with string reader
+	reader := strings.NewReader(content)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("LoadPBRT() error = %v", err)
 	}
@@ -303,20 +292,9 @@ AttributeEnd
 WorldEnd
 `
 
-	// Write to temporary file
-	tmpFile, err := os.CreateTemp("", "test_attr_*.pbrt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(content); err != nil {
-		t.Fatalf("Failed to write temp file: %v", err)
-	}
-	tmpFile.Close()
-
-	// Test loading
-	scene, err := LoadPBRT(tmpFile.Name())
+	// Test loading using ParsePBRT with string reader
+	reader := strings.NewReader(content)
+	scene, err := ParsePBRT(reader)
 	if err != nil {
 		t.Fatalf("LoadPBRT() error = %v", err)
 	}

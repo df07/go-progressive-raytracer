@@ -2,13 +2,19 @@ package scene
 
 import (
 	"testing"
+
+	"github.com/df07/go-progressive-raytracer/pkg/loaders"
 )
 
 func TestCornellPBRTSceneLoading(t *testing.T) {
 	// Test loading our actual Cornell PBRT scene file
-	scene, err := NewPBRTScene("../../scenes/cornell-empty.pbrt")
+	pbrtScene, err := loaders.LoadPBRT("../../scenes/cornell-empty.pbrt")
 	if err != nil {
-		t.Fatalf("Failed to load Cornell PBRT scene: %v", err)
+		t.Fatalf("Failed to load Cornell PBRT file: %v", err)
+	}
+	scene, err := NewPBRTScene(pbrtScene)
+	if err != nil {
+		t.Fatalf("Failed to create Cornell PBRT scene: %v", err)
 	}
 
 	// Verify basic scene structure
@@ -87,9 +93,13 @@ func TestCornellPBRTSceneLoading(t *testing.T) {
 
 func TestCornellPBRTSceneComparison(t *testing.T) {
 	// Load PBRT Cornell scene
-	pbrtScene, err := NewPBRTScene("../../scenes/cornell-empty.pbrt")
+	parsedScene, err := loaders.LoadPBRT("../../scenes/cornell-empty.pbrt")
 	if err != nil {
-		t.Fatalf("Failed to load Cornell PBRT scene: %v", err)
+		t.Fatalf("Failed to load Cornell PBRT file: %v", err)
+	}
+	pbrtScene, err := NewPBRTScene(parsedScene)
+	if err != nil {
+		t.Fatalf("Failed to create Cornell PBRT scene: %v", err)
 	}
 
 	// Load Go Cornell scene
@@ -131,9 +141,13 @@ func TestCornellPBRTSceneComparison(t *testing.T) {
 
 func TestCornellPBRTSceneRenderable(t *testing.T) {
 	// Test that the Cornell PBRT scene can be used for rendering
-	scene, err := NewPBRTScene("../../scenes/cornell-empty.pbrt")
+	pbrtScene, err := loaders.LoadPBRT("../../scenes/cornell-empty.pbrt")
 	if err != nil {
-		t.Fatalf("Failed to load Cornell PBRT scene: %v", err)
+		t.Fatalf("Failed to load Cornell PBRT file: %v", err)
+	}
+	scene, err := NewPBRTScene(pbrtScene)
+	if err != nil {
+		t.Fatalf("Failed to create Cornell PBRT scene: %v", err)
 	}
 
 	// Preprocess the scene
@@ -178,9 +192,13 @@ func TestCornellPBRTSceneRenderable(t *testing.T) {
 
 func TestCornellPBRTAreaLightProcessing(t *testing.T) {
 	// Test that area lights are correctly processed into emissive shapes
-	scene, err := NewPBRTScene("../../scenes/cornell-empty.pbrt")
+	pbrtScene, err := loaders.LoadPBRT("../../scenes/cornell-empty.pbrt")
 	if err != nil {
-		t.Fatalf("Failed to load Cornell PBRT scene: %v", err)
+		t.Fatalf("Failed to load Cornell PBRT file: %v", err)
+	}
+	scene, err := NewPBRTScene(pbrtScene)
+	if err != nil {
+		t.Fatalf("Failed to create Cornell PBRT scene: %v", err)
 	}
 
 	// Check that we have shapes (should include the area light shape)

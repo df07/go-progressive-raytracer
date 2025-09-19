@@ -12,6 +12,7 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
 	"github.com/df07/go-progressive-raytracer/pkg/lights"
+	"github.com/df07/go-progressive-raytracer/pkg/loaders"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -245,9 +246,14 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 		}
 
 		// Load actual PBRT scene with camera override using validated path
-		pbrtScene, err := scene.NewPBRTScene(scenePath, cameraOverride)
+		parsedScene, err := loaders.LoadPBRT(scenePath)
 		if err != nil {
-			log.Printf("Failed to load PBRT scene %s: %v", scenePath, err)
+			log.Printf("Failed to load PBRT file %s: %v", scenePath, err)
+			return nil // Return nil to trigger proper error response
+		}
+		pbrtScene, err := scene.NewPBRTScene(parsedScene, cameraOverride)
+		if err != nil {
+			log.Printf("Failed to create PBRT scene %s: %v", scenePath, err)
 			return nil // Return nil to trigger proper error response
 		}
 		return pbrtScene
@@ -285,9 +291,14 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
 		}
 		// Load actual PBRT scene
-		pbrtScene, err := scene.NewPBRTScene("scenes/cornell-empty.pbrt", cameraOverride)
+		parsedScene, err := loaders.LoadPBRT("scenes/cornell-empty.pbrt")
 		if err != nil {
-			log.Printf("Failed to load PBRT scene: %v", err)
+			log.Printf("Failed to load PBRT file: %v", err)
+			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
+		}
+		pbrtScene, err := scene.NewPBRTScene(parsedScene, cameraOverride)
+		if err != nil {
+			log.Printf("Failed to create PBRT scene: %v", err)
 			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
 		}
 		return pbrtScene

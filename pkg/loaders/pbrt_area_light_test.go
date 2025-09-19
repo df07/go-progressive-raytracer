@@ -1,29 +1,15 @@
 package loaders
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
 
 // Helper function to parse PBRT content from string for testing
 func parsePBRTFromString(content string) (*PBRTScene, error) {
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "pbrt_test_*.pbrt")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(tmpFile.Name())
-
-	// Write content to file
-	if _, err := tmpFile.WriteString(content); err != nil {
-		tmpFile.Close()
-		return nil, err
-	}
-	tmpFile.Close()
-
-	// Parse using existing LoadPBRT function
-	return LoadPBRT(tmpFile.Name())
+	// Use ParsePBRT directly with strings.NewReader - no temporary files needed!
+	reader := strings.NewReader(content)
+	return ParsePBRT(reader)
 }
 
 func TestAreaLightParsing(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/df07/go-progressive-raytracer/pkg/integrator"
 	"github.com/df07/go-progressive-raytracer/pkg/lights"
+	"github.com/df07/go-progressive-raytracer/pkg/loaders"
 	"github.com/df07/go-progressive-raytracer/pkg/renderer"
 	"github.com/df07/go-progressive-raytracer/pkg/scene"
 )
@@ -154,10 +155,13 @@ func createScene(sceneType string) (*scene.Scene, error) {
 			sceneObj = scene.NewCausticGlassScene(true, lights.LightTypeArea, renderer.NewDefaultLogger())
 		case "cornell-pbrt":
 			fmt.Println("Using PBRT Cornell scene...")
-			var err error
-			sceneObj, err = scene.NewPBRTScene("scenes/cornell-empty.pbrt")
+			pbrtScene, err := loaders.LoadPBRT("scenes/cornell-empty.pbrt")
 			if err != nil {
-				return nil, fmt.Errorf("failed to load PBRT scene: %v", err)
+				return nil, fmt.Errorf("failed to load PBRT file: %v", err)
+			}
+			sceneObj, err = scene.NewPBRTScene(pbrtScene)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create PBRT scene: %v", err)
 			}
 		case "default":
 			fmt.Println("Using default scene...")
@@ -194,9 +198,14 @@ func tryLoadPBRTScene(sceneType string) *scene.Scene {
 
 		if _, err := os.Stat(path); err == nil {
 			fmt.Printf("Loading PBRT scene: %s...\n", path)
-			sceneObj, err := scene.NewPBRTScene(path)
+			pbrtScene, err := loaders.LoadPBRT(path)
 			if err != nil {
-				fmt.Printf("Failed to load PBRT scene '%s': %v\n", path, err)
+				fmt.Printf("Failed to load PBRT file '%s': %v\n", path, err)
+				continue
+			}
+			sceneObj, err := scene.NewPBRTScene(pbrtScene)
+			if err != nil {
+				fmt.Printf("Failed to create PBRT scene '%s': %v\n", path, err)
 				continue
 			}
 			return sceneObj
