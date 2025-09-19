@@ -2,6 +2,7 @@ package loaders
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -293,4 +294,49 @@ WorldEnd`,
 			}
 		})
 	}
+}
+
+func TestParsePBRTFromReader(t *testing.T) {
+	// Test the new ParsePBRT function that accepts an io.Reader
+	content := `
+WorldBegin
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [0.8 0.8 0.8]
+  AreaLightSource "diffuse" "rgb L" [ 5 5 5 ]
+  Shape "sphere" "float radius" [ 1.0 ]
+AttributeEnd
+WorldEnd`
+
+	// Test using strings.NewReader (no temporary file needed!)
+	reader := strings.NewReader(content)
+	pbrtScene, err := ParsePBRT(reader)
+	if err != nil {
+		t.Fatalf("ParsePBRT() error = %v", err)
+	}
+
+	// Verify the scene was parsed correctly
+	if len(pbrtScene.Attributes) != 1 {
+		t.Errorf("Expected 1 attribute block, got %d", len(pbrtScene.Attributes))
+	}
+
+	attr := pbrtScene.Attributes[0]
+	if len(attr.LightSources) != 1 {
+		t.Errorf("Expected 1 light source, got %d", len(attr.LightSources))
+	}
+
+	if len(attr.Shapes) != 1 {
+		t.Errorf("Expected 1 shape, got %d", len(attr.Shapes))
+	}
+
+	if len(attr.Materials) != 1 {
+		t.Errorf("Expected 1 material, got %d", len(attr.Materials))
+	}
+
+	// Check that the shape has area light marker
+	shape := attr.Shapes[0]
+	if !shape.IsAreaLight() {
+		t.Error("Expected shape to be marked as area light")
+	}
+
+	t.Log("ParsePBRT successfully parsed content from io.Reader without temporary files")
 }

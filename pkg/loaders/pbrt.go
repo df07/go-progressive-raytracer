@@ -3,6 +3,7 @@ package loaders
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -68,6 +69,31 @@ type PBRTParser struct {
 	statementLines       []string
 }
 
+// ParsePBRT parses PBRT content from an io.Reader
+func ParsePBRT(reader io.Reader) (*PBRTScene, error) {
+	// Create parser instance
+	parser := NewPBRTParser()
+
+	// Process each line
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		if err := parser.processLine(scanner.Text()); err != nil {
+			return nil, err
+		}
+	}
+
+	// Process any remaining accumulated statements
+	if err := parser.finalize(); err != nil {
+		return nil, err
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading input: %v", err)
+	}
+
+	return parser.scene, nil
+}
+
 // LoadPBRT loads and parses a PBRT scene file
 func LoadPBRT(filename string) (*PBRTScene, error) {
 	// Validate file path for security
@@ -81,27 +107,7 @@ func LoadPBRT(filename string) (*PBRTScene, error) {
 	}
 	defer file.Close()
 
-	// Create parser instance
-	parser := NewPBRTParser()
-
-	// Process each line
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		if err := parser.processLine(scanner.Text()); err != nil {
-			return nil, err
-		}
-	}
-
-	// Process any remaining accumulated statements
-	if err := parser.finalize(); err != nil {
-		return nil, err
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading file: %v", err)
-	}
-
-	return parser.scene, nil
+	return ParsePBRT(file)
 }
 
 // NewPBRTParser creates a new PBRT parser instance
