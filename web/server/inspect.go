@@ -193,6 +193,12 @@ func (s *Server) extractGeometryInfo(shape geometry.Shape) (string, map[string]i
 		}
 		return "triangle_mesh", properties
 
+	case *geometry.Cylinder:
+		properties["baseCenter"] = [3]float64{geom.BaseCenter.X, geom.BaseCenter.Y, geom.BaseCenter.Z}
+		properties["topCenter"] = [3]float64{geom.TopCenter.X, geom.TopCenter.Y, geom.TopCenter.Z}
+		properties["radius"] = geom.Radius
+		return "cylinder", properties
+
 	default:
 		return "unknown", properties
 	}

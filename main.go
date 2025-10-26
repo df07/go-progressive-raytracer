@@ -153,6 +153,9 @@ func createScene(sceneType string) (*scene.Scene, error) {
 		case "caustic-glass":
 			fmt.Println("Using caustic glass scene...")
 			sceneObj = scene.NewCausticGlassScene(true, lights.LightTypeArea, renderer.NewDefaultLogger())
+		case "cylinder-test":
+			fmt.Println("Using cylinder test scene...")
+			sceneObj = scene.NewCylinderTestScene()
 		case "cornell-pbrt":
 			fmt.Println("Using PBRT Cornell scene...")
 			pbrtScene, err := loaders.LoadPBRT("scenes/cornell-empty.pbrt")

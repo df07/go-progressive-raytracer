@@ -192,6 +192,14 @@ func ListAllScenes() (ScenesResponse, error) {
 			Group:       "Built-in Scenes",
 			Type:        "builtin",
 		},
+		{
+			ID:          "cylinder-test",
+			Name:        "Cylinder Test",
+			DisplayName: "Cylinder Test",
+			Description: "Test scene with various cylinders",
+			Group:       "Built-in Scenes",
+			Type:        "builtin",
+		},
 	}
 
 	// Get PBRT scenes
