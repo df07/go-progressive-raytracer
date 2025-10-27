@@ -92,11 +92,11 @@ func NewConeTestScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 		panic(err)
 	}
 
-	// Small glass cone (in front)
+	// Small glass cone (front right)
 	coneGlass, err := geometry.NewCone(
-		core.NewVec3(0.5, 0, 1.5),   // base center
-		0.3,                         // base radius
-		core.NewVec3(0.5, 0.8, 1.5), // top center
+		core.NewVec3(1.2, 0, 0.8),   // base center
+		0.25,                        // base radius
+		core.NewVec3(1.2, 1.0, 0.8), // top center
 		0.0,                         // top radius (pointed)
 		materialGlass,
 	)
@@ -104,11 +104,11 @@ func NewConeTestScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 		panic(err)
 	}
 
-	// Tilted green frustum
+	// Tilted green frustum (back left, more visible)
 	coneTilted, err := geometry.NewCone(
-		core.NewVec3(-0.5, 0, -1),     // base center
+		core.NewVec3(-1.5, 0, -0.5),   // base center
 		0.4,                           // base radius
-		core.NewVec3(-0.3, 1.0, -0.8), // top center (tilted)
+		core.NewVec3(-1.2, 1.2, -0.3), // top center (tilted)
 		0.15,                          // top radius (frustum)
 		lambertianGreen,
 	)
