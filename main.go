@@ -156,6 +156,9 @@ func createScene(sceneType string) (*scene.Scene, error) {
 		case "cylinder-test":
 			fmt.Println("Using cylinder test scene...")
 			sceneObj = scene.NewCylinderTestScene()
+		case "cone-test":
+			fmt.Println("Using cone test scene...")
+			sceneObj = scene.NewConeTestScene()
 		case "cornell-pbrt":
 			fmt.Println("Using PBRT Cornell scene...")
 			pbrtScene, err := loaders.LoadPBRT("scenes/cornell-empty.pbrt")

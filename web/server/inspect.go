@@ -199,6 +199,18 @@ func (s *Server) extractGeometryInfo(shape geometry.Shape) (string, map[string]i
 		properties["radius"] = geom.Radius
 		return "cylinder", properties
 
+	case *geometry.Cone:
+		properties["baseCenter"] = [3]float64{geom.BaseCenter.X, geom.BaseCenter.Y, geom.BaseCenter.Z}
+		properties["baseRadius"] = geom.BaseRadius
+		properties["topCenter"] = [3]float64{geom.TopCenter.X, geom.TopCenter.Y, geom.TopCenter.Z}
+		properties["topRadius"] = geom.TopRadius
+		if geom.TopRadius == 0 {
+			properties["type"] = "pointed"
+		} else {
+			properties["type"] = "frustum"
+		}
+		return "cone", properties
+
 	default:
 		return "unknown", properties
 	}

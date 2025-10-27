@@ -287,6 +287,8 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 		return scene.NewCausticGlassScene(loadMesh, req.LightType, logger, cameraOverride)
 	case "cylinder-test":
 		return scene.NewCylinderTestScene(cameraOverride)
+	case "cone-test":
+		return scene.NewConeTestScene(cameraOverride)
 	case "cornell-pbrt":
 		if configOnly {
 			// For config-only requests, return a basic cornell scene for dimensions

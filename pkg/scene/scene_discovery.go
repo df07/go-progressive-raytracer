@@ -200,6 +200,14 @@ func ListAllScenes() (ScenesResponse, error) {
 			Group:       "Built-in Scenes",
 			Type:        "builtin",
 		},
+		{
+			ID:          "cone-test",
+			Name:        "Cone Test",
+			DisplayName: "Cone Test",
+			Description: "Test scene with cones and frustums",
+			Group:       "Built-in Scenes",
+			Type:        "builtin",
+		},
 	}
 
 	// Get PBRT scenes
