@@ -7,11 +7,12 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
-// Cylinder represents a finite cylinder shape (open-ended, no caps)
+// Cylinder represents a finite cylinder shape
 type Cylinder struct {
 	BaseCenter core.Vec3
 	TopCenter  core.Vec3
 	Radius     float64
+	Capped     bool // Whether to include circular end caps
 	Material   material.Material
 
 	// Cached derived values
@@ -20,7 +21,7 @@ type Cylinder struct {
 }
 
 // NewCylinder creates a new cylinder
-func NewCylinder(baseCenter, topCenter core.Vec3, radius float64, mat material.Material) *Cylinder {
+func NewCylinder(baseCenter, topCenter core.Vec3, radius float64, capped bool, mat material.Material) *Cylinder {
 	// Calculate derived values
 	axisVector := topCenter.Subtract(baseCenter)
 	height := axisVector.Length()
@@ -30,6 +31,7 @@ func NewCylinder(baseCenter, topCenter core.Vec3, radius float64, mat material.M
 		BaseCenter: baseCenter,
 		TopCenter:  topCenter,
 		Radius:     radius,
+		Capped:     capped,
 		Material:   mat,
 		axis:       axis,
 		height:     height,
@@ -88,6 +90,38 @@ func (c *Cylinder) BoundingBox() AABB {
 
 // Hit tests if a ray intersects with the cylinder
 func (c *Cylinder) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
+	var closestHit *material.SurfaceInteraction
+	closestT := tMax
+
+	// Check cylinder body intersection
+	if bodyHit := c.hitBody(ray, tMin, closestT); bodyHit != nil {
+		closestHit = bodyHit
+		closestT = bodyHit.T
+	}
+
+	// Check cap intersections if capped
+	if c.Capped {
+		// Check base cap
+		if baseHit := c.hitCap(ray, c.BaseCenter, c.axis.Negate(), tMin, closestT); baseHit != nil {
+			closestHit = baseHit
+			closestT = baseHit.T
+		}
+
+		// Check top cap
+		if topHit := c.hitCap(ray, c.TopCenter, c.axis, tMin, closestT); topHit != nil {
+			closestHit = topHit
+			closestT = topHit.T
+		}
+	}
+
+	if closestHit != nil {
+		return closestHit, true
+	}
+	return nil, false
+}
+
+// hitBody checks for intersection with the cylinder body (curved surface)
+func (c *Cylinder) hitBody(ray core.Ray, tMin, tMax float64) *material.SurfaceInteraction {
 	// Vector from ray origin to base center
 	delta := ray.Origin.Subtract(c.BaseCenter)
 
@@ -96,10 +130,6 @@ func (c *Cylinder) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInter
 	deltaV := delta.Dot(c.axis)     // Δ · V̂
 
 	// Quadratic equation coefficients: at² + bt + cc = 0
-	// From spec:
-	// a = |D|² - (D·V̂)²
-	// b = 2[Δ·D - (Δ·V̂)(D·V̂)]
-	// cc = |Δ|² - (Δ·V̂)² - r²
 	a := ray.Direction.LengthSquared() - DV*DV
 	b := 2.0 * (delta.Dot(ray.Direction) - deltaV*DV)
 	cc := delta.LengthSquared() - deltaV*deltaV - c.Radius*c.Radius
@@ -107,19 +137,15 @@ func (c *Cylinder) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInter
 	// Check for parallel ray (a ≈ 0)
 	const epsilon = 1e-8
 	if math.Abs(a) < epsilon {
-		// Ray is parallel to cylinder axis - will miss
-		return nil, false
+		return nil
 	}
 
 	// Compute discriminant
 	discriminant := b*b - 4*a*cc
-
-	// No intersection if discriminant is negative
 	if discriminant < 0 {
-		return nil, false
+		return nil
 	}
 
-	// Find the nearest intersection point within the valid range
 	sqrtD := math.Sqrt(discriminant)
 
 	// Try the closer intersection point first
@@ -128,8 +154,7 @@ func (c *Cylinder) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInter
 		// Try the farther intersection point
 		t = (-b + sqrtD) / (2 * a)
 		if t < tMin || t > tMax {
-			// Both intersections are outside valid range
-			return nil, false
+			return nil
 		}
 	}
 
@@ -143,25 +168,22 @@ func (c *Cylinder) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInter
 		if t == (-b-sqrtD)/(2*a) {
 			t = (-b + sqrtD) / (2 * a)
 			if t < tMin || t > tMax {
-				return nil, false
+				return nil
 			}
 			point = ray.At(t)
 			h = point.Subtract(c.BaseCenter).Dot(c.axis)
 			if h < 0 || h > c.height {
-				return nil, false
+				return nil
 			}
 		} else {
-			return nil, false
+			return nil
 		}
 	}
 
 	// Calculate surface normal (radial direction from axis to point)
-	// Point on axis at same height as intersection
 	axisPoint := c.BaseCenter.Add(c.axis.Multiply(h))
-	// Normal points radially outward
 	outwardNormal := point.Subtract(axisPoint).Normalize()
 
-	// Create hit record
 	hitRecord := &material.SurfaceInteraction{
 		T:        t,
 		Point:    point,
@@ -169,5 +191,38 @@ func (c *Cylinder) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInter
 	}
 	hitRecord.SetFaceNormal(ray, outwardNormal)
 
-	return hitRecord, true
+	return hitRecord
+}
+
+// hitCap checks for intersection with a circular cap (disc)
+func (c *Cylinder) hitCap(ray core.Ray, center, normal core.Vec3, tMin, tMax float64) *material.SurfaceInteraction {
+	const epsilon = 1e-8
+
+	// Ray-plane intersection
+	denom := ray.Direction.Dot(normal)
+	if math.Abs(denom) < epsilon {
+		// Ray is parallel to cap plane
+		return nil
+	}
+
+	t := center.Subtract(ray.Origin).Dot(normal) / denom
+	if t < tMin || t > tMax {
+		return nil
+	}
+
+	// Check if intersection point is within disc radius
+	point := ray.At(t)
+	distFromCenter := point.Subtract(center).Length()
+	if distFromCenter > c.Radius {
+		return nil
+	}
+
+	hitRecord := &material.SurfaceInteraction{
+		T:        t,
+		Point:    point,
+		Material: c.Material,
+	}
+	hitRecord.SetFaceNormal(ray, normal)
+
+	return hitRecord
 }

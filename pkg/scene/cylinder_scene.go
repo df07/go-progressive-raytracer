@@ -54,36 +54,42 @@ func NewCylinderTestScene(cameraOverrides ...geometry.CameraConfig) *Scene {
 	groundQuad := NewGroundQuad(core.NewVec3(0, 0, 0), 10000.0, lambertianGray)
 
 	// Create cylinders with different materials and orientations
+	// Mix of capped and uncapped to showcase the difference
 
-	// Central tall cylinder (Y-axis aligned) - Red lambertian
+	// Center: Gold tube pointing toward camera - Metal, UNCAPPED
+	// Angled so you can look directly down the hollow tube
 	cylinderCenter := geometry.NewCylinder(
-		core.NewVec3(0, 0, 0), // base
-		core.NewVec3(0, 2, 0), // top
-		0.5,                   // radius
-		lambertianRed,
-	)
-
-	// Left cylinder (slightly tilted) - Metal
-	cylinderLeft := geometry.NewCylinder(
-		core.NewVec3(-2, 0, 0),     // base
-		core.NewVec3(-1.8, 1.5, 0), // top (slightly tilted)
-		0.4,                        // radius
+		core.NewVec3(-0.3, 1.0, -1.5), // base (further from camera)
+		core.NewVec3(0, 1.2, 2.0),     // top (closer to camera)
+		0.35,                          // radius
+		false,                         // uncapped - open tube (look through it!)
 		metalGold,
 	)
 
-	// Right cylinder (horizontal, X-axis aligned) - Blue lambertian
+	// Right: Tall cylinder (Y-axis aligned) - Red lambertian, CAPPED
 	cylinderRight := geometry.NewCylinder(
-		core.NewVec3(1.5, 0.3, 0), // base
-		core.NewVec3(2.5, 0.3, 0), // top
-		0.3,                       // radius
+		core.NewVec3(1.8, 0, 0), // base
+		core.NewVec3(1.8, 2, 0), // top
+		0.5,                     // radius
+		true,                    // capped - can see top cap from above
+		lambertianRed,
+	)
+
+	// Left: Horizontal cylinder (X-axis aligned) - Blue lambertian, CAPPED
+	cylinderLeft := geometry.NewCylinder(
+		core.NewVec3(-2.5, 0.3, 0), // base
+		core.NewVec3(-1.5, 0.3, 0), // top
+		0.3,                        // radius
+		true,                       // capped - can see end caps
 		lambertianBlue,
 	)
 
-	// Small glass cylinder (short, in front)
+	// Small glass cylinder (short, in front) - CAPPED
 	cylinderGlass := geometry.NewCylinder(
 		core.NewVec3(0.5, 0, 1),   // base
 		core.NewVec3(0.5, 0.6, 1), // top
 		0.2,                       // radius
+		true,                      // capped
 		materialGlass,
 	)
 

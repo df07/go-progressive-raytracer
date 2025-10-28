@@ -14,7 +14,7 @@ func TestNewCylinder(t *testing.T) {
 	topCenter := core.NewVec3(0, 2, 0)
 	radius := 1.0
 
-	cyl := NewCylinder(baseCenter, topCenter, radius, mat)
+	cyl := NewCylinder(baseCenter, topCenter, radius, false, mat)
 
 	if cyl == nil {
 		t.Fatal("NewCylinder returned nil")
@@ -71,7 +71,7 @@ func TestCylinder_BoundingBox(t *testing.T) {
 	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cyl := NewCylinder(tt.baseCenter, tt.topCenter, tt.radius, mat)
+			cyl := NewCylinder(tt.baseCenter, tt.topCenter, tt.radius, false, mat)
 			bbox := cyl.BoundingBox()
 
 			tolerance := 1e-9
@@ -102,6 +102,7 @@ func TestCylinder_Hit_SimpleHit(t *testing.T) {
 		core.NewVec3(0, 0, 0),
 		core.NewVec3(0, 2, 0),
 		1.0,
+		false,
 		mat,
 	)
 
@@ -139,6 +140,7 @@ func TestCylinder_Hit_Miss(t *testing.T) {
 		core.NewVec3(0, 0, 0),
 		core.NewVec3(0, 2, 0),
 		1.0,
+		false,
 		mat,
 	)
 
@@ -158,6 +160,7 @@ func TestCylinder_Hit_HeightBounds(t *testing.T) {
 		core.NewVec3(0, 0, 0),
 		core.NewVec3(0, 2, 0),
 		1.0,
+		false,
 		mat,
 	)
 
@@ -205,6 +208,7 @@ func TestCylinder_Hit_FromInside(t *testing.T) {
 		core.NewVec3(0, 0, 0),
 		core.NewVec3(0, 2, 0),
 		1.0,
+		false,
 		mat,
 	)
 
@@ -238,6 +242,7 @@ func TestCylinder_Hit_ArbitraryOrientation(t *testing.T) {
 		core.NewVec3(0, 0, 0),
 		core.NewVec3(3, 0, 0),
 		1.0,
+		false,
 		mat,
 	)
 
@@ -271,6 +276,7 @@ func TestCylinder_Hit_TwoIntersections(t *testing.T) {
 		core.NewVec3(0, 0, 0),
 		core.NewVec3(0, 2, 0),
 		1.0,
+		false,
 		mat,
 	)
 
@@ -301,6 +307,7 @@ func TestCylinder_Hit_TBounds(t *testing.T) {
 		core.NewVec3(0, 0, 0),
 		core.NewVec3(0, 2, 0),
 		1.0,
+		false,
 		mat,
 	)
 
@@ -326,5 +333,227 @@ func TestCylinder_Hit_TBounds(t *testing.T) {
 	expectedT := 1.0
 	if math.Abs(hit.T-expectedT) > 1e-6 {
 		t.Errorf("Expected closer intersection at t=%f, got t=%f", expectedT, hit.T)
+	}
+}
+
+func TestCylinder_Capped_HitTopCap(t *testing.T) {
+	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	cyl := NewCylinder(
+		core.NewVec3(0, 0, 0),
+		core.NewVec3(0, 2, 0),
+		1.0,
+		true, // capped
+		mat,
+	)
+
+	// Ray from above hitting top cap
+	ray := core.NewRay(core.NewVec3(0.5, 3, 0), core.NewVec3(0, -1, 0))
+	hit, isHit := cyl.Hit(ray, 0.001, 1000.0)
+
+	if !isHit {
+		t.Fatal("Expected hit on top cap, but got miss")
+	}
+
+	// Should hit at Y=2 (top of cylinder)
+	expectedPoint := core.NewVec3(0.5, 2, 0)
+	tolerance := 1e-6
+	if !hit.Point.Equals(expectedPoint) {
+		t.Errorf("Expected hit point %v, got %v", expectedPoint, hit.Point)
+	}
+
+	// Normal should point in +Y direction (upward)
+	expectedNormal := core.NewVec3(0, 1, 0)
+	if math.Abs(hit.Normal.X-expectedNormal.X) > tolerance ||
+		math.Abs(hit.Normal.Y-expectedNormal.Y) > tolerance ||
+		math.Abs(hit.Normal.Z-expectedNormal.Z) > tolerance {
+		t.Errorf("Expected normal %v, got %v", expectedNormal, hit.Normal)
+	}
+
+	if !hit.FrontFace {
+		t.Error("Expected front face hit on top cap")
+	}
+}
+
+func TestCylinder_Capped_HitBottomCap(t *testing.T) {
+	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	cyl := NewCylinder(
+		core.NewVec3(0, 0, 0),
+		core.NewVec3(0, 2, 0),
+		1.0,
+		true, // capped
+		mat,
+	)
+
+	// Ray from below hitting bottom cap
+	ray := core.NewRay(core.NewVec3(0.3, -1, 0), core.NewVec3(0, 1, 0))
+	hit, isHit := cyl.Hit(ray, 0.001, 1000.0)
+
+	if !isHit {
+		t.Fatal("Expected hit on bottom cap, but got miss")
+	}
+
+	// Should hit at Y=0 (bottom of cylinder)
+	expectedPoint := core.NewVec3(0.3, 0, 0)
+	tolerance := 1e-6
+	if !hit.Point.Equals(expectedPoint) {
+		t.Errorf("Expected hit point %v, got %v", expectedPoint, hit.Point)
+	}
+
+	// Normal should point in -Y direction (downward)
+	expectedNormal := core.NewVec3(0, -1, 0)
+	if math.Abs(hit.Normal.X-expectedNormal.X) > tolerance ||
+		math.Abs(hit.Normal.Y-expectedNormal.Y) > tolerance ||
+		math.Abs(hit.Normal.Z-expectedNormal.Z) > tolerance {
+		t.Errorf("Expected normal %v, got %v", expectedNormal, hit.Normal)
+	}
+
+	if !hit.FrontFace {
+		t.Error("Expected front face hit on bottom cap")
+	}
+}
+
+func TestCylinder_Capped_MissOutsideCapRadius(t *testing.T) {
+	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	cyl := NewCylinder(
+		core.NewVec3(0, 0, 0),
+		core.NewVec3(0, 2, 0),
+		1.0,
+		true, // capped
+		mat,
+	)
+
+	tests := []struct {
+		name   string
+		origin core.Vec3
+		dir    core.Vec3
+	}{
+		{
+			name:   "miss top cap outside radius",
+			origin: core.NewVec3(1.5, 3, 0),
+			dir:    core.NewVec3(0, -1, 0),
+		},
+		{
+			name:   "miss bottom cap outside radius",
+			origin: core.NewVec3(-1.5, -1, 0),
+			dir:    core.NewVec3(0, 1, 0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ray := core.NewRay(tt.origin, tt.dir)
+			_, isHit := cyl.Hit(ray, 0.001, 1000.0)
+
+			if isHit {
+				t.Error("Expected miss outside cap radius, but got hit")
+			}
+		})
+	}
+}
+
+func TestCylinder_Capped_HitBodyNotCap(t *testing.T) {
+	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	cyl := NewCylinder(
+		core.NewVec3(0, 0, 0),
+		core.NewVec3(0, 2, 0),
+		1.0,
+		true, // capped
+		mat,
+	)
+
+	// Ray hitting the side (body), not the caps
+	ray := core.NewRay(core.NewVec3(2, 1, 0), core.NewVec3(-1, 0, 0))
+	hit, isHit := cyl.Hit(ray, 0.001, 1000.0)
+
+	if !isHit {
+		t.Fatal("Expected hit on cylinder body")
+	}
+
+	// Should hit the body at X=1, not a cap
+	expectedPoint := core.NewVec3(1, 1, 0)
+	if !hit.Point.Equals(expectedPoint) {
+		t.Errorf("Expected hit point %v, got %v", expectedPoint, hit.Point)
+	}
+
+	// Normal should be radial (in X direction), not axial
+	expectedNormal := core.NewVec3(1, 0, 0)
+	tolerance := 1e-6
+	if math.Abs(hit.Normal.X-expectedNormal.X) > tolerance ||
+		math.Abs(hit.Normal.Y-expectedNormal.Y) > tolerance ||
+		math.Abs(hit.Normal.Z-expectedNormal.Z) > tolerance {
+		t.Errorf("Expected radial normal %v, got %v", expectedNormal, hit.Normal)
+	}
+}
+
+func TestCylinder_Capped_FromInside(t *testing.T) {
+	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	cyl := NewCylinder(
+		core.NewVec3(0, 0, 0),
+		core.NewVec3(0, 2, 0),
+		1.0,
+		true, // capped
+		mat,
+	)
+
+	// Ray from inside shooting upward toward top cap
+	ray := core.NewRay(core.NewVec3(0, 1, 0), core.NewVec3(0, 1, 0))
+	hit, isHit := cyl.Hit(ray, 0.001, 1000.0)
+
+	if !isHit {
+		t.Fatal("Expected hit on top cap from inside")
+	}
+
+	// Should be a back face hit
+	if hit.FrontFace {
+		t.Error("Expected back face hit when shooting from inside")
+	}
+
+	// Normal should point inward (downward)
+	expectedNormal := core.NewVec3(0, -1, 0)
+	tolerance := 1e-6
+	if math.Abs(hit.Normal.X-expectedNormal.X) > tolerance ||
+		math.Abs(hit.Normal.Y-expectedNormal.Y) > tolerance ||
+		math.Abs(hit.Normal.Z-expectedNormal.Z) > tolerance {
+		t.Errorf("Expected inward normal %v, got %v", expectedNormal, hit.Normal)
+	}
+}
+
+func TestCylinder_Uncapped_NoCapHits(t *testing.T) {
+	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
+	cyl := NewCylinder(
+		core.NewVec3(0, 0, 0),
+		core.NewVec3(0, 2, 0),
+		1.0,
+		false, // uncapped
+		mat,
+	)
+
+	tests := []struct {
+		name   string
+		origin core.Vec3
+		dir    core.Vec3
+	}{
+		{
+			name:   "ray through top opening",
+			origin: core.NewVec3(0.5, 3, 0),
+			dir:    core.NewVec3(0, -1, 0),
+		},
+		{
+			name:   "ray through bottom opening",
+			origin: core.NewVec3(0.3, -1, 0),
+			dir:    core.NewVec3(0, 1, 0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ray := core.NewRay(tt.origin, tt.dir)
+			_, isHit := cyl.Hit(ray, 0.001, 1000.0)
+
+			// Should pass through without hitting
+			if isHit {
+				t.Error("Expected miss on uncapped cylinder, but got hit")
+			}
+		})
 	}
 }
