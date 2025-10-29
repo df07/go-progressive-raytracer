@@ -8,12 +8,13 @@ import (
 	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
-// Cone represents a finite cone or frustum shape (open-ended, no caps)
+// Cone represents a finite cone or frustum shape
 type Cone struct {
 	BaseCenter core.Vec3
 	BaseRadius float64
 	TopCenter  core.Vec3
 	TopRadius  float64 // 0 for pointed cone, >0 for frustum
+	Capped     bool    // Whether to include circular end cap(s)
 	Material   material.Material
 
 	// Cached derived values
@@ -24,7 +25,7 @@ type Cone struct {
 }
 
 // NewCone creates a new cone or frustum
-func NewCone(baseCenter core.Vec3, baseRadius float64, topCenter core.Vec3, topRadius float64, mat material.Material) (*Cone, error) {
+func NewCone(baseCenter core.Vec3, baseRadius float64, topCenter core.Vec3, topRadius float64, capped bool, mat material.Material) (*Cone, error) {
 	// Validate parameters
 	if baseRadius <= 0 {
 		return nil, fmt.Errorf("base radius must be positive, got %f", baseRadius)
@@ -65,6 +66,7 @@ func NewCone(baseCenter core.Vec3, baseRadius float64, topCenter core.Vec3, topR
 		BaseRadius: baseRadius,
 		TopCenter:  topCenter,
 		TopRadius:  topRadius,
+		Capped:     capped,
 		Material:   mat,
 		axis:       axis,
 		height:     height,
@@ -128,8 +130,42 @@ func (c *Cone) BoundingBox() AABB {
 	)
 }
 
-// Hit tests if a ray intersects with the cone
+// Hit tests if a ray intersects with the cone (body and optionally caps)
 func (c *Cone) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteraction, bool) {
+	var closestHit *material.SurfaceInteraction
+	closestT := tMax
+
+	// Check cone body intersection
+	if bodyHit := c.hitBody(ray, tMin, closestT); bodyHit != nil {
+		closestHit = bodyHit
+		closestT = bodyHit.T
+	}
+
+	// Check cap intersections if capped
+	if c.Capped {
+		// Always check base cap
+		if baseHit := c.hitCap(ray, c.BaseCenter, c.axis.Negate(), c.BaseRadius, tMin, closestT); baseHit != nil {
+			closestHit = baseHit
+			closestT = baseHit.T
+		}
+
+		// Check top cap only for frustums (topRadius > 0)
+		if c.TopRadius > 0 {
+			if topHit := c.hitCap(ray, c.TopCenter, c.axis, c.TopRadius, tMin, closestT); topHit != nil {
+				closestHit = topHit
+				closestT = topHit.T
+			}
+		}
+	}
+
+	if closestHit != nil {
+		return closestHit, true
+	}
+	return nil, false
+}
+
+// hitBody checks for intersection with the cone body (curved surface)
+func (c *Cone) hitBody(ray core.Ray, tMin, tMax float64) *material.SurfaceInteraction {
 	// Vector from ray origin to apex
 	CO := ray.Origin.Subtract(c.apex)
 
@@ -153,7 +189,7 @@ func (c *Cone) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteracti
 	const epsilon = 1e-8
 	if math.Abs(a) < epsilon {
 		// Ray is nearly parallel to cone surface - will likely miss
-		return nil, false
+		return nil
 	}
 
 	// Compute discriminant
@@ -161,7 +197,7 @@ func (c *Cone) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteracti
 
 	// No intersection if discriminant is negative
 	if discriminant < 0 {
-		return nil, false
+		return nil
 	}
 
 	// Find the nearest intersection point within the valid range
@@ -174,7 +210,7 @@ func (c *Cone) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteracti
 		t = (-b + sqrtD) / (2 * a)
 		if !c.validateIntersection(ray, t, tMin, tMax) {
 			// Both intersections are invalid
-			return nil, false
+			return nil
 		}
 	}
 
@@ -203,7 +239,7 @@ func (c *Cone) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteracti
 	}
 	hitRecord.SetFaceNormal(ray, outwardNormal)
 
-	return hitRecord, true
+	return hitRecord
 }
 
 // validateIntersection checks if an intersection at parameter t is valid
@@ -236,4 +272,37 @@ func (c *Cone) validateIntersection(ray core.Ray, t, tMin, tMax float64) bool {
 	}
 
 	return true
+}
+
+// hitCap checks for intersection with a circular cap (disc)
+func (c *Cone) hitCap(ray core.Ray, center, normal core.Vec3, radius, tMin, tMax float64) *material.SurfaceInteraction {
+	const epsilon = 1e-8
+
+	// Ray-plane intersection
+	denom := ray.Direction.Dot(normal)
+	if math.Abs(denom) < epsilon {
+		// Ray is parallel to cap plane
+		return nil
+	}
+
+	t := center.Subtract(ray.Origin).Dot(normal) / denom
+	if t < tMin || t > tMax {
+		return nil
+	}
+
+	// Check if intersection point is within disc radius
+	point := ray.At(t)
+	distFromCenter := point.Subtract(center).Length()
+	if distFromCenter > radius {
+		return nil
+	}
+
+	hitRecord := &material.SurfaceInteraction{
+		T:        t,
+		Point:    point,
+		Material: c.Material,
+	}
+	hitRecord.SetFaceNormal(ray, normal)
+
+	return hitRecord
 }
