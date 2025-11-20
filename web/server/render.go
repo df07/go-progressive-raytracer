@@ -286,7 +286,7 @@ func (s *Server) handlePassComplete(ctx context.Context, sseEventChan chan SSEEv
 	primitiveCount := scene.GetPrimitiveCount()
 
 	// Calculate average luminance from the image
-	avgLuminance := calculateAverageLuminance(passResult.Image)
+	avgLuminance := renderer.CalculateAverageLuminance(passResult.Image)
 
 	passUpdate := struct {
 		Event            string  `json:"event"`
@@ -449,35 +449,4 @@ func (s *Server) drainRemainingChannels(ctx context.Context, sseEventChan chan S
 			return
 		}
 	}
-}
-
-// calculateAverageLuminance calculates the average luminance of an RGBA image
-func calculateAverageLuminance(img *image.RGBA) float64 {
-	bounds := img.Bounds()
-	width := bounds.Max.X - bounds.Min.X
-	height := bounds.Max.Y - bounds.Min.Y
-	totalPixels := width * height
-
-	if totalPixels == 0 {
-		return 0.0
-	}
-
-	var totalLuminance float64
-
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			r, g, b, _ := img.At(x, y).RGBA()
-
-			// Convert from 16-bit to 8-bit values (0-255)
-			r8 := float64(r>>8) / 255.0
-			g8 := float64(g>>8) / 255.0
-			b8 := float64(b>>8) / 255.0
-
-			// Use Vec3's Luminance method
-			color := core.Vec3{X: r8, Y: g8, Z: b8}
-			totalLuminance += color.Luminance()
-		}
-	}
-
-	return totalLuminance / float64(totalPixels)
 }

@@ -120,9 +120,9 @@ func (v Vec3) Square() Vec3 {
 }
 
 // Luminance returns the perceptual luminance of an RGB color
-// Uses standard luminance weights: 0.299*R + 0.587*G + 0.114*B
+// Uses Rec. 709 luminance weights (sRGB standard): 0.2126*R + 0.7152*G + 0.0722*B
 func (v Vec3) Luminance() float64 {
-	return 0.299*v.X + 0.587*v.Y + 0.114*v.Z
+	return 0.2126*v.X + 0.7152*v.Y + 0.0722*v.Z
 }
 
 // IsZero returns true if the vector is zero

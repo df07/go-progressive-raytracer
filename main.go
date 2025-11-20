@@ -74,6 +74,11 @@ func main() {
 	fmt.Printf("Render completed in %v\n", renderTime)
 	fmt.Printf("Samples per pixel: %.1f (range %d - %d)\n",
 		result.Stats.AverageSamples, result.Stats.MinSamples, result.Stats.MaxSamplesUsed)
+
+	// Calculate and print average luminosity
+	avgLum := renderer.CalculateAverageLuminance(result.Image)
+	fmt.Printf("Average Luminosity: %.4f\n", avgLum)
+
 	fmt.Printf("Render saved as %s\n", filepath.Join(outputDir, fmt.Sprintf("render_%s.png", result.Timestamp)))
 }
 

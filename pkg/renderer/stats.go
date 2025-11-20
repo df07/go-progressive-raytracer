@@ -1,6 +1,10 @@
 package renderer
 
-import "github.com/df07/go-progressive-raytracer/pkg/core"
+import (
+	"image"
+
+	"github.com/df07/go-progressive-raytracer/pkg/core"
+)
 
 // RenderStats contains statistics about the rendering process
 type RenderStats struct {
@@ -48,4 +52,41 @@ func (ps *PixelStats) GetColor() core.Vec3 {
 		return core.Vec3{X: 0, Y: 0, Z: 0}
 	}
 	return ps.ColorAccum.Multiply(1.0 / float64(ps.SampleCount))
+}
+
+// CalculateAverageLuminance calculates the average luminance of an image
+// It requires *image.RGBA as that is the standard format for this raytracer
+func CalculateAverageLuminance(img *image.RGBA) float64 {
+	if img == nil {
+		return 0.0
+	}
+
+	bounds := img.Bounds()
+	width := bounds.Max.X - bounds.Min.X
+	height := bounds.Max.Y - bounds.Min.Y
+	totalPixels := width * height
+
+	if totalPixels == 0 {
+		return 0.0
+	}
+
+	var totalLuminance float64
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// Note: image.RGBA stores premultiplied alpha, but for raytracer output alpha is usually 255.
+			r, g, b, _ := img.At(x, y).RGBA()
+
+			// Convert from 16-bit to float [0, 1]
+			// RGBA() returns values in [0, 65535]
+			rF := float64(r) / 65535.0
+			gF := float64(g) / 65535.0
+			bF := float64(b) / 65535.0
+
+			color := core.Vec3{X: rF, Y: gF, Z: bF}
+			totalLuminance += color.Luminance()
+		}
+	}
+
+	return totalLuminance / float64(totalPixels)
 }
