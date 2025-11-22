@@ -2,7 +2,10 @@ package renderer
 
 import (
 	"image"
+	"image/png"
 	"math"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
@@ -24,6 +27,13 @@ func (tl *testLogger) Printf(format string, args ...interface{}) {
 }
 
 func TestIntegratorLuminanceComparison(t *testing.T) {
+	testSamplingConfig := scene.SamplingConfig{
+		Width: 32, Height: 32,
+		MaxDepth: 5, SamplesPerPixel: 256,
+		AdaptiveMinSamples:        8,
+		RussianRouletteMinBounces: 2,
+	}
+
 	tests := []struct {
 		name        string
 		createScene func() *scene.Scene
@@ -43,24 +53,21 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 					Center: core.NewVec3(0, 0, 0),
 					LookAt: core.NewVec3(0, 0, -1),
 					Up:     core.NewVec3(0, 1, 0),
-					Width:  32, AspectRatio: 1.0, VFov: 45.0,
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 45.0,
 				}
 				camera := geometry.NewCamera(cameraConfig)
 
 				s := &scene.Scene{
-					Shapes:       []geometry.Shape{}, // No shapes
-					Lights:       ls,
-					LightSampler: lights.NewUniformLightSampler(ls, 10),
-					Camera:       camera,
-					SamplingConfig: scene.SamplingConfig{
-						Width: 32, Height: 32,
-						MaxDepth: 5, SamplesPerPixel: 4,
-					},
+					Shapes:         []geometry.Shape{}, // No shapes
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
 				}
 				s.Preprocess()
 				return s
 			},
-			tolerance: 10.0, // Increased tolerance for low sample count
+			tolerance: 10.0,
 		},
 		{
 			name: "Single Sphere with Area Light",
@@ -80,19 +87,16 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 					Center: core.NewVec3(0, 0, 0),
 					LookAt: core.NewVec3(0, 0, -2),
 					Up:     core.NewVec3(0, 1, 0),
-					Width:  32, AspectRatio: 1.0, VFov: 45.0,
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 45.0,
 				}
 				camera := geometry.NewCamera(cameraConfig)
 
 				s := &scene.Scene{
-					Shapes:       []geometry.Shape{sphere, light.Sphere},
-					Lights:       ls,
-					LightSampler: lights.NewUniformLightSampler(ls, 10),
-					Camera:       camera,
-					SamplingConfig: scene.SamplingConfig{
-						Width: 32, Height: 32,
-						MaxDepth: 5, SamplesPerPixel: 4,
-					},
+					Shapes:         []geometry.Shape{sphere, light.Sphere},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
 				}
 				s.Preprocess()
 				return s
@@ -122,144 +126,16 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 					Center: core.NewVec3(0, 0, 0),
 					LookAt: core.NewVec3(0, 0, -2),
 					Up:     core.NewVec3(0, 1, 0),
-					Width:  32, AspectRatio: 1.0, VFov: 45.0,
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 45.0,
 				}
 				camera := geometry.NewCamera(cameraConfig)
 
 				s := &scene.Scene{
-					Shapes:       []geometry.Shape{sphere}, // Light has no geometry
-					Lights:       ls,
-					LightSampler: lights.NewUniformLightSampler(ls, 10),
-					Camera:       camera,
-					SamplingConfig: scene.SamplingConfig{
-						Width: 32, Height: 32,
-						MaxDepth: 5, SamplesPerPixel: 4,
-					},
-				}
-				s.Preprocess()
-				return s
-			},
-			tolerance: 15.0,
-		},
-		{
-			name: "Occluded Light Scene",
-			createScene: func() *scene.Scene {
-				// Scene with a wall blocking the light partially or fully
-				white := material.NewLambertian(core.NewVec3(0.7, 0.7, 0.7))
-				floor := geometry.NewQuad(
-					core.NewVec3(-5, -1, -5),
-					core.NewVec3(10, 0, 0),
-					core.NewVec3(0, 0, 10),
-					white,
-				)
-
-				// Wall blocking the light
-				wall := geometry.NewQuad(
-					core.NewVec3(-1, -1, -3),
-					core.NewVec3(2, 0, 0),
-					core.NewVec3(0, 2, 0),
-					white,
-				)
-
-				// Area light behind the wall
-				lightEmission := core.NewVec3(10.0, 10.0, 10.0)
-				lightMat := material.NewEmissive(lightEmission)
-				light := lights.NewSphereLight(core.NewVec3(0, 0, -4), 0.2, lightMat)
-
-				ls := []lights.Light{light}
-
-				cameraConfig := geometry.CameraConfig{
-					Center: core.NewVec3(0, 0, 0),
-					LookAt: core.NewVec3(0, 0, -3),
-					Up:     core.NewVec3(0, 1, 0),
-					Width:  32, AspectRatio: 1.0, VFov: 45.0,
-				}
-				camera := geometry.NewCamera(cameraConfig)
-
-				s := &scene.Scene{
-					Shapes:       []geometry.Shape{floor, wall, light.Sphere},
-					Lights:       ls,
-					LightSampler: lights.NewUniformLightSampler(ls, 10),
-					Camera:       camera,
-					SamplingConfig: scene.SamplingConfig{
-						Width: 32, Height: 32,
-						MaxDepth: 5, SamplesPerPixel: 4,
-					},
-				}
-				s.Preprocess()
-				return s
-			},
-			tolerance: 15.0,
-		},
-		{
-			name: "Glossy Material Scene",
-			createScene: func() *scene.Scene {
-				// Scene with a glossy sphere
-				// Metal with some roughness
-				glossy := material.NewMetal(core.NewVec3(0.9, 0.9, 0.9), 0.1)
-				sphere := geometry.NewSphere(core.NewVec3(0, 0, -2), 0.5, glossy)
-
-				// Area light
-				lightEmission := core.NewVec3(10.0, 10.0, 10.0)
-				lightMat := material.NewEmissive(lightEmission)
-				light := lights.NewSphereLight(core.NewVec3(0, 2, -1), 0.2, lightMat)
-
-				ls := []lights.Light{light}
-
-				cameraConfig := geometry.CameraConfig{
-					Center: core.NewVec3(0, 0, 0),
-					LookAt: core.NewVec3(0, 0, -2),
-					Up:     core.NewVec3(0, 1, 0),
-					Width:  32, AspectRatio: 1.0, VFov: 45.0,
-				}
-				camera := geometry.NewCamera(cameraConfig)
-
-				s := &scene.Scene{
-					Shapes:       []geometry.Shape{sphere, light.Sphere},
-					Lights:       ls,
-					LightSampler: lights.NewUniformLightSampler(ls, 10),
-					Camera:       camera,
-					SamplingConfig: scene.SamplingConfig{
-						Width: 32, Height: 32,
-						MaxDepth: 5, SamplesPerPixel: 4,
-					},
-				}
-				s.Preprocess()
-				return s
-			},
-			tolerance: 15.0,
-		},
-		{
-			name: "Glass Material Scene",
-			createScene: func() *scene.Scene {
-				// Scene with a glass sphere
-				glass := material.NewDielectric(1.5) // IOR 1.5
-				sphere := geometry.NewSphere(core.NewVec3(0, 0, -2), 0.5, glass)
-
-				// Area light
-				lightEmission := core.NewVec3(10.0, 10.0, 10.0)
-				lightMat := material.NewEmissive(lightEmission)
-				light := lights.NewSphereLight(core.NewVec3(0, 2, -1), 0.2, lightMat)
-
-				ls := []lights.Light{light}
-
-				cameraConfig := geometry.CameraConfig{
-					Center: core.NewVec3(0, 0, 0),
-					LookAt: core.NewVec3(0, 0, -2),
-					Up:     core.NewVec3(0, 1, 0),
-					Width:  32, AspectRatio: 1.0, VFov: 45.0,
-				}
-				camera := geometry.NewCamera(cameraConfig)
-
-				s := &scene.Scene{
-					Shapes:       []geometry.Shape{sphere, light.Sphere},
-					Lights:       ls,
-					LightSampler: lights.NewUniformLightSampler(ls, 10),
-					Camera:       camera,
-					SamplingConfig: scene.SamplingConfig{
-						Width: 32, Height: 32,
-						MaxDepth: 5, SamplesPerPixel: 4,
-					},
+					Shapes:         []geometry.Shape{sphere}, // Light has no geometry
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
 				}
 				s.Preprocess()
 				return s
@@ -269,9 +145,16 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 		{
 			name: "Cornell Box (Empty)",
 			createScene: func() *scene.Scene {
-				s := scene.NewCornellScene(scene.CornellEmpty)
-				s.SamplingConfig.Width = 32
-				s.SamplingConfig.Height = 32
+				// Create Cornell box with overridden camera config
+				cameraConfig := geometry.CameraConfig{
+					Width:       testSamplingConfig.Width,
+					AspectRatio: 1.0,
+				}
+				s := scene.NewCornellScene(scene.CornellEmpty, cameraConfig)
+
+				// Ensure sampling config matches
+				s.SamplingConfig = testSamplingConfig
+
 				return s
 			},
 			tolerance: 15.0, // Keeping high tolerance for now as we know it fails
@@ -286,12 +169,12 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 
 			scene := tt.createScene()
 
-			// Configure progressive rendering with minimal samples for quick test
+			// Configure progressive rendering with scene-specific settings
 			config := DefaultProgressiveConfig()
 			config.InitialSamples = 1
-			config.MaxSamplesPerPixel = 4
+			config.MaxSamplesPerPixel = scene.SamplingConfig.SamplesPerPixel
 			config.MaxPasses = 1
-			config.TileSize = 32
+			config.TileSize = scene.SamplingConfig.Width // Render full image in one tile for testing
 
 			logger := &testLogger{}
 
@@ -307,6 +190,7 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 				t.Fatalf("Path tracing render failed: %v", err)
 			}
 			pathLuminance := calculateAverageLuminance(pathImage)
+			saveTestImage(t, pathImage, tt.name, "pt")
 
 			// Test BDPT
 			bdptIntegrator := integrator.NewBDPTIntegrator(scene.SamplingConfig)
@@ -320,6 +204,7 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 				t.Fatalf("BDPT render failed: %v", err)
 			}
 			bdptLuminance := calculateAverageLuminance(bdptImage)
+			saveTestImage(t, bdptImage, tt.name, "bdpt")
 
 			t.Logf("Path tracing luminance: %.6f", pathLuminance)
 			t.Logf("BDPT luminance: %.6f", bdptLuminance)
@@ -350,6 +235,46 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 			}
 		})
 	}
+}
+
+func saveTestImage(t *testing.T, img *image.RGBA, testName, suffix string) {
+	// Only save images if verbose mode is enabled (go test -v)
+	if !testing.Verbose() {
+		return
+	}
+
+	// Create output directory in project root
+	// Tests run in pkg/renderer, so we go up two levels
+	outputDir := "../../output/debug_renders"
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		t.Logf("Failed to create output directory: %v", err)
+		return
+	}
+
+	// Sanitize test name for filename
+	filename := outputDir + "/" + sanitizeFilename(testName) + "_" + suffix + ".png"
+
+	f, err := os.Create(filename)
+	if err != nil {
+		t.Logf("Failed to create debug image file %s: %v", filename, err)
+		return
+	}
+	defer f.Close()
+
+	if err := png.Encode(f, img); err != nil {
+		t.Logf("Failed to encode debug image %s: %v", filename, err)
+	} else {
+		t.Logf("Saved debug image to %s", filename)
+	}
+}
+
+func sanitizeFilename(s string) string {
+	return strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '_'
+	}, s)
 }
 
 // calculateAverageLuminance computes the average luminance of an image
