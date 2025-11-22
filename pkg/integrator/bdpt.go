@@ -464,13 +464,21 @@ func (bdpt *BDPTIntegrator) evaluateLightTracingStrategy(lightPath Path, s int, 
 
 	// Create the sampled camera vertex for MIS weight calculation
 	// This represents the dynamically sampled camera vertex
+
+	// Calculate reverse PDF (probability of sampling the light from the camera)
+	// This corresponds to the direct lighting strategy PDF
+	directionToLight := lightVertex.Point.Subtract(cameraSample.Ray.Origin).Normalize()
+	lightPdf := lights.CalculateLightPDF(scene.Lights, scene.LightSampler, cameraSample.Ray.Origin, cameraSample.Ray.Direction.Multiply(-1), directionToLight)
+
 	sampledCameraVertex := &Vertex{
 		SurfaceInteraction: &material.SurfaceInteraction{
 			Point:  cameraSample.Ray.Origin,
 			Normal: cameraSample.Ray.Direction.Multiply(-1), // Camera "normal" points back along ray
 		},
-		IsCamera: true,
-		Beta:     cameraBeta, // Wi / pdf from camera sampling
+		IsCamera:       true,
+		Beta:           cameraBeta,       // Wi / pdf from camera sampling
+		AreaPdfForward: cameraSample.PDF, // Probability of sampling this camera point
+		AreaPdfReverse: lightPdf,         // Probability of sampling the light from this camera point
 	}
 
 	// Create splat ray for this contribution
