@@ -82,7 +82,7 @@ func (sl *PointSpotLight) Sample(point core.Vec3, normal core.Vec3, sample core.
 
 	return LightSample{
 		Point:     samplePoint,
-		Normal:    toLight,
+		Normal:    toLight.Multiply(-1), // Normal points from light to surface (emission direction)
 		Direction: toLight,
 		Distance:  distance,
 		Emission:  emission,
