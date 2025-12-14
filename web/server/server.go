@@ -68,8 +68,9 @@ type Stats struct {
 
 // Start starts the web server
 func (s *Server) Start() error {
-	// Serve static files
-	http.Handle("/", http.FileServer(http.Dir("static/")))
+	// Serve static files with no-cache headers during development
+	fileServer := http.FileServer(http.Dir("static/"))
+	http.Handle("/", noCacheMiddleware(fileServer))
 
 	// API endpoints
 	http.HandleFunc("/api/render", s.handleRender) // Real-time tile streaming
@@ -81,6 +82,17 @@ func (s *Server) Start() error {
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("Starting web server on http://localhost%s", addr)
 	return http.ListenAndServe(addr, nil)
+}
+
+// noCacheMiddleware adds cache control headers to prevent browser caching during development
+func noCacheMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Disable caching for all static files during development
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // handleHealth provides a simple health check endpoint
