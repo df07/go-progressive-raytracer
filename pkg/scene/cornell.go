@@ -1,8 +1,9 @@
 package scene
 
 import (
-	"github.com/df07/go-progressive-raytracer/pkg/lights"
 	"math"
+
+	"github.com/df07/go-progressive-raytracer/pkg/lights"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
 	"github.com/df07/go-progressive-raytracer/pkg/geometry"
@@ -18,8 +19,17 @@ const (
 	CornellEmpty
 )
 
+// CornellLightType represents the type of light to use in the Cornell box
+type CornellLightType int
+
+const (
+	CornellQuadLight CornellLightType = iota
+	CornellPointLight
+	CornellSphereLight
+)
+
 // NewCornellScene creates a classic Cornell box scene with quad walls and area lighting
-func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...geometry.CameraConfig) *Scene {
+func NewCornellScene(geometryType CornellGeometryType, lightType CornellLightType, cameraOverrides ...geometry.CameraConfig) *Scene {
 	// Setup camera and basic scene configuration
 	cameraConfig := setupCornellCamera(cameraOverrides...)
 	camera := geometry.NewCamera(cameraConfig)
@@ -36,7 +46,7 @@ func NewCornellScene(geometryType CornellGeometryType, cameraOverrides ...geomet
 	addCornellWalls(s)
 
 	// Add ceiling light
-	addCornellLight(s)
+	addCornellLight(s, lightType)
 
 	// Add geometry based on type
 	addCornellGeometry(s, geometryType)
@@ -137,19 +147,50 @@ func addCornellWalls(s *Scene) {
 }
 
 // addCornellLight adds the ceiling light to the Cornell box scene
-func addCornellLight(s *Scene) {
-	// Cornell box light specifications from official data
-	// Light position: 343.0 548.8 227.0 to 213.0 548.8 332.0
-	// This gives us a 130x105 light (343-213=130, 332-227=105)
-	lightCorner := core.NewVec3(213.0, 556-0.001, 227.0) // Slightly below ceiling
-	lightU := core.NewVec3(130.0, 0, 0)                  // U vector (X direction)
-	lightV := core.NewVec3(0, 0, 105.0)                  // V vector (Z direction)
+func addCornellLight(s *Scene, lightType CornellLightType) {
+	// Light center position (center of the Cornell box ceiling light area)
+	lightCenter := core.NewVec3(278.0, 556-0.001, 279.5)
 
-	// Warmer, more yellowish light based on Cornell emission spectrum
-	// The spectrum shows higher values at longer wavelengths (more yellow/orange)
-	lightEmission := core.NewVec3(18.0, 15.0, 8.0).Multiply(2.5) // Warm yellowish white
+	// Warm, more yellowish light based on Cornell emission spectrum
+	lightEmission := core.NewVec3(18.0, 15.0, 8.0)
 
-	s.AddQuadLight(lightCorner, lightU, lightV, lightEmission)
+	switch lightType {
+	case CornellQuadLight:
+		// Cornell box light specifications from official data
+		// Light position: 343.0 548.8 227.0 to 213.0 548.8 332.0
+		// This gives us a 130x105 light (343-213=130, 332-227=105)
+		lightCorner := core.NewVec3(213.0, 556-0.001, 227.0) // Slightly below ceiling
+		lightU := core.NewVec3(130.0, 0, 0)                  // U vector (X direction)
+		lightV := core.NewVec3(0, 0, 105.0)                  // V vector (Z direction)
+
+		intensity := lightEmission.Multiply(2.5) // Scale up for quad light
+
+		s.AddQuadLight(lightCorner, lightU, lightV, intensity)
+
+	case CornellPointLight:
+		// Point light at the center of where the quad light would be
+
+		intensity := lightEmission.Multiply(20000.0) // Scale up a lot for point light
+		light := lights.NewPointSpotLight(
+			lightCenter,
+			core.NewVec3(0, -1, 0), // Direction downward
+			intensity,
+			180.0, // Full sphere coverage
+			0.0,   // No falloff angle
+		)
+		s.Lights = append(s.Lights, light)
+		s.LightSampler = lights.NewUniformLightSampler(s.Lights, 10)
+
+	case CornellSphereLight:
+		// Sphere light at the center of where the quad light would be
+		// Radius matches half the quad's smaller dimension (105/2 = 52.5)
+		intensity := lightEmission.Multiply(2.05) // Scale down for sphere light
+		lightMat := material.NewEmissive(intensity)
+		sphereLight := lights.NewSphereLight(lightCenter, 52.5, lightMat)
+		s.Shapes = append(s.Shapes, sphereLight.Sphere)
+		s.Lights = append(s.Lights, sphereLight)
+		s.LightSampler = lights.NewUniformLightSampler(s.Lights, 10)
+	}
 }
 
 // addCornellGeometry adds the specified geometry type to the Cornell box scene

@@ -142,10 +142,10 @@ func createScene(sceneType string) (*scene.Scene, error) {
 		switch sceneType {
 		case "cornell":
 			fmt.Println("Using Cornell scene...")
-			sceneObj = scene.NewCornellScene(scene.CornellSpheres)
+			sceneObj = scene.NewCornellScene(scene.CornellSpheres, scene.CornellQuadLight)
 		case "cornell-boxes":
 			fmt.Println("Using Cornell scene with boxes...")
-			sceneObj = scene.NewCornellScene(scene.CornellBoxes)
+			sceneObj = scene.NewCornellScene(scene.CornellBoxes, scene.CornellQuadLight)
 		case "spheregrid":
 			fmt.Println("Using sphere grid scene...")
 			sceneObj = scene.NewSphereGridScene(20, "metallic") // Default grid size and material

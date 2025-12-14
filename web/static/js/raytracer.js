@@ -414,38 +414,19 @@ class ProgressiveRaytracer {
           adaptiveThreshold: document.getElementById('adaptiveThreshold').value,
           integrator: document.getElementById('integrator').value
       };
-      
-      // Add scene-specific parameters
-      const cornellGeometry = document.getElementById('cornellGeometry');
-      if (cornellGeometry) {
-          params.cornellGeometry = cornellGeometry.value;
-      }
-      
-      const sphereGridSize = document.getElementById('sphereGridSize');
-      if (sphereGridSize) {
-          params.sphereGridSize = sphereGridSize.value;
-      }
-      
-      const materialFinish = document.getElementById('materialFinish');
-      if (materialFinish) {
-          params.materialFinish = materialFinish.value;
-      }
-      
-      const sphereComplexity = document.getElementById('sphereComplexity');
-      if (sphereComplexity) {
-          params.sphereComplexity = sphereComplexity.value;
-      }
-      
-      const dragonMaterialFinish = document.getElementById('dragonMaterialFinish');
-      if (dragonMaterialFinish) {
-          params.dragonMaterialFinish = dragonMaterialFinish.value;
+
+      // Dynamically add all scene-specific parameters from the sceneOptions container
+      const sceneOptionsContainer = document.getElementById('sceneOptions');
+      if (sceneOptionsContainer) {
+          // Get all input and select elements within sceneOptions
+          const sceneInputs = sceneOptionsContainer.querySelectorAll('input, select');
+          sceneInputs.forEach(input => {
+              if (input.id) {
+                  params[input.id] = input.value;
+              }
+          });
       }
 
-      const lightType = document.getElementById('lightType');
-      if (lightType) {
-          params.lightType = lightType.value;
-      }
-      
       return params;
   }
 

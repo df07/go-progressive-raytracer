@@ -103,7 +103,7 @@ func TestCornellPBRTSceneComparison(t *testing.T) {
 	}
 
 	// Load Go Cornell scene
-	goScene := NewCornellScene(CornellEmpty)
+	goScene := NewCornellScene(CornellEmpty, CornellQuadLight)
 
 	// Compare basic properties - Go scene uses camera config for dimensions
 	expectedWidth := 400

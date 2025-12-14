@@ -48,6 +48,7 @@ type RenderRequest struct {
 
 	// Scene-specific configuration
 	CornellGeometry      string           `json:"cornellGeometry"`      // Cornell box geometry type: "spheres", "boxes", "empty"
+	CornellLight         string           `json:"cornellLight"`         // Cornell box light type: "quad", "point", "sphere"
 	SphereGridSize       int              `json:"sphereGridSize"`       // Sphere grid size (e.g., 10, 20, 100)
 	MaterialFinish       string           `json:"materialFinish"`       // Material finish for sphere grid: "metallic", "matte", "glossy", "glass", "mirror", "mixed"
 	SphereComplexity     int              `json:"sphereComplexity"`     // Triangle mesh sphere complexity
@@ -177,6 +178,12 @@ func (s *Server) parseCommonSceneParams(r *http.Request, req *RenderRequest) err
 		req.CornellGeometry = "boxes" // Default
 	}
 
+	// Parse Cornell light type
+	req.CornellLight = r.URL.Query().Get("cornellLight")
+	if req.CornellLight == "" {
+		req.CornellLight = "quad" // Default
+	}
+
 	// Parse sphere grid size
 	if req.SphereGridSize, err = parseIntParam(r.URL.Query(), "sphereGridSize", 20, 5, 200); err != nil {
 		return err
@@ -284,7 +291,19 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 		default: // "spheres" or any other value
 			geometryType = scene.CornellSpheres
 		}
-		return scene.NewCornellScene(geometryType, cameraOverride)
+
+		// Parse Cornell light type
+		var lightType scene.CornellLightType
+		switch req.CornellLight {
+		case "point":
+			lightType = scene.CornellPointLight
+		case "sphere":
+			lightType = scene.CornellSphereLight
+		default: // "quad" or any other value
+			lightType = scene.CornellQuadLight
+		}
+
+		return scene.NewCornellScene(geometryType, lightType, cameraOverride)
 	case "basic":
 		return scene.NewDefaultScene(cameraOverride)
 	case "sphere-grid":
@@ -304,18 +323,18 @@ func (s *Server) createScene(req *RenderRequest, configOnly bool, logger core.Lo
 	case "cornell-pbrt":
 		if configOnly {
 			// For config-only requests, return a basic cornell scene for dimensions
-			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
+			return scene.NewCornellScene(scene.CornellEmpty, scene.CornellQuadLight, cameraOverride)
 		}
 		// Load actual PBRT scene
 		parsedScene, err := loaders.LoadPBRT("scenes/cornell-empty.pbrt")
 		if err != nil {
 			log.Printf("Failed to load PBRT file: %v", err)
-			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
+			return scene.NewCornellScene(scene.CornellEmpty, scene.CornellQuadLight, cameraOverride)
 		}
 		pbrtScene, err := scene.NewPBRTScene(parsedScene, cameraOverride)
 		if err != nil {
 			log.Printf("Failed to create PBRT scene: %v", err)
-			return scene.NewCornellScene(scene.CornellEmpty, cameraOverride)
+			return scene.NewCornellScene(scene.CornellEmpty, scene.CornellQuadLight, cameraOverride)
 		}
 		return pbrtScene
 	default:
@@ -437,6 +456,11 @@ func (s *Server) handleSceneConfig(w http.ResponseWriter, r *http.Request) {
 				"type":    "select",
 				"options": []string{"spheres", "boxes", "empty"},
 				"default": "boxes",
+			},
+			"cornellLight": map[string]interface{}{
+				"type":    "select",
+				"options": []string{"quad", "point", "sphere"},
+				"default": "quad",
 			},
 		}
 	case "sphere-grid":
