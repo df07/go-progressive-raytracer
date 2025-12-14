@@ -159,6 +159,99 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 			},
 			tolerance: 15.0, // Keeping high tolerance for now as we know it fails
 		},
+		{
+			name: "Cornell Box (Point Light)",
+			createScene: func() *scene.Scene {
+				// Standard Cornell Box but with Point Light instead of Quad Light
+				// Room dimensions: 2x2x2 centered at (0,1,0)
+
+				// Materials
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+				red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+				green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+
+				// Walls
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				ceiling := geometry.NewQuad(core.NewVec3(-1, 2, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+				leftWall := geometry.NewQuad(core.NewVec3(1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), red)     // Red wall on left (x=1)
+				rightWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), green) // Green wall on right (x=-1)
+
+				// Point Light at ceiling center
+				intensity := core.NewVec3(15.0, 15.0, 15.0) // Adjusted intensity for point light
+				light := lights.NewPointSpotLight(
+					core.NewVec3(0, 1.9, 0),
+					core.NewVec3(0, -1, 0),
+					intensity,
+					180.0,
+					0.0,
+				)
+
+				ls := []lights.Light{light}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3), // Backed up to see more
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, ceiling, backWall, leftWall, rightWall},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 5.0,
+		},
+		{
+			name: "Cornell Box (Sphere Light)",
+			createScene: func() *scene.Scene {
+				// Standard Cornell Box but with Sphere Light instead of Quad Light
+
+				// Materials
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+				red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+				green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+				lightMat := material.NewEmissive(core.NewVec3(15, 15, 15))
+
+				// Walls
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				ceiling := geometry.NewQuad(core.NewVec3(-1, 2, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+				leftWall := geometry.NewQuad(core.NewVec3(1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), red)
+				rightWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), green)
+
+				// Sphere Light at ceiling center
+				sphereLight := lights.NewSphereLight(core.NewVec3(0, 1.7, 0), 0.25, lightMat)
+
+				ls := []lights.Light{sphereLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, ceiling, backWall, leftWall, rightWall, sphereLight},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 5.0,
+		},
 	}
 
 	for _, tt := range tests {
