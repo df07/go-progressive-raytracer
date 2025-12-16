@@ -23,9 +23,14 @@ func (dslm *discSpotLightMaterial) Scatter(rayIn core.Ray, hit material.SurfaceI
 }
 
 // Emit implements the Emitter interface with directional spot light falloff
-func (dslm *discSpotLightMaterial) Emit(rayIn core.Ray) core.Vec3 {
+func (dslm *discSpotLightMaterial) Emit(rayIn core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Calculate directional emission for indirect rays (caustics)
 	// Check if we're hitting the "back" face of the disc (the emitting side)
+
+	// Only emit from the front face
+	if hit != nil && !hit.FrontFace {
+		return core.NewVec3(0, 0, 0)
+	}
 
 	// The ray direction should be roughly opposite to the spot direction for proper emission
 	rayDirection := rayIn.Direction
@@ -234,10 +239,10 @@ func (dsl *DiscSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 }
 
 // Emit implements the Light interface - returns material emission
-func (dsl *DiscSpotLight) Emit(ray core.Ray) core.Vec3 {
+func (dsl *DiscSpotLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Spot lights emit according to their material
 	if emitter, isEmissive := dsl.discLight.Material.(material.Emitter); isEmissive {
-		return emitter.Emit(ray)
+		return emitter.Emit(ray, hit)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

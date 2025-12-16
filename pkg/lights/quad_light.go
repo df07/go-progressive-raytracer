@@ -63,8 +63,18 @@ func (ql *QuadLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 
 	solidAnglePDF := pdf * distance * distance / cosTheta
 
-	// Get emission from this light
-	emission := ql.Emit(core.NewRay(point, direction))
+	// Check if we're sampling from the front face
+	// direction is FROM shading point TO light, which is the ray direction hitting the light
+	// Front face when ray direction opposes the normal (dot < 0)
+	isFrontFace := direction.Dot(ql.Normal) < 0
+
+	// Only emit from front face
+	var emission core.Vec3
+	if isFrontFace {
+		emission = ql.Emit(core.NewRay(point, direction), nil)
+	} else {
+		emission = core.Vec3{X: 0, Y: 0, Z: 0}
+	}
 
 	return LightSample{
 		Point:     samplePoint,
@@ -119,7 +129,7 @@ func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	directionPDF := cosTheta / math.Pi
 
 	// Get emission from this light
-	emission := ql.Emit(core.NewRay(point, emissionDir))
+	emission := ql.Emit(core.NewRay(point, emissionDir), nil)
 
 	return EmissionSample{
 		Point:        point,
@@ -174,10 +184,10 @@ func (ql *QuadLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 }
 
 // Emit implements the Light interface - returns material emission
-func (ql *QuadLight) Emit(ray core.Ray) core.Vec3 {
+func (ql *QuadLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Area lights emit according to their material
 	if emitter, isEmissive := ql.Material.(material.Emitter); isEmissive {
-		return emitter.Emit(ray)
+		return emitter.Emit(ray, hit)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

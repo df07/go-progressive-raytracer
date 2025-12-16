@@ -52,7 +52,7 @@ func (pt *PathTracingIntegrator) rayColorRecursive(ray core.Ray, scene *scene.Sc
 		var totalEmission core.Vec3
 		for _, light := range ls {
 			if light.Type() == lights.LightTypeInfinite {
-				totalEmission = totalEmission.Add(light.Emit(ray))
+				totalEmission = totalEmission.Add(light.Emit(ray, nil))
 			}
 		}
 
@@ -107,7 +107,7 @@ func (pt *PathTracingIntegrator) calculateDiffuseColor(scatter material.ScatterR
 // getEmittedLight returns the emitted light from a material if it's emissive
 func getEmittedLight(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	if emitter, isEmissive := hit.Material.(material.Emitter); isEmissive {
-		return emitter.Emit(ray)
+		return emitter.Emit(ray, hit)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

@@ -218,7 +218,7 @@ func (bdpt *BDPTIntegrator) extendPath(path *Path, currentRay core.Ray, beta cor
 				for _, light := range ls {
 					// Only check infinite lights when we miss all geometry
 					if light.Type() == lights.LightTypeInfinite {
-						emission := light.Emit(currentRay)
+						emission := light.Emit(currentRay, nil)
 						totalEmission = totalEmission.Add(emission)
 					}
 				}

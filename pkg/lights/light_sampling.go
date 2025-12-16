@@ -66,7 +66,7 @@ func SampleEmissionDirection(point core.Vec3, normal core.Vec3, areaPDF float64,
 	// Get emission from material
 	var emission core.Vec3
 	if emitter, ok := mat.(material.Emitter); ok {
-		emission = emitter.Emit(core.NewRay(point, emissionDir))
+		emission = emitter.Emit(core.NewRay(point, emissionDir), nil)
 	}
 
 	return EmissionSample{

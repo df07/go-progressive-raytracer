@@ -62,7 +62,7 @@ func (dl *DiscLight) Sample(point core.Vec3, normal core.Vec3, sample core.Vec2)
 	}
 
 	// Get emission from this light
-	emission := dl.Emit(core.NewRay(point, dirNormalized))
+	emission := dl.Emit(core.NewRay(point, dirNormalized), nil)
 
 	return LightSample{
 		Point:     samplePoint,
@@ -126,10 +126,10 @@ func (dl *DiscLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 }
 
 // Emit implements the Light interface - returns material emission
-func (dl *DiscLight) Emit(ray core.Ray) core.Vec3 {
+func (dl *DiscLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Area lights emit according to their material
 	if emitter, isEmissive := dl.Material.(material.Emitter); isEmissive {
-		return emitter.Emit(ray)
+		return emitter.Emit(ray, hit)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

@@ -193,6 +193,320 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 			},
 			tolerance: 5.0, // Lower tolerance - sphere light should work correctly
 		},
+		{
+			name: "Cornell Box with Infinite Light",
+			createScene: func() *scene.Scene {
+				// Cornell Box with both quad light AND infinite environment light
+				// This tests if adding infinite light changes the behavior
+
+				// Materials
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+				red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+				green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+
+				// Walls
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				ceiling := geometry.NewQuad(core.NewVec3(-1, 2, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+				leftWall := geometry.NewQuad(core.NewVec3(1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), red)
+				rightWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), green)
+
+				// Quad Light
+				lightEmission := core.NewVec3(15, 15, 15)
+				lightMat := material.NewEmissive(lightEmission)
+				lightCorner := core.NewVec3(-0.25, 1.98, -0.25)
+				lightU := core.NewVec3(0.5, 0, 0)
+				lightV := core.NewVec3(0, 0, 0.5)
+				quadLight := lights.NewQuadLight(lightCorner, lightU, lightV, lightMat)
+
+				// Infinite environment light (moderate intensity to not overwhelm the quad light)
+				infiniteLight := lights.NewUniformInfiniteLight(core.NewVec3(1, 1, 10))
+
+				ls := []lights.Light{quadLight, infiniteLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, ceiling, backWall, leftWall, rightWall, quadLight.Quad},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 15.0,
+		},
+		{
+			name: "Floor Only with Quad Light",
+			createScene: func() *scene.Scene {
+				// Just a floor quad with a quad light above it
+				// No walls or ceiling - tests if enclosure matters
+
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+
+				// Floor only
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+
+				// Quad Light hovering above
+				lightEmission := core.NewVec3(15, 15, 15)
+				lightMat := material.NewEmissive(lightEmission)
+				lightCorner := core.NewVec3(-0.25, 1.98, -0.25)
+				lightU := core.NewVec3(0.5, 0, 0)
+				lightV := core.NewVec3(0, 0, 0.5)
+				quadLight := lights.NewQuadLight(lightCorner, lightU, lightV, lightMat)
+
+				ls := []lights.Light{quadLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, quadLight.Quad},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 15.0,
+		},
+		{
+			name: "Floor and Back Wall Only",
+			createScene: func() *scene.Scene {
+				// Floor + back wall only (partial enclosure)
+				// Tests if partial enclosure shows the issue
+
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+
+				// Floor and back wall
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+
+				// Quad Light
+				lightEmission := core.NewVec3(15, 15, 15)
+				lightMat := material.NewEmissive(lightEmission)
+				lightCorner := core.NewVec3(-0.25, 1.98, -0.25)
+				lightU := core.NewVec3(0.5, 0, 0)
+				lightV := core.NewVec3(0, 0, 0.5)
+				quadLight := lights.NewQuadLight(lightCorner, lightU, lightV, lightMat)
+
+				ls := []lights.Light{quadLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, backWall, quadLight.Quad},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 15.0,
+		},
+		{
+			name: "Full Cornell Box without Ceiling",
+			createScene: func() *scene.Scene {
+				// All walls but no ceiling - light can escape upward
+
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+				red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+				green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+
+				// All walls except ceiling
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+				leftWall := geometry.NewQuad(core.NewVec3(1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), red)
+				rightWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), green)
+
+				// Quad Light (same position as full Cornell Box)
+				lightEmission := core.NewVec3(15, 15, 15)
+				lightMat := material.NewEmissive(lightEmission)
+				lightCorner := core.NewVec3(-0.25, 1.98, -0.25)
+				lightU := core.NewVec3(0.5, 0, 0)
+				lightV := core.NewVec3(0, 0, 0.5)
+				quadLight := lights.NewQuadLight(lightCorner, lightU, lightV, lightMat)
+
+				ls := []lights.Light{quadLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, backWall, leftWall, rightWall, quadLight.Quad},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 15.0,
+		},
+		{
+			name: "Cornell Box - Quad Light at Center",
+			createScene: func() *scene.Scene {
+				// Cornell Box with quad light in center of room instead of near ceiling
+
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+				red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+				green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+
+				// Full Cornell Box walls
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				ceiling := geometry.NewQuad(core.NewVec3(-1, 2, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+				leftWall := geometry.NewQuad(core.NewVec3(1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), red)
+				rightWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), green)
+
+				// Quad Light at CENTER of room (y=1.0 instead of 1.98)
+				lightEmission := core.NewVec3(15, 15, 15)
+				lightMat := material.NewEmissive(lightEmission)
+				lightCorner := core.NewVec3(-0.25, 1.0, -0.25)
+				lightU := core.NewVec3(0.5, 0, 0)
+				lightV := core.NewVec3(0, 0, 0.5)
+				quadLight := lights.NewQuadLight(lightCorner, lightU, lightV, lightMat)
+
+				ls := []lights.Light{quadLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, ceiling, backWall, leftWall, rightWall, quadLight.Quad},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 15.0,
+		},
+		{
+			name: "Cornell Box - Quad Light on Back Wall",
+			createScene: func() *scene.Scene {
+				// Cornell Box with quad light on the back wall
+
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+				red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+				green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+
+				// Full Cornell Box walls
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				ceiling := geometry.NewQuad(core.NewVec3(-1, 2, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+				leftWall := geometry.NewQuad(core.NewVec3(1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), red)
+				rightWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), green)
+
+				// Quad Light on back wall (z=-0.98, back wall is at z=-1.0)
+				// Light is oriented to face forward (toward camera)
+				lightEmission := core.NewVec3(15, 15, 15)
+				lightMat := material.NewEmissive(lightEmission)
+				lightCorner := core.NewVec3(-0.25, 0.75, -0.98)
+				lightU := core.NewVec3(0.5, 0, 0) // Horizontal
+				lightV := core.NewVec3(0, 0.5, 0) // Vertical
+				quadLight := lights.NewQuadLight(lightCorner, lightU, lightV, lightMat)
+
+				ls := []lights.Light{quadLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, ceiling, backWall, leftWall, rightWall, quadLight.Quad},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 15.0,
+		},
+		{
+			name: "Cornell Box - Sphere Light at Center",
+			createScene: func() *scene.Scene {
+				// Cornell Box with sphere light at center of room
+
+				white := material.NewLambertian(core.NewVec3(0.73, 0.73, 0.73))
+				red := material.NewLambertian(core.NewVec3(0.65, 0.05, 0.05))
+				green := material.NewLambertian(core.NewVec3(0.12, 0.45, 0.15))
+
+				// Full Cornell Box walls
+				floor := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				ceiling := geometry.NewQuad(core.NewVec3(-1, 2, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 0, 2), white)
+				backWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(2, 0, 0), core.NewVec3(0, 2, 0), white)
+				leftWall := geometry.NewQuad(core.NewVec3(1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), red)
+				rightWall := geometry.NewQuad(core.NewVec3(-1, 0, -1), core.NewVec3(0, 0, 2), core.NewVec3(0, 2, 0), green)
+
+				// Sphere Light at center (y=1.0)
+				lightMat := material.NewEmissive(core.NewVec3(15, 15, 15))
+				sphereLight := lights.NewSphereLight(core.NewVec3(0, 1.0, 0), 0.25, lightMat)
+
+				ls := []lights.Light{sphereLight}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 1, 3),
+					LookAt: core.NewVec3(0, 1, 0),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 40.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{floor, ceiling, backWall, leftWall, rightWall, sphereLight.Sphere},
+					Lights:         ls,
+					LightSampler:   lights.NewUniformLightSampler(ls, 10),
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 15.0,
+		},
 	}
 
 	for _, tt := range tests {

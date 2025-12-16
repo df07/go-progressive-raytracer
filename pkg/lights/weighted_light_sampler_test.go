@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // MockLight implements the Light interface for testing
@@ -47,7 +48,7 @@ func (ml *MockLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 	return ml.pdf
 }
 
-func (ml *MockLight) Emit(ray core.Ray) core.Vec3 {
+func (ml *MockLight) Emit(ray core.Ray, si *material.SurfaceInteraction) core.Vec3 {
 	// Mock light doesn't emit in arbitrary directions (finite light)
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

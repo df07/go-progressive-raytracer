@@ -345,7 +345,7 @@ func TestQuadLight_Emit_WithEmissiveMaterial(t *testing.T) {
 	light := NewQuadLight(corner, u, v, emissiveMat)
 
 	ray := core.NewRay(core.NewVec3(0, 0, 1), core.NewVec3(0, 0, -1))
-	result := light.Emit(ray)
+	result := light.Emit(ray, nil)
 
 	if result.X != emission.X || result.Y != emission.Y || result.Z != emission.Z {
 		t.Errorf("Emit incorrect: got %v, expected %v", result, emission)
@@ -361,7 +361,7 @@ func TestQuadLight_Emit_WithNonEmissiveMaterial(t *testing.T) {
 	light := NewQuadLight(corner, u, v, lambertian)
 
 	ray := core.NewRay(core.NewVec3(0, 0, 1), core.NewVec3(0, 0, -1))
-	result := light.Emit(ray)
+	result := light.Emit(ray, nil)
 
 	expectedEmission := core.Vec3{X: 0, Y: 0, Z: 0}
 	if result != expectedEmission {

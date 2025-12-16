@@ -232,7 +232,7 @@ func TestPathTracingMissedRay(t *testing.T) {
 	}
 
 	// Should be similar to what infinite light returns
-	expectedBg := scene.Lights[0].Emit(ray)
+	expectedBg := scene.Lights[0].Emit(ray, nil)
 	tolerance := 0.01
 	if math.Abs(color.X-expectedBg.X) > tolerance ||
 		math.Abs(color.Y-expectedBg.Y) > tolerance ||

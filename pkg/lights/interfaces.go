@@ -1,6 +1,9 @@
 package lights
 
-import "github.com/df07/go-progressive-raytracer/pkg/core"
+import (
+	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
+)
 
 type LightType string
 
@@ -32,7 +35,8 @@ type Light interface {
 
 	// Emit evaluates emission in the direction of the given ray
 	// For finite lights, returns zero. For infinite lights, returns emission based on ray direction.
-	Emit(ray core.Ray) core.Vec3
+	// hit can be nil for lights that don't need surface information
+	Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3
 }
 
 // LightSample contains information about a sampled point on a light

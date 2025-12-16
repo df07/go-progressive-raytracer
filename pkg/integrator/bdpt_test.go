@@ -768,7 +768,7 @@ func createTestCameraPathWithLight(materials []material.Material, positions []co
 			// Set EmittedLight using the same pattern as BDPT - use incoming ray
 			incomingRay := core.NewRayTo(positions[i-1], positions[i])
 			if emitter, isEmissive := mat.(material.Emitter); isEmissive {
-				vertices[i].EmittedLight = emitter.Emit(incomingRay)
+				vertices[i].EmittedLight = emitter.Emit(incomingRay, vertices[i].SurfaceInteraction)
 			}
 		}
 	}

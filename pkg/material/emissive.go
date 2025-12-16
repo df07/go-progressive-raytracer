@@ -22,7 +22,12 @@ func (e *Emissive) Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.
 }
 
 // Emit returns the emitted light for this material
-func (e *Emissive) Emit(rayIn core.Ray) core.Vec3 {
+// Only emits from the front face to avoid double-counting in path tracing
+func (e *Emissive) Emit(rayIn core.Ray, hit *SurfaceInteraction) core.Vec3 {
+	// Only emit from the front face
+	if hit != nil && !hit.FrontFace {
+		return core.Vec3{X: 0, Y: 0, Z: 0}
+	}
 	return e.Emission
 }
 

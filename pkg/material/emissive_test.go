@@ -83,7 +83,7 @@ func TestEmissive_Emit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			emissive := NewEmissive(tt.emission)
-			emitted := emissive.Emit(core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0)))
+			emitted := emissive.Emit(core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0)), nil)
 
 			// Verify emission matches what was set
 			if abs(emitted.X-tt.emission.X) > tolerance {

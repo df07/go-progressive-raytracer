@@ -65,7 +65,7 @@ func (sl *SphereLight) sampleUniform(point core.Vec3, sample core.Vec2) LightSam
 	pdf := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
 
 	// Get emission from this light
-	emission := sl.Emit(core.NewRay(point, dirNormalized))
+	emission := sl.Emit(core.NewRay(point, dirNormalized), nil)
 
 	return LightSample{
 		Point:     samplePoint,
@@ -128,7 +128,7 @@ func (sl *SphereLight) sampleVisible(point core.Vec3, sample core.Vec2) LightSam
 	pdf := 1.0 / (2.0 * math.Pi * (1.0 - cosThetaMax))
 
 	// Get emission from this light
-	emission := sl.Emit(ray)
+	emission := sl.Emit(ray, nil)
 
 	return LightSample{
 		Point:     hitRecord.Point,
@@ -204,10 +204,10 @@ func (sl *SphereLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64
 }
 
 // Emit implements the Light interface - returns material emission
-func (sl *SphereLight) Emit(ray core.Ray) core.Vec3 {
+func (sl *SphereLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Area lights emit according to their material
 	if emitter, isEmissive := sl.Material.(material.Emitter); isEmissive {
-		return emitter.Emit(ray)
+		return emitter.Emit(ray, hit)
 	}
 	return core.Vec3{X: 0, Y: 0, Z: 0}
 }

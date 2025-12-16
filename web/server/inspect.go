@@ -91,7 +91,7 @@ func (s *Server) extractMaterialInfo(mat material.Material) (string, map[string]
 	default:
 		// Check if it's emissive using interface
 		if emitter, ok := mat.(material.Emitter); ok {
-			emission := emitter.Emit(core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0)))
+			emission := emitter.Emit(core.NewRay(core.NewVec3(0, 0, 0), core.NewVec3(1, 0, 0)), nil)
 			properties["emission"] = [3]float64{emission.X, emission.Y, emission.Z}
 			properties["color"] = fmt.Sprintf("#%02x%02x%02x",
 				int(emission.X*255), int(emission.Y*255), int(emission.Z*255))

@@ -28,7 +28,7 @@ type Material interface {
 
 // Emitter interface for materials that emit light
 type Emitter interface {
-	Emit(rayIn core.Ray) core.Vec3
+	Emit(rayIn core.Ray, hit *SurfaceInteraction) core.Vec3
 }
 
 // ScatterResult contains the result of material scattering

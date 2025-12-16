@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df07/go-progressive-raytracer/pkg/core"
+	"github.com/df07/go-progressive-raytracer/pkg/material"
 )
 
 // PointSpotLight represents a directional point spot light with cone angle and falloff
@@ -203,7 +204,7 @@ func (sl *PointSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 }
 
 // Emit implements the Light interface - point lights emit in all directions
-func (sl *PointSpotLight) Emit(ray core.Ray) core.Vec3 {
+func (sl *PointSpotLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Point lights don't have a material but emit their emission uniformly
 	return sl.emission
 }

@@ -19,8 +19,9 @@ func (gilm *gradientInfiniteLightMaterial) Scatter(rayIn core.Ray, hit material.
 }
 
 // Emit implements the Emitter interface with gradient emission based on ray direction
-func (gilm *gradientInfiniteLightMaterial) Emit(rayIn core.Ray) core.Vec3 {
+func (gilm *gradientInfiniteLightMaterial) Emit(rayIn core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Use ray direction to determine gradient position
+	// Infinite lights don't have a surface, so we ignore the hit parameter
 	direction := rayIn.Direction.Normalize()
 	t := 0.5 * (direction.Y + 1.0) // Map Y from [-1,1] to [0,1]
 	return gilm.bottomColor.Multiply(1.0 - t).Add(gilm.topColor.Multiply(t))
@@ -126,7 +127,7 @@ func (gil *GradientInfiniteLight) EmissionPDF(point core.Vec3, direction core.Ve
 }
 
 // Emit implements the Light interface - evaluates emission in ray direction
-func (gil *GradientInfiniteLight) Emit(ray core.Ray) core.Vec3 {
+func (gil *GradientInfiniteLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Use ray direction to determine gradient position
 	direction := ray.Direction.Normalize()
 	t := 0.5 * (direction.Y + 1.0) // Map Y from [-1,1] to [0,1]

@@ -18,8 +18,9 @@ func (uilm *uniformInfiniteLightMaterial) Scatter(rayIn core.Ray, hit material.S
 }
 
 // Emit implements the Emitter interface with uniform emission
-func (uilm *uniformInfiniteLightMaterial) Emit(rayIn core.Ray) core.Vec3 {
+func (uilm *uniformInfiniteLightMaterial) Emit(rayIn core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Uniform infinite light emits the same color in all directions
+	// Infinite lights don't have a surface, so we ignore the hit parameter
 	return uilm.emission
 }
 
@@ -113,7 +114,7 @@ func (uil *UniformInfiniteLight) EmissionPDF(point core.Vec3, direction core.Vec
 }
 
 // Emit implements the Light interface - evaluates emission in ray direction
-func (uil *UniformInfiniteLight) Emit(ray core.Ray) core.Vec3 {
+func (uil *UniformInfiniteLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Uniform infinite light emits the same color in all directions
 	return uil.emission
 }
