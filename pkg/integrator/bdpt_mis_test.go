@@ -187,7 +187,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			}),
 			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
 			s:             1, t: 2,
-			expectedWeight: 0.236901, // Actual calculated MIS weight
+			expectedWeight: 0.752119, // Actual calculated MIS weight (updated after PDF fix)
 			tolerance:      0.001,    // Very tight tolerance (0.1%)
 			description:    "Direct lighting: connect camera-hit surface to light",
 		},
@@ -203,7 +203,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			}),
 			sampledVertex: createSampledLightVertex(), // Direct lighting requires sampled light vertex
 			s:             1, t: 3,
-			expectedWeight: 0.071113, // Actual calculated MIS weight
+			expectedWeight: 0.583572, // Actual calculated MIS weight (updated after PDF fix)
 			tolerance:      0.001,    // Very tight tolerance (0.1%)
 			description:    "Connect light to second bounce of camera path",
 		},
@@ -331,7 +331,7 @@ func TestCalculateMISWeight(t *testing.T) {
 			}),
 			s: 1, t: 2,
 			sampledVertex:  createSampledLightVertex(), // Direct lighting requires sampled light vertex
-			expectedWeight: 0.194492,                   // Direct lighting with specular BRDF
+			expectedWeight: 0.444444,                   // Direct lighting with specular BRDF (updated after PDF fix)
 			tolerance:      0.001,
 			description:    "Direct lighting to perfect specular surface",
 		},
@@ -730,7 +730,7 @@ func TestCalculateVertexPdf(t *testing.T) {
 			},
 			prev:        nil,
 			next:        createTestVertex(core.NewVec3(0, 0, 0), core.NewVec3(0, 1, 0), false, false, nil),
-			expectedPdf: 0.0, // light PDF calculation returns 0 for this configuration
+			expectedPdf: 0.318310, // light PDF calculation (updated after PDF fix)
 			tolerance:   0.01,
 		},
 	}

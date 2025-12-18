@@ -265,18 +265,16 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene *s
 				// We apply cosThetaAtSurface later if to.IsOnSurface()
 				pdf = emissionPdf * invDist2
 			} else {
-				// Area Light: EmissionPDF is area PDF p(Pos)
-				// We need joint PDF p(Pos, Dir) = p(Pos) * p(Dir)
-				// For Lambertian: p(Dir) = cosTheta / pi
-				// p(z1) = p(Pos) * p(Dir) * cosTheta * cosThetaAtSurface / dist^2
-				// = EmissionPDF * (cosTheta/pi) * cosTheta * invDist2 * cosThetaAtSurface
-
+				// Area Light: Compute directional PDF directly (PBRT approach)
+				// For Lambertian emission: pdfDir = cosTheta / pi
+				// Formula: pdf = pdfDir * invDist2 * cosThetaAtReceiver
 				cosTheta := w.Dot(curr.Normal)
 				if cosTheta <= 0 {
 					return 0
 				}
 
-				pdf = emissionPdf * cosTheta * cosTheta * invDist2 / math.Pi
+				pdfDir := cosTheta / math.Pi
+				pdf = pdfDir * invDist2
 			}
 		}
 	}

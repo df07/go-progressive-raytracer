@@ -426,8 +426,8 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 				s.Preprocess()
 				return s
 			},
-			tolerance: 15.0, // This test will fail - bug demonstration
-			skip:      true, // Skip by default - unskip to demonstrate scale-dependent bug
+			tolerance: 15.0,  // This test will fail - bug demonstration
+			skip:      false, // Skip by default - unskip to demonstrate scale-dependent bug
 		},
 	}
 
