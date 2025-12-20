@@ -300,7 +300,7 @@ func TestQuadLight_EmissionPDF_PointValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pdf := light.EmissionPDF(tt.point, tt.direction)
+			pdf, _ := light.PDF_Le(tt.point, tt.direction)
 
 			if !tt.expectPDF {
 				if pdf != 0 {
@@ -512,7 +512,7 @@ func TestQuadLight_EmissionSampling_ConsistencyWithEmissionPDF(t *testing.T) {
 		sample := light.SampleEmission(sampler.Get2D(), sampler.Get2D())
 
 		// Calculate emission PDF for the same point and direction
-		calculatedAreaPDF := light.EmissionPDF(sample.Point, sample.Direction)
+		calculatedAreaPDF, _ := light.PDF_Le(sample.Point, sample.Direction)
 
 		// Area PDFs should match
 		if math.Abs(sample.AreaPDF-calculatedAreaPDF) > tolerance {

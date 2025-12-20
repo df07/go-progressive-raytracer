@@ -121,7 +121,7 @@ func TestUniformInfiniteLight_EmissionPDF(t *testing.T) {
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)
 
-	pdf := light.EmissionPDF(point, direction)
+	pdf, _ := light.PDF_Le(point, direction)
 	expectedPDF := 1.0 / (math.Pi * worldRadius * worldRadius)
 
 	if math.Abs(pdf-expectedPDF) > 1e-10 {
@@ -135,7 +135,7 @@ func TestUniformInfiniteLight_EmissionPDF_ZeroRadius(t *testing.T) {
 	point := core.NewVec3(0, 0, 0)
 	direction := core.NewVec3(1, 0, 0)
 
-	pdf := light.EmissionPDF(point, direction)
+	pdf, _ := light.PDF_Le(point, direction)
 
 	if pdf != 0.0 {
 		t.Errorf("Expected zero PDF for zero radius, got %f", pdf)

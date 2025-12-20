@@ -117,15 +117,6 @@ func (gil *GradientInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDi
 	}
 }
 
-// EmissionPDF implements the Light interface - calculates PDF for BDPT MIS calculations
-func (gil *GradientInfiniteLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	// PBRT: For infinite lights, return planar sampling density
-	if gil.worldRadius <= 0 {
-		return 0.0
-	}
-	return 1.0 / (math.Pi * gil.worldRadius * gil.worldRadius)
-}
-
 // PDF_Le implements the Light interface - returns both position and directional PDFs
 func (gil *GradientInfiniteLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
 	// For infinite lights, position PDF is planar sampling density

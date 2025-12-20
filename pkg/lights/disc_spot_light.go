@@ -219,25 +219,6 @@ func (dsl *DiscSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection 
 	}
 }
 
-// EmissionPDF implements the Light interface - calculates PDF for emission sampling
-func (dsl *DiscSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	// First check if point is on disc surface
-	basePDF := dsl.discLight.EmissionPDF(point, direction)
-	if basePDF == 0.0 {
-		return 0.0 // Point not on disc or direction below surface
-	}
-
-	// Check if direction is within the spot cone
-	cosAngleToSpot := direction.Dot(dsl.direction)
-	if cosAngleToSpot < dsl.cosTotalWidth {
-		return 0.0 // Direction outside spot cone
-	}
-
-	// Return area PDF only (direction PDF handled separately in new interface)
-	areaPDF := 1.0 / (math.Pi * dsl.discLight.Radius * dsl.discLight.Radius)
-	return areaPDF
-}
-
 // PDF_Le implements the Light interface - returns both position and directional PDFs
 func (dsl *DiscSpotLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
 	// Delegate to underlying disc light for position PDF and base directional PDF

@@ -44,10 +44,6 @@ func (ml *MockLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	}
 }
 
-func (ml *MockLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	return ml.pdf
-}
-
 func (ml *MockLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
 	// Mock light returns same PDF for both (test convenience)
 	return ml.pdf, ml.pdf

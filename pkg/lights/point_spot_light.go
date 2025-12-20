@@ -186,23 +186,6 @@ func (sl *PointSpotLight) SampleEmission(samplePoint core.Vec2, sampleDirection 
 	}
 }
 
-// EmissionPDF implements the Light interface - calculates PDF for emission sampling
-func (sl *PointSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	// Check if point is at the light position
-	if point.Subtract(sl.position).Length() > 0.001 {
-		return 0.0 // Point not at light position
-	}
-
-	// Check if direction is within the spot cone
-	cosAngleToSpot := direction.Dot(sl.direction)
-	if cosAngleToSpot < sl.cosTotalWidth {
-		return 0.0 // Direction outside spot cone
-	}
-
-	// Use shared cone PDF calculation
-	return UniformConePDF(sl.cosTotalWidth)
-}
-
 // PDF_Le implements the Light interface - returns both position and directional PDFs
 func (sl *PointSpotLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
 	// Check if point is at the light position

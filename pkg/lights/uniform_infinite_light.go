@@ -104,15 +104,6 @@ func (uil *UniformInfiniteLight) SampleEmission(samplePoint core.Vec2, sampleDir
 	}
 }
 
-// EmissionPDF implements the Light interface - calculates PDF for BDPT MIS calculations
-func (uil *UniformInfiniteLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	// PBRT: For infinite lights, return planar sampling density
-	if uil.worldRadius <= 0 {
-		return 0.0
-	}
-	return 1.0 / (math.Pi * uil.worldRadius * uil.worldRadius)
-}
-
 // PDF_Le implements the Light interface - returns both position and directional PDFs
 func (uil *UniformInfiniteLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
 	// For infinite lights, position PDF is planar sampling density

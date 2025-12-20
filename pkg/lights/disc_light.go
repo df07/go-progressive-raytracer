@@ -108,23 +108,6 @@ func (dl *DiscLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	return SampleEmissionDirection(point, normal, areaPDF, dl.Material, sampleDirection)
 }
 
-// EmissionPDF implements the Light interface - calculates PDF for emission sampling
-func (dl *DiscLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	// Validate point is on disc surface
-	if !validatePointOnDisc(point, dl.Center, dl.Normal, dl.Radius, 0.001) {
-		return 0.0
-	}
-
-	// Check if direction is in correct hemisphere
-	if direction.Dot(dl.Normal) <= 0 {
-		return 0.0
-	}
-
-	// Return area PDF only (direction PDF handled separately in new interface)
-	areaPDF := 1.0 / (math.Pi * dl.Radius * dl.Radius)
-	return areaPDF
-}
-
 // PDF_Le implements the Light interface - returns both position and directional PDFs
 func (dl *DiscLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
 	// Validate point is on disc surface

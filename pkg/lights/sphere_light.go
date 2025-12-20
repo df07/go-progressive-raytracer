@@ -183,26 +183,6 @@ func (sl *SphereLight) SampleEmission(samplePoint core.Vec2, sampleDirection cor
 	return SampleEmissionDirection(point, normal, areaPDF, sl.Material, sampleDirection)
 }
 
-// EmissionPDF implements the Light interface - calculates PDF for emission sampling
-func (sl *SphereLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	// Validate point is on sphere surface
-	if !validatePointOnSphere(point, sl.Center, sl.Radius, 0.001) {
-		return 0.0
-	}
-
-	// Calculate surface normal
-	normal := point.Subtract(sl.Center).Normalize()
-
-	// Check if direction is in correct hemisphere
-	if direction.Dot(normal) <= 0 {
-		return 0.0
-	}
-
-	// Return area PDF only (direction PDF handled separately in new interface)
-	areaPDF := 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
-	return areaPDF
-}
-
 // PDF_Le implements the Light interface - returns both position and directional PDFs
 func (sl *SphereLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
 	// Validate point is on sphere surface

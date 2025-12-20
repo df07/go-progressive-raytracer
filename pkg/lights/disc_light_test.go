@@ -322,7 +322,7 @@ func TestDiscLight_EmissionPDF(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pdf := light.EmissionPDF(tt.point, tt.direction)
+			pdf, _ := light.PDF_Le(tt.point, tt.direction)
 
 			if !tt.expectPDF {
 				if pdf != 0 {
@@ -392,8 +392,8 @@ func TestDiscLight_EmissionSampling_Coverage(t *testing.T) {
 			t.Errorf("Sample %d direction not in correct hemisphere", i)
 		}
 
-		// Verify area PDF consistency (EmissionPDF returns area-only PDF)
-		calculatedAreaPDF := light.EmissionPDF(sample.Point, sample.Direction)
+		// Verify area PDF consistency (PDF_Le returns area PDF as first value)
+		calculatedAreaPDF, _ := light.PDF_Le(sample.Point, sample.Direction)
 		if math.Abs(sample.AreaPDF-calculatedAreaPDF) > 1e-6 {
 			t.Errorf("Sample %d AreaPDF inconsistent: sample=%f, calculated=%f", i, sample.AreaPDF, calculatedAreaPDF)
 		}

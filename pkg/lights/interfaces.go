@@ -30,10 +30,6 @@ type Light interface {
 	// Returns EmissionSample with direction FROM light surface (for light transport)
 	SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample
 
-	// EmissionPDF calculates PDF for emission sampling - needed for BDPT MIS calculations
-	// DEPRECATED: Use PDF_Le instead for consistent PDF handling
-	EmissionPDF(point core.Vec3, direction core.Vec3) float64
-
 	// PDF_Le returns both position and directional PDFs for emission (PBRT-style interface)
 	// For area lights: pdfPos is probability per unit area, pdfDir is directional probability (cosine-weighted)
 	// For point lights: pdfPos is discrete (1.0), pdfDir is directional probability (uniform or cone)

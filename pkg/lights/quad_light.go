@@ -141,51 +141,9 @@ func (ql *QuadLight) SampleEmission(samplePoint core.Vec2, sampleDirection core.
 	}
 }
 
-// EmissionPDF implements the Light interface - calculates PDF for emission sampling
-func (ql *QuadLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
-	// Check if point is on quad surface by solving point = corner + alpha*u + beta*v
-	toPoint := point.Subtract(ql.Corner)
-
-	// Project onto u and v vectors to get parametric coordinates
-	uDotU := ql.U.Dot(ql.U)
-	vDotV := ql.V.Dot(ql.V)
-	uDotV := ql.U.Dot(ql.V)
-
-	if uDotU == 0 || vDotV == 0 {
-		return 0.0 // Degenerate quad
-	}
-
-	// Solve the 2x2 system for alpha and beta
-	det := uDotU*vDotV - uDotV*uDotV
-	if math.Abs(det) < 1e-8 {
-		return 0.0 // Degenerate or nearly parallel vectors
-	}
-
-	toDotU := toPoint.Dot(ql.U)
-	toDotV := toPoint.Dot(ql.V)
-
-	alpha := (vDotV*toDotU - uDotV*toDotV) / det
-	beta := (uDotU*toDotV - uDotV*toDotU) / det
-
-	// Check if point is within quad bounds
-	if alpha < 0 || alpha > 1 || beta < 0 || beta > 1 {
-		return 0.0 // Point outside quad
-	}
-
-	// Verify the point is actually on the quad plane
-	reconstructed := ql.Corner.Add(ql.U.Multiply(alpha)).Add(ql.V.Multiply(beta))
-	if reconstructed.Subtract(point).Length() > 0.001 {
-		return 0.0 // Point not on quad surface
-	}
-
-	// For BDPT, use area measure only (probability per unit area)
-	areaPDF := 1.0 / ql.Area
-	return areaPDF
-}
-
 // PDF_Le implements the Light interface - returns both position and directional PDFs
 func (ql *QuadLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
-	// Check if point is on quad surface (reuse validation logic from EmissionPDF)
+	// Check if point is on quad surface
 	toPoint := point.Subtract(ql.Corner)
 	uDotU := ql.U.Dot(ql.U)
 	vDotV := ql.V.Dot(ql.V)
