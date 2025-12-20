@@ -126,6 +126,20 @@ func (gil *GradientInfiniteLight) EmissionPDF(point core.Vec3, direction core.Ve
 	return 1.0 / (math.Pi * gil.worldRadius * gil.worldRadius)
 }
 
+// PDF_Le implements the Light interface - returns both position and directional PDFs
+func (gil *GradientInfiniteLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// For infinite lights, position PDF is planar sampling density
+	if gil.worldRadius <= 0 {
+		return 0.0, 0.0
+	}
+	pdfPos = 1.0 / (math.Pi * gil.worldRadius * gil.worldRadius)
+
+	// Directional PDF is uniform over the sphere
+	pdfDir = 1.0 / (4.0 * math.Pi)
+
+	return pdfPos, pdfDir
+}
+
 // Emit implements the Light interface - evaluates emission in ray direction
 func (gil *GradientInfiniteLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Use ray direction to determine gradient position

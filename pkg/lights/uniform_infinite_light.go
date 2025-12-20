@@ -113,6 +113,20 @@ func (uil *UniformInfiniteLight) EmissionPDF(point core.Vec3, direction core.Vec
 	return 1.0 / (math.Pi * uil.worldRadius * uil.worldRadius)
 }
 
+// PDF_Le implements the Light interface - returns both position and directional PDFs
+func (uil *UniformInfiniteLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// For infinite lights, position PDF is planar sampling density
+	if uil.worldRadius <= 0 {
+		return 0.0, 0.0
+	}
+	pdfPos = 1.0 / (math.Pi * uil.worldRadius * uil.worldRadius)
+
+	// Directional PDF is uniform over the sphere
+	pdfDir = 1.0 / (4.0 * math.Pi)
+
+	return pdfPos, pdfDir
+}
+
 // Emit implements the Light interface - evaluates emission in ray direction
 func (uil *UniformInfiniteLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Uniform infinite light emits the same color in all directions

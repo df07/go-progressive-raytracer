@@ -368,7 +368,12 @@ func createSceneWithLight(light lights.Light) *scene.Scene {
 // createTestVertex creates a test vertex with specified properties
 func createTestAreaLight() lights.Light {
 	emissiveMaterial := material.NewEmissive(core.NewVec3(5.0, 5.0, 5.0))
-	return lights.NewSphereLight(core.NewVec3(0, 1, 0), 0.1, emissiveMaterial)
+	// Create a quad light large enough to cover all test positions
+	// Test uses positions like (0, 2, -1), (-1, 2, -1), (1, 3, -1)
+	corner := core.NewVec3(-2, 2, -3) // Bottom-left corner at y=2
+	u := core.NewVec3(4, 0, 0)        // 4 units wide in X
+	v := core.NewVec3(0, 0, 4)        // 4 units deep in Z (normal will be downward)
+	return lights.NewQuadLight(corner, u, v, emissiveMaterial)
 }
 
 func createGlancingTestSceneWithMaterial(mat material.Material) *scene.Scene {
@@ -789,6 +794,11 @@ func createTestLightPath(materials []material.Material, positions []core.Vec3) P
 
 	// First vertex is always a light source
 	testLight := createTestAreaLight()
+
+	// Calculate the position PDF from the light (for quad: 1/area)
+	direction := core.NewVec3(0, -1, 0) // arbitrary direction for PDF query
+	pdfPos, _ := testLight.PDF_Le(positions[0], direction)
+
 	vertices[0] = Vertex{
 		SurfaceInteraction: &material.SurfaceInteraction{
 			Point:    positions[0],
@@ -799,7 +809,7 @@ func createTestLightPath(materials []material.Material, positions []core.Vec3) P
 		Light:          testLight,
 		LightIndex:     0,                           // Test light at index 0
 		Beta:           core.Vec3{X: 1, Y: 1, Z: 1}, // full light emission
-		AreaPdfForward: 0.25 / math.Pi,              // area light sampling
+		AreaPdfForward: pdfPos,                      // Use actual PDF from light
 		EmittedLight:   core.Vec3{X: 5, Y: 5, Z: 5},
 	}
 

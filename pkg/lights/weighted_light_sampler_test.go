@@ -48,6 +48,11 @@ func (ml *MockLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 	return ml.pdf
 }
 
+func (ml *MockLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// Mock light returns same PDF for both (test convenience)
+	return ml.pdf, ml.pdf
+}
+
 func (ml *MockLight) Emit(ray core.Ray, si *material.SurfaceInteraction) core.Vec3 {
 	// Mock light doesn't emit in arbitrary directions (finite light)
 	return core.Vec3{X: 0, Y: 0, Z: 0}

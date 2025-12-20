@@ -238,6 +238,27 @@ func (dsl *DiscSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 	return areaPDF
 }
 
+// PDF_Le implements the Light interface - returns both position and directional PDFs
+func (dsl *DiscSpotLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// Delegate to underlying disc light for position PDF and base directional PDF
+	pdfPos, basePdfDir := dsl.discLight.PDF_Le(point, direction)
+	if pdfPos == 0.0 || basePdfDir == 0.0 {
+		return 0.0, 0.0
+	}
+
+	// Check if direction is within the spot cone
+	cosAngleToSpot := direction.Dot(dsl.direction)
+	if cosAngleToSpot < dsl.cosTotalWidth {
+		return pdfPos, 0.0
+	}
+
+	// For a spot light, the directional PDF is the cosine-weighted PDF
+	// restricted to the cone (same as base disc light for now)
+	pdfDir = basePdfDir
+
+	return pdfPos, pdfDir
+}
+
 // Emit implements the Light interface - returns material emission
 func (dsl *DiscSpotLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Spot lights emit according to their material

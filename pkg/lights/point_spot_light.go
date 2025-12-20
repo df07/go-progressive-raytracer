@@ -203,6 +203,28 @@ func (sl *PointSpotLight) EmissionPDF(point core.Vec3, direction core.Vec3) floa
 	return UniformConePDF(sl.cosTotalWidth)
 }
 
+// PDF_Le implements the Light interface - returns both position and directional PDFs
+func (sl *PointSpotLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// Check if point is at the light position
+	if point.Subtract(sl.position).Length() > 0.001 {
+		return 0.0, 0.0
+	}
+
+	// Check if direction is within the spot cone
+	cosAngleToSpot := direction.Dot(sl.direction)
+	if cosAngleToSpot < sl.cosTotalWidth {
+		return 0.0, 0.0
+	}
+
+	// Position PDF: discrete (point light has single position)
+	pdfPos = 1.0
+
+	// Directional PDF: uniform cone distribution
+	pdfDir = UniformConePDF(sl.cosTotalWidth)
+
+	return pdfPos, pdfDir
+}
+
 // Emit implements the Light interface - point lights emit in all directions
 func (sl *PointSpotLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Point lights don't have a material but emit their emission uniformly

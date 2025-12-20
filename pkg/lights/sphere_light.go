@@ -203,6 +203,31 @@ func (sl *SphereLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64
 	return areaPDF
 }
 
+// PDF_Le implements the Light interface - returns both position and directional PDFs
+func (sl *SphereLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// Validate point is on sphere surface
+	if !validatePointOnSphere(point, sl.Center, sl.Radius, 0.001) {
+		return 0.0, 0.0
+	}
+
+	// Calculate surface normal
+	normal := point.Subtract(sl.Center).Normalize()
+
+	// Check if direction is in correct hemisphere
+	if direction.Dot(normal) <= 0 {
+		return 0.0, 0.0
+	}
+
+	// Position PDF: uniform sampling over sphere surface
+	pdfPos = 1.0 / (4.0 * math.Pi * sl.Radius * sl.Radius)
+
+	// Directional PDF: cosine-weighted hemisphere for Lambertian emission
+	cosTheta := direction.Dot(normal)
+	pdfDir = cosTheta / math.Pi
+
+	return pdfPos, pdfDir
+}
+
 // Emit implements the Light interface - returns material emission
 func (sl *SphereLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Area lights emit according to their material

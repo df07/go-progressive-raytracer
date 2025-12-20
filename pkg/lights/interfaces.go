@@ -31,7 +31,14 @@ type Light interface {
 	SampleEmission(samplePoint core.Vec2, sampleDirection core.Vec2) EmissionSample
 
 	// EmissionPDF calculates PDF for emission sampling - needed for BDPT MIS calculations
+	// DEPRECATED: Use PDF_Le instead for consistent PDF handling
 	EmissionPDF(point core.Vec3, direction core.Vec3) float64
+
+	// PDF_Le returns both position and directional PDFs for emission (PBRT-style interface)
+	// For area lights: pdfPos is probability per unit area, pdfDir is directional probability (cosine-weighted)
+	// For point lights: pdfPos is discrete (1.0), pdfDir is directional probability (uniform or cone)
+	// For infinite lights: pdfPos is planar probability, pdfDir is directional probability
+	PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64)
 
 	// Emit evaluates emission in the direction of the given ray
 	// For finite lights, returns zero. For infinite lights, returns emission based on ray direction.

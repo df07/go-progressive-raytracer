@@ -183,6 +183,50 @@ func (ql *QuadLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 	return areaPDF
 }
 
+// PDF_Le implements the Light interface - returns both position and directional PDFs
+func (ql *QuadLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// Check if point is on quad surface (reuse validation logic from EmissionPDF)
+	toPoint := point.Subtract(ql.Corner)
+	uDotU := ql.U.Dot(ql.U)
+	vDotV := ql.V.Dot(ql.V)
+	uDotV := ql.U.Dot(ql.V)
+
+	if uDotU == 0 || vDotV == 0 {
+		return 0.0, 0.0
+	}
+
+	det := uDotU*vDotV - uDotV*uDotV
+	if math.Abs(det) < 1e-8 {
+		return 0.0, 0.0
+	}
+
+	toDotU := toPoint.Dot(ql.U)
+	toDotV := toPoint.Dot(ql.V)
+	alpha := (vDotV*toDotU - uDotV*toDotV) / det
+	beta := (uDotU*toDotV - uDotV*toDotU) / det
+
+	if alpha < 0 || alpha > 1 || beta < 0 || beta > 1 {
+		return 0.0, 0.0
+	}
+
+	reconstructed := ql.Corner.Add(ql.U.Multiply(alpha)).Add(ql.V.Multiply(beta))
+	if reconstructed.Subtract(point).Length() > 0.001 {
+		return 0.0, 0.0
+	}
+
+	// Position PDF: uniform sampling over quad area
+	pdfPos = 1.0 / ql.Area
+
+	// Directional PDF: cosine-weighted hemisphere for Lambertian emission
+	cosTheta := direction.Dot(ql.Normal)
+	if cosTheta <= 0 {
+		return pdfPos, 0.0
+	}
+	pdfDir = cosTheta / math.Pi
+
+	return pdfPos, pdfDir
+}
+
 // Emit implements the Light interface - returns material emission
 func (ql *QuadLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Area lights emit according to their material

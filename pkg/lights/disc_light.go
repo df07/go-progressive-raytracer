@@ -125,6 +125,28 @@ func (dl *DiscLight) EmissionPDF(point core.Vec3, direction core.Vec3) float64 {
 	return areaPDF
 }
 
+// PDF_Le implements the Light interface - returns both position and directional PDFs
+func (dl *DiscLight) PDF_Le(point core.Vec3, direction core.Vec3) (pdfPos, pdfDir float64) {
+	// Validate point is on disc surface
+	if !validatePointOnDisc(point, dl.Center, dl.Normal, dl.Radius, 0.001) {
+		return 0.0, 0.0
+	}
+
+	// Check if direction is in correct hemisphere
+	if direction.Dot(dl.Normal) <= 0 {
+		return 0.0, 0.0
+	}
+
+	// Position PDF: uniform sampling over disc area
+	pdfPos = 1.0 / (math.Pi * dl.Radius * dl.Radius)
+
+	// Directional PDF: cosine-weighted hemisphere for Lambertian emission
+	cosTheta := direction.Dot(dl.Normal)
+	pdfDir = cosTheta / math.Pi
+
+	return pdfPos, pdfDir
+}
+
 // Emit implements the Light interface - returns material emission
 func (dl *DiscLight) Emit(ray core.Ray, hit *material.SurfaceInteraction) core.Vec3 {
 	// Area lights emit according to their material

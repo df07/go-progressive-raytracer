@@ -255,27 +255,11 @@ func (bdpt *BDPTIntegrator) calculateLightPdf(curr *Vertex, to *Vertex, scene *s
 
 			pdf = 1.0 / (math.Pi * worldRadius * worldRadius)
 		} else if curr.Light != nil {
-			// Use the light's EmissionPDF
-			emissionPdf := curr.Light.EmissionPDF(curr.Point, w)
-
-			if curr.Light.Type() == lights.LightTypePoint {
-				// Point Light: EmissionPDF is directional PDF p(Dir)
-				// p(z1) = p(Dir) * cosThetaAtSurface / dist^2
-				// cosTheta at light is 1 (handled by Sample fix)
-				// We apply cosThetaAtSurface later if to.IsOnSurface()
-				pdf = emissionPdf * invDist2
-			} else {
-				// Area Light: Compute directional PDF directly (PBRT approach)
-				// For Lambertian emission: pdfDir = cosTheta / pi
-				// Formula: pdf = pdfDir * invDist2 * cosThetaAtReceiver
-				cosTheta := w.Dot(curr.Normal)
-				if cosTheta <= 0 {
-					return 0
-				}
-
-				pdfDir := cosTheta / math.Pi
-				pdf = pdfDir * invDist2
-			}
+			// Use PDF_Le to get directional PDF (matches PBRT)
+			// Formula: pdf = pdfDir * invDist2 * cosThetaAtReceiver
+			// (cosThetaAtReceiver applied later if to.IsOnSurface())
+			_, pdfDir := curr.Light.PDF_Le(curr.Point, w)
+			pdf = pdfDir * invDist2
 		}
 	}
 
@@ -317,9 +301,8 @@ func (bdpt *BDPTIntegrator) calculateLightOriginPdf(lightVertex *Vertex, to *Ver
 	lightSampler := scene.LightSampler
 	pdfChoice := lightSampler.GetLightProbability(lightVertex.LightIndex, lightVertex.Point, lightVertex.Normal)
 
-	// Get position PDF from the light's EmissionPDF
-	// This is equivalent to PBRT's light->Pdf_Le(..., &pdfPos, &pdfDir)
-	pdfPos := lightVertex.Light.EmissionPDF(lightVertex.Point, w)
+	// Get position PDF from the light's PDF_Le (matches PBRT exactly)
+	pdfPos, _ := lightVertex.Light.PDF_Le(lightVertex.Point, w)
 
 	return pdfPos * pdfChoice
 }
