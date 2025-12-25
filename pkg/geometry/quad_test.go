@@ -173,7 +173,7 @@ func TestGetAxisAlignment(t *testing.T) {
 }
 
 func TestAxisAlignedQuadBoundingBox(t *testing.T) {
-	mat := &material.Lambertian{Albedo: core.NewVec3(0.5, 0.5, 0.5)}
+	mat := material.NewLambertian(core.NewVec3(0.5, 0.5, 0.5))
 
 	// Test X-axis aligned quad (in YZ plane)
 	quad := NewQuad(

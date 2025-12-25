@@ -208,6 +208,14 @@ func ListAllScenes() (ScenesResponse, error) {
 			Group:       "Built-in Scenes",
 			Type:        "builtin",
 		},
+		{
+			ID:          "texture-test",
+			Name:        "Texture Test",
+			DisplayName: "Texture Test",
+			Description: "Seven geometry types in a row showing texture mapping: sphere, cylinder, cone, box, disc, quad, triangle",
+			Group:       "Built-in Scenes",
+			Type:        "builtin",
+		},
 	}
 
 	// Get PBRT scenes

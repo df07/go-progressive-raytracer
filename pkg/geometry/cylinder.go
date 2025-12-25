@@ -184,10 +184,31 @@ func (c *Cylinder) hitBody(ray core.Ray, tMin, tMax float64) *material.SurfaceIn
 	axisPoint := c.BaseCenter.Add(c.axis.Multiply(h))
 	outwardNormal := point.Subtract(axisPoint).Normalize()
 
+	// Compute UV coordinates
+	// V: height along cylinder (0 at base, 1 at top)
+	v := h / c.height
+
+	// U: angle around the axis (0 to 1 for full circle)
+	radial := point.Subtract(axisPoint)
+	var refVector core.Vec3
+	if math.Abs(c.axis.Y) < 0.9 {
+		refVector = core.NewVec3(0, 1, 0)
+	} else {
+		refVector = core.NewVec3(1, 0, 0)
+	}
+	tangent := c.axis.Cross(refVector).Normalize()
+	bitangent := c.axis.Cross(tangent)
+
+	u := math.Atan2(radial.Dot(bitangent), radial.Dot(tangent))
+	u = (u + math.Pi) / (2.0 * math.Pi) // Map from [-π, π] to [0, 1]
+
+	uv := core.NewVec2(u, v)
+
 	hitRecord := &material.SurfaceInteraction{
 		T:        t,
 		Point:    point,
 		Material: c.Material,
+		UV:       uv,
 	}
 	hitRecord.SetFaceNormal(ray, outwardNormal)
 
@@ -217,10 +238,27 @@ func (c *Cylinder) hitCap(ray core.Ray, center, normal core.Vec3, tMin, tMax flo
 		return nil
 	}
 
+	// Compute UV coordinates for the cap (disc)
+	localPoint := point.Subtract(center)
+
+	var refVector core.Vec3
+	if math.Abs(normal.Y) < 0.9 {
+		refVector = core.NewVec3(0, 1, 0)
+	} else {
+		refVector = core.NewVec3(1, 0, 0)
+	}
+	tangent := normal.Cross(refVector).Normalize()
+	bitangent := normal.Cross(tangent)
+
+	u := (localPoint.Dot(tangent)/c.Radius + 1.0) / 2.0
+	v := (localPoint.Dot(bitangent)/c.Radius + 1.0) / 2.0
+	uv := core.NewVec2(u, v)
+
 	hitRecord := &material.SurfaceInteraction{
 		T:        t,
 		Point:    point,
 		Material: c.Material,
+		UV:       uv,
 	}
 	hitRecord.SetFaceNormal(ray, normal)
 

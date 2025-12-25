@@ -25,6 +25,16 @@ func NewVec2(x, y float64) Vec2 {
 	return Vec2{X: x, Y: y}
 }
 
+// Add returns the sum of two Vec2 values
+func (v Vec2) Add(other Vec2) Vec2 {
+	return Vec2{v.X + other.X, v.Y + other.Y}
+}
+
+// Multiply returns the Vec2 scaled by a scalar
+func (v Vec2) Multiply(scalar float64) Vec2 {
+	return Vec2{v.X * scalar, v.Y * scalar}
+}
+
 func (v Vec3) String() string {
 	return fmt.Sprintf("{%.3g, %.3g, %.3g}", v.X, v.Y, v.Z)
 }

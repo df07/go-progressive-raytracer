@@ -162,11 +162,15 @@ func (q *Quad) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteracti
 		return nil, false
 	}
 
+	// Use barycentric coordinates as UV
+	uv := core.NewVec2(alpha, beta)
+
 	// Create hit record
 	hitRecord := &material.SurfaceInteraction{
 		T:        t,
 		Point:    hitPoint,
 		Material: q.Material,
+		UV:       uv,
 	}
 
 	// Set face normal

@@ -65,11 +65,19 @@ func (d *Disc) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInteracti
 		return nil, false // Outside disc
 	}
 
+	// Compute UV coordinates
+	// Disc already has Right and Up vectors, use them directly
+	localPoint := hitPoint.Subtract(d.Center)
+	u := (localPoint.Dot(d.Right)/d.Radius + 1.0) / 2.0
+	v := (localPoint.Dot(d.Up)/d.Radius + 1.0) / 2.0
+	uv := core.NewVec2(u, v)
+
 	// Create hit record
 	hitRecord := &material.SurfaceInteraction{
 		Point:    hitPoint,
 		T:        t,
 		Material: d.Material,
+		UV:       uv,
 	}
 
 	// Set face normal

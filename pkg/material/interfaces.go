@@ -51,6 +51,7 @@ type SurfaceInteraction struct {
 	T         float64   // Parameter t along the ray
 	FrontFace bool      // Whether ray hit the front face
 	Material  Material  // Material of the hit object
+	UV        core.Vec2 // Texture coordinates
 }
 
 // SetFaceNormal sets the normal vector and determines front/back face

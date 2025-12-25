@@ -164,6 +164,9 @@ func createScene(sceneType string) (*scene.Scene, error) {
 		case "cone-test":
 			fmt.Println("Using cone test scene...")
 			sceneObj = scene.NewConeTestScene()
+		case "texture-test":
+			fmt.Println("Using texture test scene...")
+			sceneObj = scene.NewTextureTestScene()
 		case "cornell-pbrt":
 			fmt.Println("Using PBRT Cornell scene...")
 			pbrtScene, err := loaders.LoadPBRT("scenes/cornell-empty.pbrt")
@@ -238,7 +241,7 @@ func createOutputDir(sceneType string) string {
 	}
 
 	// Use known scene types or default
-	knownScenes := []string{"cornell", "cornell-boxes", "default", "spheregrid", "trianglemesh", "dragon", "caustic-glass", "cornell-pbrt", "cornell-empty", "simple-sphere", "test"}
+	knownScenes := []string{"cornell", "cornell-boxes", "default", "spheregrid", "trianglemesh", "dragon", "caustic-glass", "cornell-pbrt", "cornell-empty", "simple-sphere", "test", "texture-test"}
 	found := false
 	for _, known := range knownScenes {
 		if dirName == known {

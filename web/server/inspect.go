@@ -34,15 +34,19 @@ func (s *Server) extractMaterialInfo(mat material.Material) (string, map[string]
 	// Check specific material types using type assertions
 	switch m := mat.(type) {
 	case *material.Lambertian:
-		properties["albedo"] = [3]float64{m.Albedo.X, m.Albedo.Y, m.Albedo.Z}
+		// Evaluate the albedo at (0,0) UV coordinates to get a representative color
+		albedo := m.Albedo.Evaluate(core.NewVec2(0, 0), core.Vec3{})
+		properties["albedo"] = [3]float64{albedo.X, albedo.Y, albedo.Z}
 		properties["color"] = fmt.Sprintf("#%02x%02x%02x",
-			int(m.Albedo.X*255), int(m.Albedo.Y*255), int(m.Albedo.Z*255))
+			int(albedo.X*255), int(albedo.Y*255), int(albedo.Z*255))
 		return "lambertian", properties
 
 	case *material.Metal:
-		properties["albedo"] = [3]float64{m.Albedo.X, m.Albedo.Y, m.Albedo.Z}
+		// Evaluate the albedo at (0,0) UV coordinates to get a representative color
+		albedo := m.Albedo.Evaluate(core.NewVec2(0, 0), core.Vec3{})
+		properties["albedo"] = [3]float64{albedo.X, albedo.Y, albedo.Z}
 		properties["color"] = fmt.Sprintf("#%02x%02x%02x",
-			int(m.Albedo.X*255), int(m.Albedo.Y*255), int(m.Albedo.Z*255))
+			int(albedo.X*255), int(albedo.Y*255), int(albedo.Z*255))
 		properties["fuzzness"] = m.Fuzzness
 		return "metal", properties
 

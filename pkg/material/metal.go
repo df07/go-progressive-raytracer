@@ -6,11 +6,11 @@ import (
 
 // Metal represents a metallic material with specular reflection
 type Metal struct {
-	Albedo   core.Vec3 // Metal color
-	Fuzzness float64   // 0.0 = perfect mirror, 1.0 = very fuzzy
+	Albedo   ColorSource // Metal color (can be solid or textured)
+	Fuzzness float64     // 0.0 = perfect mirror, 1.0 = very fuzzy
 }
 
-// NewMetal creates a new metal material
+// NewMetal creates a new metal material with solid color (backward compatibility)
 func NewMetal(albedo core.Vec3, fuzzness float64) *Metal {
 	// Clamp fuzzness to valid range
 	if fuzzness > 1.0 {
@@ -19,7 +19,19 @@ func NewMetal(albedo core.Vec3, fuzzness float64) *Metal {
 	if fuzzness < 0.0 {
 		fuzzness = 0.0
 	}
-	return &Metal{Albedo: albedo, Fuzzness: fuzzness}
+	return &Metal{Albedo: NewSolidColor(albedo), Fuzzness: fuzzness}
+}
+
+// NewTexturedMetal creates a new metal material with texture
+func NewTexturedMetal(albedoTexture ColorSource, fuzzness float64) *Metal {
+	// Clamp fuzzness to valid range
+	if fuzzness > 1.0 {
+		fuzzness = 1.0
+	}
+	if fuzzness < 0.0 {
+		fuzzness = 0.0
+	}
+	return &Metal{Albedo: albedoTexture, Fuzzness: fuzzness}
 }
 
 // Scatter implements the Material interface for metal scattering
@@ -38,11 +50,14 @@ func (m *Metal) Scatter(rayIn core.Ray, hit SurfaceInteraction, sampler core.Sam
 	// Only scatter if the ray is above the surface (not absorbed)
 	scatters := scattered.Direction.Dot(hit.Normal) > 0
 
+	// Sample texture at UV coordinates to get albedo
+	albedo := m.Albedo.Evaluate(hit.UV, hit.Point)
+
 	return ScatterResult{
 		Incoming:    rayIn,
 		Scattered:   scattered,
-		Attenuation: m.Albedo, // No π factor for specular
-		PDF:         0,        // Specular materials have no PDF
+		Attenuation: albedo, // No π factor for specular
+		PDF:         0,      // Specular materials have no PDF
 	}, scatters
 }
 
@@ -53,7 +68,9 @@ func (m *Metal) EvaluateBRDF(incomingDir, outgoingDir core.Vec3, hit *SurfaceInt
 
 	// Check if outgoing direction matches perfect reflection (within tolerance)
 	if outgoingDir.Subtract(reflected).Length() < 0.001 {
-		return m.Albedo // Delta function contribution
+		// Sample texture at UV coordinates to get albedo
+		albedo := m.Albedo.Evaluate(hit.UV, hit.Point)
+		return albedo // Delta function contribution
 	}
 
 	return core.Vec3{X: 0, Y: 0, Z: 0} // No contribution for non-reflection directions

@@ -231,11 +231,33 @@ func (c *Cone) hitBody(ray core.Ray, tMin, tMax float64) *material.SurfaceIntera
 	normalScale := (c.BaseRadius - c.TopRadius) / c.height
 	outwardNormal := radial.Add(c.axis.Multiply(normalScale)).Normalize()
 
+	// Compute UV coordinates
+	// V: height along cone (0 at base, 1 at top)
+	v := h / c.height
+
+	// U: angle around the axis (0 to 1 for full circle)
+	// Project radial onto a perpendicular plane to get angle
+	// Choose an arbitrary perpendicular vector for reference
+	var refVector core.Vec3
+	if math.Abs(c.axis.Y) < 0.9 {
+		refVector = core.NewVec3(0, 1, 0)
+	} else {
+		refVector = core.NewVec3(1, 0, 0)
+	}
+	tangent := c.axis.Cross(refVector).Normalize()
+	bitangent := c.axis.Cross(tangent)
+
+	u := math.Atan2(radial.Dot(bitangent), radial.Dot(tangent))
+	u = (u + math.Pi) / (2.0 * math.Pi) // Map from [-π, π] to [0, 1]
+
+	uv := core.NewVec2(u, v)
+
 	// Create hit record
 	hitRecord := &material.SurfaceInteraction{
 		T:        t,
 		Point:    point,
 		Material: c.Material,
+		UV:       uv,
 	}
 	hitRecord.SetFaceNormal(ray, outwardNormal)
 
@@ -297,10 +319,30 @@ func (c *Cone) hitCap(ray core.Ray, center, normal core.Vec3, radius, tMin, tMax
 		return nil
 	}
 
+	// Compute UV coordinates for the cap (disc)
+	// Center the disc at (0, 0) in UV space
+	localPoint := point.Subtract(center)
+
+	// Choose perpendicular vectors for UV mapping
+	var refVector core.Vec3
+	if math.Abs(normal.Y) < 0.9 {
+		refVector = core.NewVec3(0, 1, 0)
+	} else {
+		refVector = core.NewVec3(1, 0, 0)
+	}
+	tangent := normal.Cross(refVector).Normalize()
+	bitangent := normal.Cross(tangent)
+
+	// Project onto the disc plane and normalize by radius
+	u := (localPoint.Dot(tangent)/radius + 1.0) / 2.0 // Map from [-radius, radius] to [0, 1]
+	v := (localPoint.Dot(bitangent)/radius + 1.0) / 2.0
+	uv := core.NewVec2(u, v)
+
 	hitRecord := &material.SurfaceInteraction{
 		T:        t,
 		Point:    point,
 		Material: c.Material,
+		UV:       uv,
 	}
 	hitRecord.SetFaceNormal(ray, normal)
 

@@ -22,6 +22,7 @@ type TriangleMeshOptions struct {
 	Materials []material.Material // Optional per-triangle materials
 	Rotation  *core.Vec3          // Optional rotation to apply to vertices
 	Center    *core.Vec3          // Optional center point for rotation
+	VertexUVs []core.Vec2         // Optional per-vertex texture coordinates
 }
 
 // NewTriangleMesh creates a new triangle mesh from vertices and face indices
@@ -43,6 +44,9 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material material.Materi
 		}
 		if options.Materials != nil && len(options.Materials) != numTriangles {
 			panic("Number of materials must match number of triangles")
+		}
+		if options.VertexUVs != nil && len(options.VertexUVs) != len(vertices) {
+			panic("Number of vertex UVs must match number of vertices")
 		}
 	}
 
@@ -83,12 +87,34 @@ func NewTriangleMesh(vertices []core.Vec3, faces []int, material material.Materi
 			triangleMaterial = options.Materials[i]
 		}
 
-		// Create triangle with or without custom normal
+		// Get vertex positions
+		v0 := workingVertices[i0]
+		v1 := workingVertices[i1]
+		v2 := workingVertices[i2]
+
+		// Create triangle with appropriate constructor based on available data
 		var triangle Shape
-		if options != nil && options.Normals != nil {
-			triangle = NewTriangleWithNormal(workingVertices[i0], workingVertices[i1], workingVertices[i2], options.Normals[i], triangleMaterial)
+		hasUVs := options != nil && options.VertexUVs != nil
+		hasNormals := options != nil && options.Normals != nil
+
+		if hasUVs && hasNormals {
+			// Both UVs and normals provided
+			uv0 := options.VertexUVs[i0]
+			uv1 := options.VertexUVs[i1]
+			uv2 := options.VertexUVs[i2]
+			triangle = NewTriangleWithNormalAndUVs(v0, v1, v2, uv0, uv1, uv2, options.Normals[i], triangleMaterial)
+		} else if hasUVs {
+			// Only UVs provided
+			uv0 := options.VertexUVs[i0]
+			uv1 := options.VertexUVs[i1]
+			uv2 := options.VertexUVs[i2]
+			triangle = NewTriangleWithUVs(v0, v1, v2, uv0, uv1, uv2, triangleMaterial)
+		} else if hasNormals {
+			// Only normals provided
+			triangle = NewTriangleWithNormal(v0, v1, v2, options.Normals[i], triangleMaterial)
 		} else {
-			triangle = NewTriangle(workingVertices[i0], workingVertices[i1], workingVertices[i2], triangleMaterial)
+			// Neither UVs nor normals provided
+			triangle = NewTriangle(v0, v1, v2, triangleMaterial)
 		}
 		triangles[i] = triangle
 	}

@@ -7,10 +7,12 @@ import (
 
 // Triangle represents a single triangle defined by three vertices
 type Triangle struct {
-	V0, V1, V2 core.Vec3         // The three vertices
-	Material   material.Material // Material of the triangle
-	normal     core.Vec3         // Cached normal vector
-	bbox       AABB              // Cached bounding box
+	V0, V1, V2    core.Vec3         // The three vertices
+	UV0, UV1, UV2 core.Vec2         // Per-vertex texture coordinates (optional)
+	hasUVs        bool              // Whether per-vertex UVs are provided
+	Material      material.Material // Material of the triangle
+	normal        core.Vec3         // Cached normal vector
+	bbox          AABB              // Cached bounding box
 }
 
 // NewTriangle creates a new triangle from three vertices
@@ -37,6 +39,47 @@ func NewTriangleWithNormal(v0, v1, v2 core.Vec3, normal core.Vec3, material mate
 		V2:       v2,
 		Material: material,
 		normal:   normal.Normalize(), // Ensure the normal is normalized
+		hasUVs:   false,
+	}
+
+	// Only compute bounding box, normal is provided
+	t.computeBoundingBox()
+
+	return t
+}
+
+// NewTriangleWithUVs creates a new triangle with per-vertex UV coordinates
+func NewTriangleWithUVs(v0, v1, v2 core.Vec3, uv0, uv1, uv2 core.Vec2, material material.Material) *Triangle {
+	t := &Triangle{
+		V0:       v0,
+		V1:       v1,
+		V2:       v2,
+		UV0:      uv0,
+		UV1:      uv1,
+		UV2:      uv2,
+		hasUVs:   true,
+		Material: material,
+	}
+
+	// Precompute normal and bounding box
+	t.computeNormal()
+	t.computeBoundingBox()
+
+	return t
+}
+
+// NewTriangleWithNormalAndUVs creates a new triangle with custom normal and per-vertex UV coordinates
+func NewTriangleWithNormalAndUVs(v0, v1, v2 core.Vec3, uv0, uv1, uv2 core.Vec2, normal core.Vec3, material material.Material) *Triangle {
+	t := &Triangle{
+		V0:       v0,
+		V1:       v1,
+		V2:       v2,
+		UV0:      uv0,
+		UV1:      uv1,
+		UV2:      uv2,
+		hasUVs:   true,
+		Material: material,
+		normal:   normal.Normalize(),
 	}
 
 	// Only compute bounding box, normal is provided
@@ -105,11 +148,24 @@ func (t *Triangle) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInter
 	// Calculate intersection point
 	hitPoint := ray.At(t_param)
 
+	// Calculate UV coordinates
+	var uv core.Vec2
+	if t.hasUVs {
+		// Interpolate per-vertex UVs using barycentric coordinates
+		// u and v are barycentric coords, w = 1 - u - v
+		w := 1.0 - u - v
+		uv = t.UV0.Multiply(w).Add(t.UV1.Multiply(u)).Add(t.UV2.Multiply(v))
+	} else {
+		// Use barycentric coordinates directly as UV
+		uv = core.NewVec2(u, v)
+	}
+
 	// Create hit record
 	hitRecord := &material.SurfaceInteraction{
 		T:        t_param,
 		Point:    hitPoint,
 		Material: t.Material,
+		UV:       uv,
 	}
 
 	// Set face normal

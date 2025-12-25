@@ -55,15 +55,26 @@ func (s *Sphere) Hit(ray core.Ray, tMin, tMax float64) (*material.SurfaceInterac
 		}
 	}
 
+	// Calculate intersection point
+	point := ray.At(root)
+
+	// Calculate outward normal (from center to hit point)
+	outwardNormal := point.Subtract(s.Center).Multiply(1.0 / s.Radius)
+
+	// Compute UV coordinates from spherical coordinates
+	// outwardNormal is (x, y, z) on unit sphere
+	theta := math.Acos(-outwardNormal.Y)                           // Angle from top pole [0, π]
+	phi := math.Atan2(-outwardNormal.Z, outwardNormal.X) + math.Pi // Angle around equator [0, 2π]
+	uv := core.NewVec2(phi/(2.0*math.Pi), theta/math.Pi)
+
 	// Create hit record with material
 	hitRecord := &material.SurfaceInteraction{
 		T:        root,
-		Point:    ray.At(root),
+		Point:    point,
 		Material: s.Material,
+		UV:       uv,
 	}
 
-	// Calculate outward normal (from center to hit point)
-	outwardNormal := hitRecord.Point.Subtract(s.Center).Multiply(1.0 / s.Radius)
 	hitRecord.SetFaceNormal(ray, outwardNormal)
 
 	return hitRecord, true

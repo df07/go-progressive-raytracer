@@ -155,7 +155,9 @@ func calculateExpectedDirectLighting(vertex Vertex, lightPoint core.Vec3, emissi
 
 	// BRDF evaluation for Lambertian materials
 	if lambertian, ok := vertex.Material.(*material.Lambertian); ok {
-		brdfValue := lambertian.Albedo.Multiply(1.0 / math.Pi)
+		// Evaluate the albedo (use zero UV/point for test - doesn't affect solid colors)
+		albedo := lambertian.Albedo.Evaluate(core.NewVec2(0, 0), core.Vec3{})
+		brdfValue := albedo.Multiply(1.0 / math.Pi)
 		// Direct lighting: beta * brdf * emission * cosTheta / distance²
 		return vertex.Beta.MultiplyVec(brdfValue.MultiplyVec(emission)).Multiply(cosTheta / (distance * distance))
 	}
