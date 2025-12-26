@@ -349,21 +349,14 @@ func (bdpt *BDPTIntegrator) evaluateDirectLightingStrategy(cameraPath Path, t in
 		return core.Vec3{X: 0, Y: 0, Z: 0}, nil // Light is behind the surface
 	}
 
-	// TODO: Replace with proper SurfaceInteraction struct to avoid redundant data
-	// For now, construct a temporary HitRecord from vertex data
-	hit := &material.SurfaceInteraction{
-		Point:     cameraVertex.Point,
-		Normal:    cameraVertex.Normal,
-		Material:  cameraVertex.Material,
-		FrontFace: cameraVertex.FrontFace,
-	}
-
+	// Use the vertex's SurfaceInteraction directly to preserve UV coordinates and all surface data.
+	// Previously, constructing a new SurfaceInteraction omitted the UV field, causing incorrect texture sampling.
 	// pbrt: L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta
 	// pbrt sampled.beta: light->Sample_Li / (Sample_Li &pdf * lightDistr &lightPdf)
 	// pbrt pdfFwd: sampled.PdfLightOrigin(scene, pt, lightDistr, lightToIndex)
 	//          => pdfPos * pdfChoice // Return solid angle density for non-infinite light sources
 	//          => pdfDir for light sample not used
-	brdf := cameraVertex.Material.EvaluateBRDF(cameraVertex.IncomingDirection, lightSample.Direction, hit, material.Radiance)
+	brdf := cameraVertex.Material.EvaluateBRDF(cameraVertex.IncomingDirection, lightSample.Direction, cameraVertex.SurfaceInteraction, material.Radiance)
 	lightBeta := lightSample.Emission.Multiply(1 / lightSample.PDF) // light sample pdf contains light selection pdf
 	lightContribution := brdf.MultiplyVec(cameraVertex.Beta).MultiplyVec(lightBeta).Multiply(cosTheta)
 

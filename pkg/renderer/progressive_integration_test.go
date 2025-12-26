@@ -357,6 +357,50 @@ func TestIntegratorLuminanceComparison(t *testing.T) {
 			tolerance: 15.0,
 		},
 		{
+			name: "Textured Checkerboard Quad",
+			createScene: func() *scene.Scene {
+				// Regression test: BDPT must correctly sample texture UVs when evaluating direct lighting.
+				// Bug was: BDPT created new SurfaceInteraction without UV, always sampling at UV=(0,0)
+				checkerboard := material.NewCheckerboardTexture(256, 256, 32,
+					core.NewVec3(0.9, 0.9, 0.9), // White
+					core.NewVec3(0.1, 0.1, 0.9), // Blue
+				)
+				texturedMat := material.NewTexturedLambertian(checkerboard)
+
+				// Large quad filling most of the view
+				quad := geometry.NewQuad(
+					core.NewVec3(-2, -2, -5),
+					core.NewVec3(4, 0, 0),
+					core.NewVec3(0, 4, 0),
+					texturedMat,
+				)
+
+				// Bright area light above
+				lightMat := material.NewEmissive(core.NewVec3(10, 10, 10))
+				light := lights.NewSphereLight(core.NewVec3(0, 3, -3), 0.5, lightMat)
+
+				ls := []lights.Light{light}
+
+				cameraConfig := geometry.CameraConfig{
+					Center: core.NewVec3(0, 0, 0),
+					LookAt: core.NewVec3(0, 0, -5),
+					Up:     core.NewVec3(0, 1, 0),
+					Width:  testSamplingConfig.Width, AspectRatio: 1.0, VFov: 60.0,
+				}
+				camera := geometry.NewCamera(cameraConfig)
+
+				s := &scene.Scene{
+					Shapes:         []geometry.Shape{quad, light.Sphere},
+					Lights:         ls,
+					Camera:         camera,
+					SamplingConfig: testSamplingConfig,
+				}
+				s.Preprocess()
+				return s
+			},
+			tolerance: 5.0, // Should be very close
+		},
+		{
 			name: "Large-Scale Cornell Box (Quad Light) - DEMONSTRATES BUG",
 			createScene: func() *scene.Scene {
 				// Exact 278x scaled version of unit box to isolate scale-dependent bug
