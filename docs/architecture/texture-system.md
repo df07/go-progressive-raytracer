@@ -325,3 +325,8 @@ See `pkg/scene/texture_test_scene.go` for comprehensive demonstration:
 - 7 geometry types with different textures
 - Checkerboard, gradient, and UV debug textures
 - Shows texture mapping on sphere, cylinder, cone, box, disc, quad, triangle
+2025-12-26T15:59:31Z +1 Accessed to understand texture system for debugging texture inconsistency bug
+
+## Access Log
+2025-12-26T16:17:00Z +1 Accessed to understand material BRDF and texture evaluation for PT vs BDPT bug investigation
+2025-12-26T16:27:53Z +1 Accessed to understand texture evaluation in ColorSource interface for PT vs BDPT bug

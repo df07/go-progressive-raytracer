@@ -283,3 +283,8 @@ quad := geometry.NewQuad(corner, u, v, texturedMat)
 - BRDF must be energy-conserving (total reflectance ≤ 1.0)
 - Delta materials must consistently return PDF=0 and isDelta=true
 - Materials cannot query world-space position (only local intersection data)
+
+
+## Access Log
+2025-12-26T15:59:32Z +1 Accessed to understand material BRDF evaluation and ColorSource for texture bug
+2025-12-26T16:27:53Z +1 Accessed to understand material BRDF evaluation for PT vs BDPT bug

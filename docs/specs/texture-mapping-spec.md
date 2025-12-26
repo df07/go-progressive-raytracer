@@ -1064,3 +1064,7 @@ The implementation is production-ready and successfully renders textured scenes 
 ---
 
 **End of Specification**
+
+## Access Log
+2025-12-26T16:08:53Z +1 Accessed to understand texture ColorSource interface for debugging PT vs BDPT inconsistency
+2025-12-26T16:27:53Z +1 Accessed to understand texture implementation details for PT vs BDPT bug

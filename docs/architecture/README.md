@@ -74,6 +74,23 @@ Scene definition, registration, and asset loading patterns.
 
 **Read this if**: You're creating scenes, loading assets, or integrating with the rendering system.
 
+### [Integrator System](integrator-system.md)
+
+Light transport algorithms that compute pixel colors by tracing paths through the scene.
+
+**Key Topics**:
+- Path Tracing algorithm (unidirectional)
+- BDPT algorithm (bidirectional path tracing)
+- Material evaluation timing and texture sampling
+- MIS (Multiple Importance Sampling) weighting
+- Connection strategies in BDPT
+- Splat ray system for cross-tile contributions
+- Direct vs indirect lighting
+- Russian Roulette termination
+- Performance characteristics and debugging
+
+**Read this if**: You're debugging rendering inconsistencies between integrators, implementing new integrators, optimizing light transport, or need to understand when and how materials/textures are evaluated.
+
 ## Architecture Overview
 
 ### Dependency Hierarchy
