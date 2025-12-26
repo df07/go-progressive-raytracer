@@ -167,6 +167,106 @@ scene.AddSphereLight(position, radius, emission)
 scene.Preprocess()
 ```
 
+## Additional Architecture Documentation
+
+### [Rendering Pipeline Architecture](rendering-pipeline.md)
+
+High-level architecture of the progressive rendering pipeline.
+
+**Key Topics**:
+- Pipeline flow: Camera → Tiles → Workers → Integrator → Pixels
+- Component responsibilities (Renderer, Integrator, Scene)
+- Progressive rendering mechanics
+- BDPT splat system
+- Why bugs appear only in full renders vs tests
+
+**Read this if**: You're debugging the rendering pipeline, understanding component interactions, or investigating splat-related issues.
+
+### [Material and Texture System Data Flow](material-texture-data-flow.md)
+
+Complete data flow from geometry intersection to texture sampling.
+
+**Key Topics**:
+- UV coordinate journey: Geometry → SurfaceInteraction → Material → ColorSource
+- Component responsibilities
+- Why preserving complete SurfaceInteraction is critical
+- PT and BDPT data flow examples
+- Debugging UV-related issues
+
+**Read this if**: You're debugging texture issues, working with materials, or investigating UV coordinate problems.
+
+## Implementation Guides
+
+### [BDPT Implementation Guide](../implementation/bdpt-implementation-guide.md)
+
+Code-level walkthrough of BDPT implementation with common pitfalls.
+
+**Key Topics**:
+- Code structure and file organization
+- Path construction (camera and light paths)
+- Connection strategies breakdown
+- Vertex structure and data preservation
+- Common pitfalls (UV loss, PDF errors, geometric terms)
+- Verification tests and debugging
+
+**Read this if**: You're modifying BDPT, debugging BDPT-specific issues, or need to understand connection strategies.
+
+## Testing and Debugging Guides
+
+### [Testing Strategy](../guides/testing-strategy.md)
+
+Comprehensive guide to testing integrators and rendering systems.
+
+**Key Topics**:
+- Three-level testing strategy (unit, integration, visual)
+- Luminance comparison patterns for PT vs BDPT
+- Test scene selection and design
+- Debugging workflow examples
+- When bugs appear at different test levels
+
+**Read this if**: You're testing integrators, debugging rendering inconsistencies, or writing new tests.
+
+### [CLI Usage and Testing Workflow](../guides/cli-usage.md)
+
+Complete guide to CLI flags, output behavior, and debugging workflows.
+
+**Key Topics**:
+- Complete CLI flag reference
+- Output file locations and naming
+- Quick test render recipes
+- Integrator comparison workflow
+- Profiling and performance analysis
+
+**Read this if**: You're running renders for testing, comparing integrators, or need a debugging workflow.
+
+### [Debugging Guide for Rendering Issues](../guides/debugging-rendering-issues.md)
+
+Practical guide to diagnosing and fixing common rendering bugs.
+
+**Key Topics**:
+- Common bug classes (brightness, color bleeding, artifacts, crashes)
+- Diagnostic workflows for each bug type
+- Tools and techniques (luminance comparison, visual diff, debug rendering)
+- PT vs BDPT comparison as debugging tool
+- Step-by-step debugging examples
+
+**Read this if**: You're debugging a rendering issue, investigating integrator differences, or need systematic debugging techniques.
+
+### [Common Bug Patterns in Raytracers](../guides/common-bug-patterns.md)
+
+Catalog of common bug patterns with recognition and fix strategies.
+
+**Key Topics**:
+- Data loss bugs (UV, normals not preserved)
+- Coordinate system bugs (world vs local space)
+- Integrator inconsistencies (PT vs BDPT divergence)
+- Floating-point precision issues
+- Parallel rendering bugs (race conditions)
+- Scale-dependent bugs
+- Real examples from this codebase
+
+**Read this if**: You're debugging any rendering issue - this guide helps classify and fix common patterns quickly.
+
 ## Related Documentation
 
 - **CLAUDE.md**: High-level project overview, build commands, CLI usage
