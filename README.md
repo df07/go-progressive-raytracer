@@ -4,16 +4,13 @@ A high-performance progressive raytracer written in Go that renders photorealist
 
 Built following the excellent [Ray Tracing in One Weekend](https://raytracing.github.io/) series with additional techniques from [Physically Based Rendering: From Theory to Practice](https://www.pbrt.org/).
 
-Developed using [Cursor](https://cursor.sh/) with Claude-4-Sonnet for AI-assisted programming.
-
 ## Features
 
-- **Progressive Rendering**: Watch your renders improve in real-time across multiple passes
-- **Multi-threaded**: Parallel processing with configurable worker pools
+- **Progressive Rendering**: Samples are added progressively, so renders improve progressively
+- **Multiple Integrators**: Choose between traditional path tracing or bidirectional path tracing (BDPT) for different lighting scenarios
 - **Rich Materials**: Lambertian, metal, glass, dielectric, and emissive materials
 - **Complex Geometry**: Spheres, planes, triangle meshes, and PLY file support
 - **Advanced Lighting**: Area lights, environment lighting, and physically-based illumination
-- **Web Interface**: Real-time progressive rendering via web browser
 - **BVH Acceleration**: Optimized ray-triangle intersection for complex scenes
 
 ## Progressive Rendering
@@ -26,6 +23,24 @@ Watch how the image quality improves with more samples per pixel:
 | *136ms* | *911ms* | *6.1s* | *51s* | *7m20s* |
 
 *Progressive rendering allows you to see results immediately and stop when quality is sufficient for your needs.*
+
+## Multiple Integrators: Path Tracing vs BDPT
+
+The raytracer supports two rendering integrators, each with different strengths:
+
+- **Path Tracing** is the standard unidirectional approach, with paths traced from the camera to the scene, with both direct and indirect lighting sampled at each point - fast and efficient for most scenes with direct lighting and diffuse materials.
+
+- **BDPT** traces paths from both the camera and light sources, connecting them to explore more light transport paths. This produces significantly better results for images with more complex lighting (e.g. specular reflections, caustics, complex indirect lighting)
+
+### BDPT vs PT Comparison:
+
+
+| Path Tracing | Bidirectional Path Tracing (BDPT) |
+|--------------|-----------------------------------|
+| ![Path Tracing](renders/cornell-pt-256samples.png) | ![BDPT](renders/cornell-bdpt-64samples.png) |
+| *256 samples • 12.8s* | *64 samples • 12.8s* |
+
+The comparison above (cornell-boxes scene) shows equal wall-clock rendering time (~12.8 seconds). Despite using 4x fewer samples, BDPT produces comparable or better quality, especially in the reflected light on the ceiling where path tracing shows more noise.
 
 ## Sample Renders
 
